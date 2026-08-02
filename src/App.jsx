@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import "@fontsource/barlow/400.css";
 import "@fontsource/barlow/500.css";
 import "@fontsource/barlow/600.css";
@@ -95,41 +95,89 @@ const NODES = {
   rescuePen: { left: 69, top: 72, label: "Salvage enclosure" },
 };
 
-const DEFAULT_DEPLOYMENT = Object.fromEntries(
-  FORMATIONS.map((formation) => [formation.id, formation.defaultNode]),
-);
-
-const DOCTRINES = [
+const PLAYBOOKS = [
   {
-    id: "breakthrough",
-    name: "BREAKTHROUGH",
-    summary: "Momentum over position.",
-    icon: Lightning,
+    id: "trapline",
+    name: "TRAPLINE",
+    summary: "Displace, deny, then breach.",
+    intent: "Open Alpha by forcing the defender through overlapping fires.",
+    icon: Anchor,
+    stages: [
+      { label: "PULL", detail: "Displace blocker.", icon: Anchor },
+      { label: "BURN", detail: "Deny response.", icon: Fire, warm: true },
+      { label: "BREAK", detail: "Collapse hold.", icon: Hammer },
+    ],
+    roles: [
+      { id: "pull", label: "PULL / DISPLACER", brief: "Draw Alpha into the kill zone.", node: "alphaApproach", accepts: ["harpoon", "breaker"], defaultFormation: "harpoon" },
+      { id: "burn", label: "BURN / DENIER", brief: "Seal the hostile response lane.", node: "fireLine", accepts: ["furnace", "railjack"], defaultFormation: "furnace" },
+      { id: "break", label: "BREAK / BREACHER", brief: "Exploit the opened route.", node: "breachLine", accepts: ["breaker", "harpoon"], defaultFormation: "breaker" },
+      { id: "anchor", label: "ANCHOR", brief: "Hold the captured control node.", node: "anchorLine", accepts: ["railjack", "furnace"], defaultFormation: "railjack" },
+      { id: "recover", label: "RECOVERY", brief: "Preserve extraction capacity.", node: "recoveryLine", accepts: ["hauler"], defaultFormation: "hauler" },
+    ],
   },
   {
-    id: "hold",
-    name: "HOLD",
-    summary: "Anchor strongpoints.",
+    id: "spear",
+    name: "ARMORED SPEAR",
+    summary: "Screen, punch through, exploit.",
+    intent: "Concentrate protection around one decisive reactor thrust.",
     icon: Shield,
+    stages: [
+      { label: "SCREEN", detail: "Absorb contact.", icon: Shield },
+      { label: "PUNCH", detail: "Rupture Beta.", icon: Hammer, warm: true },
+      { label: "EXPLOIT", detail: "Drive on reactor.", icon: Lightning },
+    ],
+    roles: [
+      { id: "screen", label: "SCREEN", brief: "Take first contact at Alpha.", node: "alphaApproach", accepts: ["railjack", "breaker"], defaultFormation: "railjack" },
+      { id: "point", label: "POINT", brief: "Mark the narrow transit lane.", node: "highWalk", accepts: ["harpoon", "breaker"], defaultFormation: "harpoon" },
+      { id: "punch", label: "PUNCH / BREACHER", brief: "Crack Beta and the reactor shell.", node: "breachLine", accepts: ["breaker", "harpoon"], defaultFormation: "breaker" },
+      { id: "suppress", label: "SUPPRESSION", brief: "Deny flanking reinforcements.", node: "fireLine", accepts: ["furnace", "railjack"], defaultFormation: "furnace" },
+      { id: "recover", label: "RECOVERY", brief: "Follow the armored corridor.", node: "recoveryLine", accepts: ["hauler"], defaultFormation: "hauler" },
+    ],
   },
   {
-    id: "hunt",
-    name: "HUNT",
-    summary: "Disrupt and collapse.",
+    id: "withdrawal",
+    name: "FIGHTING WITHDRAWAL",
+    summary: "Trade ground for force preservation.",
+    intent: "Complete the sabotage while keeping an organized escape corridor.",
     icon: Crosshair,
+    stages: [
+      { label: "SCREEN", detail: "Mask intent.", icon: Eye },
+      { label: "SABOTAGE", detail: "Strike and delay.", icon: Factory, warm: true },
+      { label: "WITHDRAW", detail: "Exit in order.", icon: Flag },
+    ],
+    roles: [
+      { id: "screen", label: "FORWARD SCREEN", brief: "Make contact without becoming fixed.", node: "alphaApproach", accepts: ["harpoon", "railjack"], defaultFormation: "harpoon" },
+      { id: "delay", label: "DELAY", brief: "Close pursuit lanes behind the screen.", node: "fireLine", accepts: ["furnace", "harpoon"], defaultFormation: "furnace" },
+      { id: "sabotage", label: "SABOTAGE", brief: "Strike the Reactor Spine on schedule.", node: "betaLane", accepts: ["breaker", "furnace"], defaultFormation: "breaker" },
+      { id: "rearguard", label: "REARGUARD", brief: "Keep the extraction corridor open.", node: "anchorLine", accepts: ["railjack", "breaker"], defaultFormation: "railjack" },
+      { id: "recover", label: "RECOVERY", brief: "Collect disabled formations en route.", node: "rescuePen", accepts: ["hauler"], defaultFormation: "hauler" },
+    ],
   },
 ];
 
-const DRILL_STEPS = [
-  "Scanning the Alpha approach",
-  "Harpoon Rig establishes line of sight",
-  "Furnace Crew overlaps the kill zone",
-  "Breaker Exo confirms the breach path",
-  "Extraction timing remains inside the window",
+const BREAKPOINTS = [
+  {
+    id: "beta",
+    trigger: "IF Beta lane is ranged",
+    options: [
+      { id: "tempo", label: "PRESERVE TEMPO", effect: "Cross exposed; keep reactor timing." },
+      { id: "protect", label: "PROTECT BREACHER", effect: "Lay smoke and divert the thrust." },
+    ],
+    defaultOption: "tempo",
+  },
+  {
+    id: "rescue",
+    trigger: "IF salvage crew is located",
+    options: [
+      { id: "clock", label: "PRESERVE CLOCK", effect: "Leave the crew; secure extraction." },
+      { id: "recover", label: "RECOVER CREW", effect: "Divert the Hauler before sabotage." },
+    ],
+    defaultOption: "clock",
+  },
 ];
 
 const EVENTS = [
-  { at: 30, text: "Harpoon Rig has contact. Trapline primed." },
+  { at: 30, text: "Forward role has contact. Playbook in motion." },
   { at: 60, text: "Control Node Alpha seized. Railjack anchoring." },
   { at: 105, text: "Helioch fire closes the Beta transit lane." },
   { at: 150, text: "Control Node Beta seized under pressure." },
@@ -138,6 +186,14 @@ const EVENTS = [
   { at: 300, text: "Reactor Spine sabotaged. Extraction route open." },
   { at: 345, text: "Warhost crossing the Extraction Gantry." },
 ];
+
+const defaultAssignments = (playbook) => Object.fromEntries(
+  playbook.roles.map((role) => [role.id, role.defaultFormation]),
+);
+
+const defaultBranches = () => Object.fromEntries(
+  BREAKPOINTS.map((breakpoint) => [breakpoint.id, breakpoint.defaultOption]),
+);
 
 const fmtClock = (seconds) => {
   const remaining = Math.max(0, 360 - seconds);
@@ -200,17 +256,39 @@ function AppHeader({ phase, battleTime }) {
   );
 }
 
-function FormationRoster({ selected, onSelect, deployments, phase, doctrine, setDoctrine }) {
+function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook, phase }) {
+  const roleByFormation = Object.fromEntries(
+    playbook.roles.map((role) => [assignments[role.id], role]),
+  );
   return (
-    <section className="left-rail" aria-label="Warhost formations and doctrine">
+    <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
+      <div className="doctrine-heading"><span>TACTICAL PLAYBOOK</span><Radio weight="duotone" /></div>
+      <div className="playbook-list">
+        {PLAYBOOKS.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              className={`playbook-row ${playbook.id === item.id ? "selected" : ""}`}
+              onClick={() => onPlaybook(item.id)}
+              disabled={phase !== "plan"}
+              aria-pressed={playbook.id === item.id}
+            >
+              <Icon weight="duotone" />
+              <span><b>{item.name}</b><small>{item.summary}</small></span>
+            </button>
+          );
+        })}
+      </div>
       <div className="rail-heading">
-        <span>YOUR FORMATIONS</span>
-        <span>5 / 5 DEPLOYED</span>
+        <span>SELECT FORMATION</span>
+        <span>ASSIGN TO ROLE →</span>
       </div>
       <div className="formation-list">
         {FORMATIONS.map((formation) => {
           const Icon = formation.icon;
           const active = selected === formation.id;
+          const assignedRole = roleByFormation[formation.id];
           return (
             <button
               key={formation.id}
@@ -224,26 +302,8 @@ function FormationRoster({ selected, onSelect, deployments, phase, doctrine, set
               <span className="formation-copy">
                 <b>{formation.name}</b>
                 <small><Icon weight="duotone" /> {formation.role}</small>
-                <em>{NODES[deployments[formation.id]].label}</em>
+                <em>{assignedRole?.label ?? "UNASSIGNED"}</em>
               </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="doctrine-heading"><span>DOCTRINE</span><Radio weight="duotone" /></div>
-      <div className="doctrine-list">
-        {DOCTRINES.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              className={`doctrine-row ${doctrine === item.id ? "selected" : ""}`}
-              onClick={() => setDoctrine(item.id)}
-              disabled={phase !== "plan"}
-              aria-pressed={doctrine === item.id}
-            >
-              <Icon weight="duotone" />
-              <span><b>{item.name}</b><small>{item.summary}</small></span>
             </button>
           );
         })}
@@ -281,23 +341,27 @@ function ObjectiveMarker({ className, number, title, description, state = "activ
   );
 }
 
-function ComboPanel({ active, drillStep }) {
+function ComboPanel({ active, drillStep, playbook }) {
   return (
     <div className={`combo-panel panel-surface ${active ? "ready" : "broken"}`}>
-      <span className="panel-label">TRAPLINE: PULL → BURN → BREAK</span>
-      <p>{active ? "Clear the Alpha approach. Open the route." : "Placement has broken the support chain."}</p>
+      <span className="panel-label">{playbook.name}: {playbook.stages.map((stage) => stage.label).join(" → ")}</span>
+      <p>{active ? playbook.intent : "One or more tactical roles are unresolved."}</p>
       <div className="combo-steps">
-        <div className={drillStep >= 1 ? "lit" : ""}><Anchor weight="duotone" /><b>PULL</b><small>Displace blocker.</small></div>
-        <ArrowRight />
-        <div className={drillStep >= 2 ? "lit warm" : ""}><Fire weight="duotone" /><b>BURN</b><small>Deny response.</small></div>
-        <ArrowRight />
-        <div className={drillStep >= 3 ? "lit" : ""}><Hammer weight="duotone" /><b>BREAK</b><small>Collapse hold.</small></div>
+        {playbook.stages.map((stage, index) => {
+          const Icon = stage.icon;
+          return (
+            <Fragment key={stage.label}>
+              <div className={drillStep >= index + 1 ? `lit ${stage.warm ? "warm" : ""}` : ""}><Icon weight="duotone" /><b>{stage.label}</b><small>{stage.detail}</small></div>
+              {index < playbook.stages.length - 1 && <ArrowRight />}
+            </Fragment>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function Battlefield({ selected, onSelect, deployments, onMove, phase, battleTime, drillStep, traplineReady }) {
+function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, planReady, playbook, drillSteps }) {
   const activeFormations = phase === "complete" ? ["harpoon", "furnace", "breaker", "railjack"] : FORMATIONS.map((f) => f.id);
   const alphaState = battleTime >= 60 ? "secured" : "active";
   const betaState = battleTime >= 150 ? "secured" : "threat";
@@ -319,10 +383,10 @@ function Battlefield({ selected, onSelect, deployments, onMove, phase, battleTim
       <div className="mission-path path-one" aria-hidden="true" />
       <div className="mission-path path-two" aria-hidden="true" />
       <div className="mission-path path-three" aria-hidden="true" />
-      <div className={`combo-path combo-pull ${traplineReady ? "active" : ""}`} aria-hidden="true" />
-      <div className={`combo-path combo-burn ${traplineReady ? "active warm" : ""}`} aria-hidden="true" />
-      <div className={`combo-path combo-break ${traplineReady ? "active" : ""}`} aria-hidden="true" />
-      <div className={`kill-zone ${traplineReady ? "active" : ""}`}><span>KILL ZONE</span></div>
+      <div className={`combo-path combo-pull ${planReady ? "active" : ""}`} aria-hidden="true" />
+      <div className={`combo-path combo-burn ${planReady ? "active warm" : ""}`} aria-hidden="true" />
+      <div className={`combo-path combo-break ${planReady ? "active" : ""}`} aria-hidden="true" />
+      <div className={`kill-zone ${planReady ? "active" : ""}`}><span>DECISION AREA</span></div>
 
       <div className={`enemy-formation enemy-alpha ${battleTime >= 60 ? "routed" : ""}`}>
         <img src="/assets/helioch-sentinels.png" alt="Helioch Oath defenders at Control Node Alpha" />
@@ -332,17 +396,6 @@ function Battlefield({ selected, onSelect, deployments, onMove, phase, battleTim
         <img src="/assets/helioch-sentinels.png" alt="Uncertain Helioch Oath presence near Control Node Beta" />
         <span>{battleTime >= 150 ? "BETA DEFENDERS ROUTED" : "STRENGTH UNCERTAIN"}</span>
       </div>
-
-      {phase === "plan" && Object.entries(NODES).map(([nodeId, node]) => (
-        <button
-          key={nodeId}
-          className="deployment-node"
-          style={{ left: `${node.left}%`, top: `${node.top}%` }}
-          onClick={() => onMove(selected, nodeId)}
-          aria-label={`Move selected formation to ${node.label}`}
-          title={node.label}
-        />
-      ))}
 
       {FORMATIONS.filter((formation) => activeFormations.includes(formation.id)).map((formation) => {
         const node = NODES[deployments[formation.id]];
@@ -365,11 +418,11 @@ function Battlefield({ selected, onSelect, deployments, onMove, phase, battleTim
         );
       })}
 
-      <ComboPanel active={traplineReady} drillStep={drillStep} />
+      <ComboPanel active={planReady} drillStep={drillStep} playbook={playbook} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
-          <div><span>GHOST DRILL {Math.min(drillStep + 1, DRILL_STEPS.length)} / {DRILL_STEPS.length}</span><b>{DRILL_STEPS[Math.min(drillStep, DRILL_STEPS.length - 1)]}</b></div>
+          <div><span>GHOST DRILL {Math.min(drillStep + 1, drillSteps.length)} / {drillSteps.length}</span><b>{drillSteps[Math.min(drillStep, drillSteps.length - 1)]}</b></div>
         </div>
       )}
       {(phase === "battle" || phase === "complete") && <BattlePulse battleTime={battleTime} />}
@@ -387,13 +440,43 @@ function BattlePulse({ battleTime }) {
   );
 }
 
-function IntelRail({ phase, battleTime, traplineReady, rescueComplete }) {
+function RoleBoard({ playbook, assignments, selected, onAssign, canAssign, phase }) {
+  return (
+    <div className="intel-block role-board">
+      <span className="panel-label">PLAYBOOK ROLE SLOTS</span>
+      <p className="role-instruction">Select a formation, then assign it to a compatible role.</p>
+      <div className="role-list">
+        {playbook.roles.map((role, index) => {
+          const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
+          const assignable = canAssign(role.id);
+          return (
+            <button
+              key={role.id}
+              className={`role-slot ${formation?.id === selected ? "selected" : ""}`}
+              onClick={() => onAssign(role.id)}
+              disabled={phase !== "plan" || !assignable}
+              aria-label={`Assign selected formation to ${role.label}. Currently ${formation?.name ?? "unassigned"}`}
+              title={`${role.brief} Compatible formations: ${role.accepts.map((id) => FORMATIONS.find((item) => item.id === id)?.name).join(", ")}.`}
+            >
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <span><b>{role.label}</b><small>{formation?.name ?? "UNASSIGNED"}</small></span>
+              {formation?.id === selected ? <CheckCircle weight="fill" /> : <ArrowRight weight="bold" />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignments, selected, onAssign, canAssign }) {
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
+      {(phase === "plan" || phase === "drill") && <RoleBoard playbook={playbook} assignments={assignments} selected={selected} onAssign={onAssign} canAssign={canAssign} phase={phase} />}
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
-        <strong className={traplineReady ? "viable" : "at-risk"}>{traplineReady ? "VIABLE" : "AT RISK"}</strong>
-        <p><b>KEY RISK:</b> Beta transit lane exposed.</p>
+        <strong className={planReady ? "viable" : "at-risk"}>{planReady ? "VIABLE" : "INCOMPLETE"}</strong>
+        <p><b>{playbook.name}:</b> {playbook.intent}</p>
       </div>
       <div className="intel-block enemy-intel">
         <span className="panel-label">ENEMY INTELLIGENCE</span>
@@ -428,14 +511,31 @@ function ProgressRow({ label, done, optional = false }) {
   );
 }
 
-function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onReset, traplineReady }) {
+function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onReset, planReady, branches, onBranch }) {
   return (
     <footer className="mission-footer">
       <div className="contingency-block">
-        <span className="panel-label">CONTINGENCIES · 2 COMMAND SEALS TO AUTHOR</span>
+        <span className="panel-label">AUTHORED BREAKPOINTS · OVERRIDE COSTS 1 COMMAND SEAL</span>
         <div className="contingencies">
-          <div><span>01</span><p>IF Alpha is secured <ArrowRight /> <b>Railjack holds.</b></p></div>
-          <div><span>02</span><p>IF reactor route opens <ArrowRight /> <b>Breaker Exo advances.</b></p></div>
+          {BREAKPOINTS.map((breakpoint, index) => (
+            <div className="breakpoint" key={breakpoint.id}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <p>{breakpoint.trigger}</p>
+                <div className="branch-options">
+                  {breakpoint.options.map((option) => (
+                    <button
+                      key={option.id}
+                      className={branches[breakpoint.id] === option.id ? "selected" : ""}
+                      onClick={() => onBranch(breakpoint.id, option.id)}
+                      disabled={phase !== "plan"}
+                      aria-pressed={branches[breakpoint.id] === option.id}
+                    >{option.label}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
       <div className="seals-block">
@@ -449,12 +549,12 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
       <div className="primary-controls">
         {phase === "plan" || phase === "drill" ? (
           <>
-            <button className={`ghost-button ${drillComplete ? "complete" : ""}`} onClick={onDrill} disabled={phase === "drill" || !traplineReady}>
+            <button className={`ghost-button ${drillComplete ? "complete" : ""}`} onClick={onDrill} disabled={phase === "drill" || !planReady}>
               {phase === "drill" ? <Pause weight="fill" /> : drillComplete ? <CheckCircle weight="fill" /> : <Play weight="fill" />}
               <span><b>{phase === "drill" ? "RUNNING GHOST DRILL" : drillComplete ? "DRILL VERIFIED" : "RUN GHOST DRILL"}</b><small>Preview routes, triggers, and timing.</small></span>
             </button>
-            <button className="commit-button" onClick={onCommit} disabled={!traplineReady}>
-              <span><b>COMMIT MISSION PLAN</b><small>{traplineReady ? "Deploy and execute autonomously." : "Restore Trapline placement first."}</small></span>
+            <button className="commit-button" onClick={onCommit} disabled={!planReady}>
+              <span><b>COMMIT PLAYBOOK</b><small>{planReady ? "Execute roles and authored branches." : "Resolve every required role first."}</small></span>
               <ArrowRight weight="bold" />
             </button>
           </>
@@ -469,26 +569,30 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
   );
 }
 
-function DecisionOverlay({ decision, seals, onResolve }) {
+function DecisionOverlay({ decision, seals, branches, onResolve }) {
   if (!decision) return null;
   const isBeta = decision === "beta";
+  const breakpoint = BREAKPOINTS.find((item) => item.id === decision);
+  const authored = breakpoint.options.find((option) => option.id === branches[decision]);
+  const alternative = breakpoint.options.find((option) => option.id !== branches[decision]);
   return (
     <div className="decision-backdrop" role="dialog" aria-modal="true" aria-labelledby="decision-title">
       <div className="decision-panel">
         <div className="decision-icon"><Radio weight="duotone" /></div>
-        <p className="eyebrow">COMMAND INTERRUPTION</p>
+        <p className="eyebrow">PLAYBOOK BREAKPOINT</p>
         <h2 id="decision-title">{isBeta ? "Beta lane is collapsing" : "Salvage crew is cut off"}</h2>
-        <p>{isBeta ? "Helioch fire has the planned transit lane ranged. The mission can continue, but Breaker Exo will cross exposed." : "The optional rescue now conflicts with the reactor timetable. Override the Hauler or preserve the mission clock."}</p>
+        <p>{isBeta ? "Helioch fire has the planned transit lane ranged. Your authored response is ready for execution." : "The optional rescue now conflicts with the reactor timetable. Your playbook already contains a response."}</p>
+        <div className="authored-order"><span>AUTHORED ORDER</span><b>{authored.label}</b><small>{authored.effect}</small></div>
         <div className="decision-actions">
-          <button onClick={() => onResolve("hold")}><Shield weight="duotone" /><span><b>HOLD THE PLAN</b><small>Spend no seal. Accept the exposure.</small></span></button>
-          <button className="spend-seal" onClick={() => onResolve("override")} disabled={seals <= 0}><Seal weight="duotone" /><span><b>{isBeta ? "LAY SMOKE & DIVERT" : "DIVERT SALVAGE HAULER"}</b><small>Spend 1 Command Seal.</small></span></button>
+          <button onClick={() => onResolve("plan")}><Play weight="duotone" /><span><b>EXECUTE PLAYBOOK</b><small>{authored.label} · spend no seal.</small></span></button>
+          <button className="spend-seal" onClick={() => onResolve("override")} disabled={seals <= 0}><Seal weight="duotone" /><span><b>BREAK PLAYBOOK</b><small>{alternative.label} · spend 1 seal.</small></span></button>
         </div>
       </div>
     </div>
   );
 }
 
-function CompletionOverlay({ rescued, usedSeals, onClose }) {
+function CompletionOverlay({ rescued, usedSeals, playbook, onClose }) {
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className="decision-panel completion-panel">
@@ -500,8 +604,9 @@ function CompletionOverlay({ rescued, usedSeals, onClose }) {
           <div><span>PRIMARY</span><b>Reactor sabotaged</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION</span><b>4 / 5 formations</b><CheckCircle weight="fill" /></div>
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>COMMAND</span><b>{usedSeals} seals spent</b><Seal weight="duotone" /></div>
+          <div><span>PLAYBOOK</span><b>{playbook.name}</b><Seal weight="duotone" /></div>
         </div>
+        <p className="completion-note">{usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onClose}><span><b>RETURN TO BATTLEFIELD</b><small>Inspect the completed mission state.</small></span><ArrowRight /></button>
       </div>
     </div>
@@ -511,8 +616,9 @@ function CompletionOverlay({ rescued, usedSeals, onClose }) {
 export function App() {
   const [phase, setPhase] = useState("plan");
   const [selected, setSelected] = useState("harpoon");
-  const [deployments, setDeployments] = useState(DEFAULT_DEPLOYMENT);
-  const [doctrine, setDoctrine] = useState("breakthrough");
+  const [playbookId, setPlaybookId] = useState("trapline");
+  const [assignments, setAssignments] = useState(() => defaultAssignments(PLAYBOOKS[0]));
+  const [branches, setBranches] = useState(defaultBranches);
   const [drillStep, setDrillStep] = useState(-1);
   const [drillComplete, setDrillComplete] = useState(false);
   const [battleTime, setBattleTime] = useState(0);
@@ -523,9 +629,29 @@ export function App() {
   const [showCompletion, setShowCompletion] = useState(false);
   const timerRef = useRef(null);
 
-  const traplineReady = useMemo(
-    () => deployments.harpoon === "alphaApproach" && deployments.furnace === "fireLine" && deployments.breaker === "breachLine",
-    [deployments],
+  const playbook = useMemo(
+    () => PLAYBOOKS.find((item) => item.id === playbookId) ?? PLAYBOOKS[0],
+    [playbookId],
+  );
+
+  const deployments = useMemo(
+    () => Object.fromEntries(playbook.roles.map((role) => [assignments[role.id], role.node])),
+    [assignments, playbook],
+  );
+
+  const planReady = useMemo(
+    () => playbook.roles.every((role) => role.accepts.includes(assignments[role.id]))
+      && new Set(Object.values(assignments)).size === FORMATIONS.length,
+    [assignments, playbook],
+  );
+
+  const drillSteps = useMemo(
+    () => [
+      `Loading ${playbook.name} geometry`,
+      ...playbook.stages.map((stage) => `${stage.label} timing and support arcs confirmed`),
+      `Both authored breakpoints remain inside the mission window`,
+    ],
+    [playbook],
   );
 
   useEffect(() => {
@@ -533,7 +659,7 @@ export function App() {
     setDrillStep(0);
     const interval = window.setInterval(() => {
       setDrillStep((current) => {
-        if (current >= DRILL_STEPS.length - 1) {
+        if (current >= drillSteps.length - 1) {
           window.clearInterval(interval);
           setDrillComplete(true);
           setPhase("plan");
@@ -543,7 +669,7 @@ export function App() {
       });
     }, 720);
     return () => window.clearInterval(interval);
-  }, [phase]);
+  }, [phase, drillSteps.length]);
 
   useEffect(() => {
     if (phase !== "battle" || decision) return undefined;
@@ -569,23 +695,62 @@ export function App() {
     }
   }, [battleTime, phase, decision, resolvedDecisions]);
 
-  const moveFormation = (formationId, nodeId) => {
-    if (!formationId || phase !== "plan") return;
-    setDeployments((current) => ({ ...current, [formationId]: nodeId }));
+  const changePlaybook = (nextId) => {
+    if (phase !== "plan") return;
+    const next = PLAYBOOKS.find((item) => item.id === nextId);
+    if (!next) return;
+    setPlaybookId(next.id);
+    setAssignments(defaultAssignments(next));
+    setBranches(defaultBranches());
+    setSelected(next.roles[0].defaultFormation);
+    setDrillStep(-1);
+    setDrillComplete(false);
+  };
+
+  const canAssign = (roleId) => {
+    const targetRole = playbook.roles.find((role) => role.id === roleId);
+    const currentRole = playbook.roles.find((role) => assignments[role.id] === selected);
+    const displacedFormation = assignments[roleId];
+    if (!targetRole?.accepts.includes(selected)) return false;
+    return !currentRole || currentRole.id === roleId || currentRole.accepts.includes(displacedFormation);
+  };
+
+  const assignFormation = (roleId) => {
+    if (phase !== "plan" || !canAssign(roleId)) return;
+    const currentRole = playbook.roles.find((role) => assignments[role.id] === selected);
+    if (!currentRole || currentRole.id === roleId) return;
+    setAssignments((current) => ({
+      ...current,
+      [currentRole.id]: current[roleId],
+      [roleId]: selected,
+    }));
+    setDrillComplete(false);
+  };
+
+  const chooseBranch = (breakpointId, optionId) => {
+    if (phase !== "plan") return;
+    const breakpoint = BREAKPOINTS.find((item) => item.id === breakpointId);
+    if (!breakpoint?.options.some((option) => option.id === optionId)) return;
+    setBranches((current) => ({ ...current, [breakpointId]: optionId }));
     setDrillComplete(false);
   };
 
   const resolveDecision = (choice) => {
+    const breakpoint = BREAKPOINTS.find((item) => item.id === decision);
+    const plannedOption = branches[decision];
+    const chosenOption = choice === "override"
+      ? breakpoint.options.find((option) => option.id !== plannedOption)?.id
+      : plannedOption;
     if (choice === "override" && seals > 0) {
       setSeals((current) => current - 1);
-      if (decision === "rescue") setRescueComplete(true);
     }
+    if (decision === "rescue") setRescueComplete(chosenOption === "recover");
     setResolvedDecisions((current) => [...current, decision]);
     setDecision(null);
   };
 
   const commitMission = () => {
-    if (!traplineReady) return;
+    if (!planReady) return;
     setPhase("battle");
     setBattleTime(0);
     setResolvedDecisions([]);
@@ -597,8 +762,9 @@ export function App() {
   const resetMission = () => {
     setPhase("plan");
     setBattleTime(0);
-    setDeployments(DEFAULT_DEPLOYMENT);
-    setDoctrine("breakthrough");
+    setPlaybookId("trapline");
+    setAssignments(defaultAssignments(PLAYBOOKS[0]));
+    setBranches(defaultBranches());
     setSelected("harpoon");
     setDrillStep(-1);
     setDrillComplete(false);
@@ -613,13 +779,13 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} />
       <div className="mission-shell">
-        <FormationRoster selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} doctrine={doctrine} setDoctrine={setDoctrine} />
-        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} onMove={moveFormation} phase={phase} battleTime={battleTime} drillStep={drillStep} traplineReady={traplineReady} />
-        <IntelRail phase={phase} battleTime={battleTime} traplineReady={traplineReady} rescueComplete={rescueComplete} />
+        <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} />
+        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} />
+        <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignments={assignments} selected={selected} onAssign={assignFormation} canAssign={canAssign} />
       </div>
-      <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} traplineReady={traplineReady} />
-      <DecisionOverlay decision={decision} seals={seals} onResolve={resolveDecision} />
-      {showCompletion && <CompletionOverlay rescued={rescueComplete} usedSeals={2 - seals} onClose={() => setShowCompletion(false)} />}
+      <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={branches} onBranch={chooseBranch} />
+      <DecisionOverlay decision={decision} seals={seals} branches={branches} onResolve={resolveDecision} />
+      {showCompletion && <CompletionOverlay rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} onClose={() => setShowCompletion(false)} />}
     </main>
   );
 }

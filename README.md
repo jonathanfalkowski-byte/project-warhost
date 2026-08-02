@@ -15,11 +15,11 @@ Open `http://localhost:5173/`.
 
 ## Core loop
 
-1. Select a formation and place it on a deployment node.
-2. Build the Trapline combination from terrain and support arcs.
-3. Choose a doctrine and run the Ghost Drill.
-4. Commit the mission and watch the plan execute.
-5. Spend scarce Command Seals only when battlefield contingencies demand it.
+1. Choose Trapline, Armored Spear, or Fighting Withdrawal from the detachment's tactical playbook.
+2. Select formations and assign them to compatible functional roles.
+3. Author two responses at known battlefield breakpoints.
+4. Run the Ghost Drill, commit the playbook, and watch it execute autonomously.
+5. Execute the authored response for free or spend a scarce Command Seal to break the playbook after contact.
 
 ## Validation
 
@@ -29,4 +29,3 @@ npm.cmd run test:sites
 ```
 
 The prototype uses only local, generated original-IP visual assets and makes no runtime network requests.
-
