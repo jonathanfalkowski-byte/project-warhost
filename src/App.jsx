@@ -39,7 +39,7 @@ const FORMATIONS = [
     role: "DISPLACE",
     purpose: "Pull the Alpha blocker into the kill zone.",
     creates: "DISPLACED",
-    uses: ["SCREENED", "SUPPLIED"],
+    uses: ["SCREENED", "SUPPLIED", "FORWARD HOLD"],
     asset: "/assets/harpoon-rig.png",
     icon: Anchor,
     defaultNode: "alphaApproach",
@@ -51,7 +51,7 @@ const FORMATIONS = [
     role: "DENY",
     purpose: "Seal the reinforcement lane with heat.",
     creates: "OVERHEATED",
-    uses: ["DISPLACED", "SCREENED"],
+    uses: ["DISPLACED", "SCREENED", "SUPPLIED", "FORWARD HOLD"],
     asset: "/assets/furnace-crew.png",
     icon: Fire,
     defaultNode: "fireLine",
@@ -63,7 +63,7 @@ const FORMATIONS = [
     role: "BREACH",
     purpose: "Crack the Reactor Spine after Beta falls.",
     creates: "BREACHED",
-    uses: ["DISPLACED", "OVERHEATED", "SCREENED", "SUPPLIED"],
+    uses: ["DISPLACED", "OVERHEATED", "SCREENED", "SUPPLIED", "KILL ZONE", "SEALED LANE"],
     asset: "/assets/breaker-exo.png",
     icon: Hammer,
     defaultNode: "breachLine",
@@ -75,7 +75,7 @@ const FORMATIONS = [
     role: "HOLD",
     purpose: "Anchor the captured Alpha control node.",
     creates: "SCREENED",
-    uses: ["DISPLACED", "OVERHEATED", "BREACHED", "SUPPLIED"],
+    uses: ["DISPLACED", "OVERHEATED", "BREACHED", "SUPPLIED", "OPEN CORE", "FRACTURED ARMOR"],
     asset: "/assets/railjack.png",
     icon: Shield,
     defaultNode: "anchorLine",
@@ -87,7 +87,7 @@ const FORMATIONS = [
     role: "EXTRACT",
     purpose: "Recover the crew and damaged formations.",
     creates: "SUPPLIED",
-    uses: ["OVERHEATED", "BREACHED", "SCREENED"],
+    uses: ["OVERHEATED", "BREACHED", "SCREENED", "OPEN CORE", "SECURED BREACH", "SECURED CORRIDOR"],
     asset: "/assets/salvage-hauler.png",
     icon: Truck,
     defaultNode: "recoveryLine",
@@ -231,7 +231,7 @@ const ENEMY_PLAN = {
       uses: "FORTIFIED LANE",
       creates: "COUNTERFIRE",
       intelligence: "UNCERTAIN",
-      counteredBy: ["THERMAL BREACH", "FORCED ENTRY", "FIELD REARM", "COVERED ADVANCE"],
+      counteredBy: ["EXECUTION BREACH", "THERMAL BREACH", "FORCED ENTRY", "FIELD REARM", "COVERED ADVANCE", "LOCKED BREACH"],
       impact: { missionDelay: 15 },
       consequence: "Extraction timetable delayed +00:15",
     },
@@ -242,7 +242,7 @@ const ENEMY_PLAN = {
       uses: "COUNTERFIRE",
       creates: "CUT OFF",
       intelligence: "UNKNOWN",
-      counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY"],
+      counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "LOCKSTEP HOLD"],
       impact: { recoveryLoss: 1 },
       consequence: "One formation cut off from extraction",
     },
@@ -353,51 +353,91 @@ const emptyAssignments = (playbook) => Object.fromEntries(
   playbook.roles.map((role) => [role.id, null]),
 );
 
-const TACTICAL_HANDOFFS = {
-  "harpoon:furnace": { name: "FURNACE DRAGNET", passes: "DISPLACED", result: "KILL ZONE", impact: { alpha: 15, phase: "alpha", text: "Alpha secured 15 seconds earlier" } },
-  "harpoon:breaker": { name: "FORCED ENTRY", passes: "DISPLACED", result: "EXPOSED CORE", impact: { reactor: 15, phase: "reactor", text: "Reactor assault starts 15 seconds earlier" } },
-  "harpoon:railjack": { name: "TOWED BASTION", passes: "DISPLACED", result: "FORWARD HOLD", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
-  "furnace:breaker": { name: "THERMAL BREACH", passes: "OVERHEATED", result: "FRACTURED ARMOR", impact: { reactor: 30, phase: "reactor", text: "Reactor opens 30 seconds earlier" } },
-  "furnace:railjack": { name: "ASHEN CORDON", passes: "OVERHEATED", result: "SEALED LANE", impact: { beta: 15, phase: "beta", text: "Beta secured 15 seconds earlier" } },
-  "furnace:hauler": { name: "HOT RECOVERY", passes: "OVERHEATED", result: "CLEAR EXTRACTION", impact: { extraction: 15, phase: "extraction", text: "Extraction begins 15 seconds earlier" } },
-  "breaker:railjack": { name: "WEDGE & WALL", passes: "BREACHED", result: "SECURED BREACH", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
-  "breaker:hauler": { name: "BREACH RECOVERY", passes: "BREACHED", result: "OPEN EXTRACTION", impact: { extraction: 30, phase: "extraction", text: "Extraction begins 30 seconds earlier" } },
-  "railjack:breaker": { name: "COVERED ADVANCE", passes: "SCREENED", result: "SAFE BREACH", impact: { reactor: 15, phase: "reactor", text: "Reactor approach gains 15 seconds" } },
-  "railjack:hauler": { name: "ARMORED EVAC", passes: "SCREENED", result: "PROTECTED RECOVERY", impact: { extraction: 15, protects: 1, phase: "extraction", text: "Extraction starts early and one more formation survives" } },
-  "hauler:breaker": { name: "FIELD REARM", passes: "SUPPLIED", result: "OVERCHARGED BREACH", impact: { reactor: 30, phase: "reactor", text: "Reactor strike gains 30 seconds" } },
-  "hauler:railjack": { name: "MOBILE RESUPPLY", passes: "SUPPLIED", result: "FORTIFIED HOLD", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
+const TACTICAL_REACTIONS = {
+  "DISPLACED:furnace": { name: "FURNACE DRAGNET", result: "KILL ZONE", impact: { alpha: 15, phase: "alpha", text: "Alpha secured 15 seconds earlier" } },
+  "SCREENED:furnace": { name: "ASHEN CORDON", result: "SEALED LANE", impact: { beta: 15, phase: "beta", text: "Beta secured 15 seconds earlier" } },
+  "SUPPLIED:furnace": { name: "STOKED ADVANCE", result: "OVERHEATED", impact: { beta: 15, phase: "beta", text: "Beta pressure arrives 15 seconds earlier" } },
+  "FORWARD HOLD:furnace": { name: "BASTION PYRE", result: "KILL ZONE", impact: { alpha: 15, phase: "alpha", text: "The forward hold becomes a prepared kill zone" } },
+  "DISPLACED:breaker": { name: "FORCED ENTRY", result: "EXPOSED CORE", impact: { reactor: 15, phase: "reactor", text: "Reactor assault starts 15 seconds earlier" } },
+  "OVERHEATED:breaker": { name: "THERMAL BREACH", result: "FRACTURED ARMOR", impact: { reactor: 30, phase: "reactor", text: "Reactor opens 30 seconds earlier" } },
+  "SCREENED:breaker": { name: "COVERED ADVANCE", result: "SAFE BREACH", impact: { reactor: 15, phase: "reactor", text: "Reactor approach gains 15 seconds" } },
+  "SUPPLIED:breaker": { name: "FIELD REARM", result: "OVERCHARGED BREACH", impact: { reactor: 30, phase: "reactor", text: "Reactor strike gains 30 seconds" } },
+  "KILL ZONE:breaker": { name: "EXECUTION BREACH", result: "OPEN CORE", impact: { reactor: 30, phase: "reactor", text: "The trapped defense exposes the Reactor core" } },
+  "SEALED LANE:breaker": { name: "LOCKED BREACH", result: "OPEN CORE", impact: { reactor: 15, phase: "reactor", text: "The sealed lane becomes an uncontested Reactor breach" } },
+  "DISPLACED:railjack": { name: "TOWED BASTION", result: "FORWARD HOLD", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
+  "OVERHEATED:railjack": { name: "ASHEN CORDON", result: "SEALED LANE", impact: { beta: 15, phase: "beta", text: "Beta secured 15 seconds earlier" } },
+  "BREACHED:railjack": { name: "WEDGE & WALL", result: "SECURED BREACH", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
+  "SUPPLIED:railjack": { name: "MOBILE RESUPPLY", result: "FORTIFIED HOLD", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
+  "OPEN CORE:railjack": { name: "LOCKSTEP HOLD", result: "SECURED CORRIDOR", impact: { protects: 1, phase: "extraction", text: "The open core becomes a protected extraction corridor" } },
+  "FRACTURED ARMOR:railjack": { name: "WEDGE & WALL", result: "SECURED CORRIDOR", impact: { protects: 1, phase: "extraction", text: "The breach is converted into a protected corridor" } },
+  "OVERHEATED:hauler": { name: "HOT RECOVERY", result: "CLEAR EXTRACTION", impact: { extraction: 15, phase: "extraction", text: "Extraction begins 15 seconds earlier" } },
+  "BREACHED:hauler": { name: "BREACH RECOVERY", result: "OPEN EXTRACTION", impact: { extraction: 30, phase: "extraction", text: "Extraction begins 30 seconds earlier" } },
+  "SCREENED:hauler": { name: "ARMORED EVAC", result: "PROTECTED RECOVERY", impact: { extraction: 15, protects: 1, phase: "extraction", text: "Extraction starts early and one more formation survives" } },
+  "OPEN CORE:hauler": { name: "BREACH RECOVERY", result: "OPEN EXTRACTION", impact: { extraction: 30, phase: "extraction", text: "The open core becomes a direct extraction lane" } },
+  "SECURED BREACH:hauler": { name: "ARMORED EVAC", result: "PROTECTED RECOVERY", impact: { extraction: 15, protects: 1, phase: "extraction", text: "The secured breach becomes a protected recovery lane" } },
+  "SECURED CORRIDOR:hauler": { name: "ARMORED EVAC", result: "PROTECTED RECOVERY", impact: { extraction: 15, protects: 1, phase: "extraction", text: "The corridor carries every formation toward extraction" } },
+  "SCREENED:harpoon": { name: "COVERED DRAG", result: "DISPLACED", impact: { alpha: 15, phase: "alpha", text: "The screened rig displaces the Alpha blocker early" } },
+  "SUPPLIED:harpoon": { name: "POWER WINCH", result: "DISPLACED", impact: { alpha: 15, phase: "alpha", text: "The resupplied rig displaces the Alpha blocker early" } },
+  "FORWARD HOLD:harpoon": { name: "ANCHOR DRAG", result: "DISPLACED", impact: { alpha: 15, phase: "alpha", text: "The forward hold anchors a forced displacement" } },
 };
 
-const tacticalHandoffFor = (leftId, rightId) => (
-  leftId && rightId ? TACTICAL_HANDOFFS[`${leftId}:${rightId}`] ?? null : null
-);
+const evaluateTacticalSequence = (playbook, assignments) => {
+  const outputs = {};
+  const handoffs = [];
+  let previousRole = null;
+  let previousFormation = null;
+  let carriedCondition = null;
 
-const calculateTacticalHandoffs = (playbook, assignments) => playbook.roles.slice(0, -1).map((role, index) => {
-  const nextRole = playbook.roles[index + 1];
-  const sourceId = assignments[role.id];
-  const receiverId = assignments[nextRole.id];
-  return {
-    id: `${role.id}:${nextRole.id}`,
-    from: index,
-    to: index + 1,
-    sourceId,
-    receiverId,
-    maneuver: tacticalHandoffFor(sourceId, receiverId),
-  };
-});
-
-const calculateRoleOutputs = (playbook, assignments, handoffs) => Object.fromEntries(
-  playbook.roles.map((role, index) => {
+  playbook.roles.forEach((role, index) => {
     const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
-    if (!formation) return [role.id, null];
-    const incoming = index > 0 ? handoffs[index - 1]?.maneuver : null;
-    return [role.id, {
+    if (!formation) {
+      outputs[role.id] = null;
+      if (previousRole) {
+        handoffs.push({
+          id: `${previousRole.id}:${role.id}`,
+          from: index - 1,
+          to: index,
+          sourceId: previousFormation?.id ?? null,
+          receiverId: null,
+          incomingCondition: carriedCondition,
+          maneuver: null,
+        });
+      }
+      previousRole = role;
+      previousFormation = null;
+      carriedCondition = null;
+      return;
+    }
+
+    const reaction = previousFormation && carriedCondition
+      ? TACTICAL_REACTIONS[`${carriedCondition}:${formation.id}`] ?? null
+      : null;
+    const maneuver = reaction ? { ...reaction, passes: carriedCondition } : null;
+
+    if (previousRole) {
+      handoffs.push({
+        id: `${previousRole.id}:${role.id}`,
+        from: index - 1,
+        to: index,
+        sourceId: previousFormation?.id ?? null,
+        receiverId: formation.id,
+        incomingCondition: carriedCondition,
+        maneuver,
+      });
+    }
+
+    carriedCondition = maneuver?.result ?? formation.creates;
+    outputs[role.id] = {
       creates: formation.creates,
-      result: incoming?.result ?? formation.creates,
-      incoming,
-    }];
-  }),
-);
+      result: carriedCondition,
+      incoming: maneuver,
+    };
+    previousRole = role;
+    previousFormation = formation;
+  });
+
+  return { handoffs, outputs };
+};
 
 const calculateEnemyClashes = (maneuvers) => ENEMY_PLAN.stages.map((stage) => {
   const counterManeuver = maneuvers.find((maneuver) => stage.counteredBy.includes(maneuver.name));
@@ -834,11 +874,27 @@ function EnemyFieldPlan({ battleTime, phase, clashes }) {
 }
 
 function TacticalHandoffBoard({ handoffs }) {
+  const discovered = handoffs.filter((handoff) => handoff.maneuver);
+  const fullyStaffed = handoffs.every((handoff) => handoff.sourceId && handoff.receiverId);
+  const longestCascade = handoffs.reduce((state, handoff) => {
+    const current = handoff.maneuver ? state.current + 1 : 0;
+    return { current, longest: Math.max(state.longest, current) };
+  }, { current: 0, longest: 0 }).longest;
+  const conditionTrace = discovered.map((handoff) => `${handoff.maneuver.passes} → ${handoff.maneuver.result}`).join(" · ");
+  const cascadeLabel = longestCascade === discovered.length
+    ? `${longestCascade} LINK CASCADE`
+    : `${discovered.length} SEPARATE LINKS`;
+
   return (
     <div className="handoff-board" aria-live="polite">
       <div className="handoff-heading">
         <span>TACTICAL HANDOFFS</span>
-        <small>Conditions pass left to right. Placement reveals the maneuver.</small>
+        <small>Transformed conditions continue into the next staffed stop.</small>
+      </div>
+      <div className={`cascade-readout ${discovered.length > 0 ? "active" : fullyStaffed ? "broken" : "unresolved"}`}>
+        <span><Lightning weight="fill" /> {discovered.length > 0 ? cascadeLabel : fullyStaffed ? "CHAIN BROKEN" : "CASCADE UNRESOLVED"}</span>
+        <b>{discovered.length > 0 ? conditionTrace : fullyStaffed ? "Every formation executes its own condition." : "Staff adjacent stops to test how conditions travel."}</b>
+        <small>{discovered.length > 0 ? `${discovered.length} tactical ${discovered.length === 1 ? "reaction" : "reactions"} discovered in this arrangement.` : "Independent actions remain valid."}</small>
       </div>
       <div className="handoff-grid">
         {handoffs.map((handoff) => {
@@ -1309,10 +1365,12 @@ export function App() {
     [assignments, playbook],
   );
 
-  const tacticalHandoffs = useMemo(
-    () => calculateTacticalHandoffs(playbook, assignments),
+  const tacticalSequence = useMemo(
+    () => evaluateTacticalSequence(playbook, assignments),
     [assignments, playbook],
   );
+  const tacticalHandoffs = tacticalSequence.handoffs;
+  const roleOutputs = tacticalSequence.outputs;
 
   const activeBranches = phase === "plan" || phase === "drill" ? branches : battleBranches;
 
@@ -1324,11 +1382,6 @@ export function App() {
   const operationEvents = useMemo(
     () => buildOperationEvents(operationProfile),
     [operationProfile],
-  );
-
-  const roleOutputs = useMemo(
-    () => calculateRoleOutputs(playbook, assignments, tacticalHandoffs),
-    [assignments, playbook, tacticalHandoffs],
   );
 
   const drillSteps = useMemo(
