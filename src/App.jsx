@@ -135,22 +135,22 @@ const PLAYBOOKS = [
     ],
   },
   {
-    id: "withdrawal",
-    name: "FIGHTING WITHDRAWAL",
-    summary: "Trade ground for force preservation.",
-    intent: "Complete the sabotage while keeping an organized escape corridor.",
+    id: "pressure",
+    name: "DIVIDED PRESSURE",
+    summary: "Pin both nodes, converge on reactor.",
+    intent: "Split the defense at Alpha and Beta, then reunite for the sabotage.",
     icon: Crosshair,
     stages: [
-      { label: "SCREEN", detail: "Mask intent.", icon: Eye },
-      { label: "SABOTAGE", detail: "Strike and delay.", icon: Factory, warm: true },
-      { label: "WITHDRAW", detail: "Exit in order.", icon: Flag },
+      { label: "PIN", detail: "Fix both guards.", icon: Target },
+      { label: "SPLIT", detail: "Open two lanes.", icon: Crosshair, warm: true },
+      { label: "CONVERGE", detail: "Collapse on reactor.", icon: Factory },
     ],
     roles: [
-      { id: "screen", label: "FORWARD SCREEN", brief: "Make contact without becoming fixed.", node: "alphaApproach", accepts: ["harpoon", "railjack"], defaultFormation: "harpoon" },
-      { id: "delay", label: "DELAY", brief: "Close pursuit lanes behind the screen.", node: "fireLine", accepts: ["furnace", "harpoon"], defaultFormation: "furnace" },
-      { id: "sabotage", label: "SABOTAGE", brief: "Strike the Reactor Spine on schedule.", node: "betaLane", accepts: ["breaker", "furnace"], defaultFormation: "breaker" },
-      { id: "rearguard", label: "REARGUARD", brief: "Keep the extraction corridor open.", node: "anchorLine", accepts: ["railjack", "breaker"], defaultFormation: "railjack" },
-      { id: "recover", label: "RECOVERY", brief: "Collect disabled formations en route.", node: "rescuePen", accepts: ["hauler"], defaultFormation: "hauler" },
+      { id: "alpha", label: "ALPHA PIN", brief: "Hold the known defenders in place.", node: "alphaApproach", accepts: ["railjack", "harpoon"], defaultFormation: "railjack" },
+      { id: "beta", label: "BETA RAID", brief: "Pressure the uncertain control node.", node: "betaLane", accepts: ["harpoon", "breaker"], defaultFormation: "harpoon" },
+      { id: "deny", label: "LANE DENIAL", brief: "Prevent either defense from reinforcing.", node: "fireLine", accepts: ["furnace", "railjack"], defaultFormation: "furnace" },
+      { id: "reactor", label: "REACTOR TEAM", brief: "Converge through the opening and sabotage.", node: "breachLine", accepts: ["breaker", "harpoon"], defaultFormation: "breaker" },
+      { id: "recover", label: "EXTRACTION", brief: "Collect the split force at the gantry.", node: "recoveryLine", accepts: ["hauler", "railjack"], defaultFormation: "hauler" },
     ],
   },
 ];
@@ -282,7 +282,7 @@ function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook
       </div>
       <div className="rail-heading">
         <span>SELECT FORMATION</span>
-        <span>ASSIGN TO ROLE →</span>
+        <span>VIEW ON FIELD</span>
       </div>
       <div className="formation-list">
         {FORMATIONS.map((formation) => {
@@ -320,9 +320,10 @@ function MissionRoute({ phase, battleTime }) {
   ];
   return (
     <div className="mission-route panel-surface">
-      <span className="panel-label">MISSION ROUTE</span>
+      <span className="panel-label">VICTORY ORDERS</span>
+      <div className="victory-rule"><b>WIN THE MISSION</b><small>Sabotage Reactor Spine + extract 3 formations.</small></div>
       {steps.map((step) => (
-        <div className={`route-step ${step.done ? "done" : ""}`} key={step.n}>
+        <div className={`route-step route-${step.n} ${step.done ? "done" : ""}`} key={step.n}>
           <span>{step.done ? <CheckCircle weight="fill" /> : step.n}</span>
           <b>{step.label}</b>
         </div>
@@ -440,27 +441,28 @@ function BattlePulse({ battleTime }) {
   );
 }
 
-function RoleBoard({ playbook, assignments, selected, onAssign, canAssign, phase }) {
+function RoleBoard({ playbook, assignments, onChooseRole, phase }) {
   return (
     <div className="intel-block role-board">
       <span className="panel-label">PLAYBOOK ROLE SLOTS</span>
-      <p className="role-instruction">Select a formation, then assign it to a compatible role.</p>
+      <p className="role-instruction">You decide who performs every job. Recommendations never lock a slot.</p>
       <div className="role-list">
         {playbook.roles.map((role, index) => {
           const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
-          const assignable = canAssign(role.id);
+          const recommended = role.accepts.includes(formation?.id);
           return (
             <button
               key={role.id}
-              className={`role-slot ${formation?.id === selected ? "selected" : ""}`}
-              onClick={() => onAssign(role.id)}
-              disabled={phase !== "plan" || !assignable}
-              aria-label={`Assign selected formation to ${role.label}. Currently ${formation?.name ?? "unassigned"}`}
-              title={`${role.brief} Compatible formations: ${role.accepts.map((id) => FORMATIONS.find((item) => item.id === id)?.name).join(", ")}.`}
+              className={`role-slot ${recommended ? "recommended" : "improvised"}`}
+              onClick={() => onChooseRole(role.id)}
+              disabled={phase !== "plan"}
+              aria-label={`Choose formation for ${role.label}. Currently ${formation?.name ?? "unassigned"}`}
+              title={role.brief}
             >
               <span>{String(index + 1).padStart(2, "0")}</span>
-              <span><b>{role.label}</b><small>{formation?.name ?? "UNASSIGNED"}</small></span>
-              {formation?.id === selected ? <CheckCircle weight="fill" /> : <ArrowRight weight="bold" />}
+              <span><b>{role.label}</b><small>{formation?.name ?? "CHOOSE FORMATION"}</small></span>
+              <span className="role-fit">{recommended ? "RECOMMENDED" : "IMPROVISED"}</span>
+              <ArrowRight weight="bold" />
             </button>
           );
         })}
@@ -469,14 +471,15 @@ function RoleBoard({ playbook, assignments, selected, onAssign, canAssign, phase
   );
 }
 
-function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignments, selected, onAssign, canAssign }) {
+function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignments, onChooseRole, improvisedCount }) {
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
-      {(phase === "plan" || phase === "drill") && <RoleBoard playbook={playbook} assignments={assignments} selected={selected} onAssign={onAssign} canAssign={canAssign} phase={phase} />}
+      {(phase === "plan" || phase === "drill") && <RoleBoard playbook={playbook} assignments={assignments} onChooseRole={onChooseRole} phase={phase} />}
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planReady ? "viable" : "at-risk"}>{planReady ? "VIABLE" : "INCOMPLETE"}</strong>
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
+        {improvisedCount > 0 && <p className="improvised-note"><Warning weight="fill" /> {improvisedCount} improvised {improvisedCount === 1 ? "assignment" : "assignments"}. Allowed, but riskier.</p>}
       </div>
       <div className="intel-block enemy-intel">
         <span className="panel-label">ENEMY INTELLIGENCE</span>
@@ -592,17 +595,48 @@ function DecisionOverlay({ decision, seals, branches, onResolve }) {
   );
 }
 
+function FormationPicker({ role, playbook, assignments, onChoose, onClose }) {
+  if (!role) return null;
+  const assignedFormationId = assignments[role.id];
+  return (
+    <div className="decision-backdrop formation-picker-backdrop" role="dialog" aria-modal="true" aria-labelledby="formation-picker-title">
+      <div className="decision-panel formation-picker-panel">
+        <p className="eyebrow">ASSIGN PLAYBOOK ROLE</p>
+        <h2 id="formation-picker-title">Choose who performs {role.label}</h2>
+        <p>{role.brief} Every formation is legal. Recommended choices fit the role naturally; improvised choices trade efficiency for your plan.</p>
+        <div className="formation-picker-list">
+          {FORMATIONS.map((formation) => {
+            const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
+            const recommended = role.accepts.includes(formation.id);
+            const current = assignedFormationId === formation.id;
+            return (
+              <button key={formation.id} className={`${current ? "current" : ""} ${recommended ? "recommended" : "improvised"}`} onClick={() => onChoose(formation.id)}>
+                <FormationPortrait formation={formation} compact />
+                <span><b>{formation.name}</b><small>Currently: {currentRole?.label ?? "UNASSIGNED"}</small></span>
+                <span className="picker-fit">{recommended ? "RECOMMENDED" : "IMPROVISED"}</span>
+                {current ? <CheckCircle weight="fill" /> : <ArrowRight weight="bold" />}
+              </button>
+            );
+          })}
+        </div>
+        <button className="picker-cancel" onClick={onClose}>KEEP CURRENT ASSIGNMENT</button>
+      </div>
+    </div>
+  );
+}
+
 function CompletionOverlay({ rescued, usedSeals, playbook, onClose }) {
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className="decision-panel completion-panel">
         <CheckCircle className="completion-icon" weight="duotone" />
-        <p className="eyebrow">MISSION COMPLETE</p>
-        <h2 id="complete-title">Dead Circuit is dark.</h2>
-        <p>The Reactor Spine is sabotaged. Four formations crossed the Extraction Gantry before Helioch reinforcements sealed the foundry.</p>
+        <p className="eyebrow">OPERATION SUCCESS</p>
+        <div className="victory-banner">VICTORY</div>
+        <h2 id="complete-title">You won Operation Dead Circuit.</h2>
+        <p>The Reactor Spine was sabotaged and 4 formations escaped. Victory required the primary objective plus at least 3 extracted formations.</p>
         <div className="after-action-grid">
-          <div><span>PRIMARY</span><b>Reactor sabotaged</b><CheckCircle weight="fill" /></div>
-          <div><span>EXTRACTION</span><b>4 / 5 formations</b><CheckCircle weight="fill" /></div>
+          <div><span>PRIMARY · COMPLETE</span><b>Reactor sabotaged</b><CheckCircle weight="fill" /></div>
+          <div><span>EXTRACTION · PASSED</span><b>4 extracted · 3 required</b><CheckCircle weight="fill" /></div>
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAYBOOK</span><b>{playbook.name}</b><Seal weight="duotone" /></div>
         </div>
@@ -627,6 +661,7 @@ export function App() {
   const [resolvedDecisions, setResolvedDecisions] = useState([]);
   const [rescueComplete, setRescueComplete] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
+  const [pickerRoleId, setPickerRoleId] = useState(null);
   const timerRef = useRef(null);
 
   const playbook = useMemo(
@@ -640,8 +675,13 @@ export function App() {
   );
 
   const planReady = useMemo(
-    () => playbook.roles.every((role) => role.accepts.includes(assignments[role.id]))
+    () => playbook.roles.every((role) => Boolean(assignments[role.id]))
       && new Set(Object.values(assignments)).size === FORMATIONS.length,
+    [assignments, playbook],
+  );
+
+  const improvisedCount = useMemo(
+    () => playbook.roles.filter((role) => !role.accepts.includes(assignments[role.id])).length,
     [assignments, playbook],
   );
 
@@ -649,9 +689,10 @@ export function App() {
     () => [
       `Loading ${playbook.name} geometry`,
       ...playbook.stages.map((stage) => `${stage.label} timing and support arcs confirmed`),
+      improvisedCount > 0 ? `${improvisedCount} improvised role assignments accepted` : "All role assignments fit recommended capabilities",
       `Both authored breakpoints remain inside the mission window`,
     ],
-    [playbook],
+    [improvisedCount, playbook],
   );
 
   useEffect(() => {
@@ -703,27 +744,27 @@ export function App() {
     setAssignments(defaultAssignments(next));
     setBranches(defaultBranches());
     setSelected(next.roles[0].defaultFormation);
+    setPickerRoleId(null);
     setDrillStep(-1);
     setDrillComplete(false);
   };
 
-  const canAssign = (roleId) => {
-    const targetRole = playbook.roles.find((role) => role.id === roleId);
-    const currentRole = playbook.roles.find((role) => assignments[role.id] === selected);
-    const displacedFormation = assignments[roleId];
-    if (!targetRole?.accepts.includes(selected)) return false;
-    return !currentRole || currentRole.id === roleId || currentRole.accepts.includes(displacedFormation);
-  };
-
-  const assignFormation = (roleId) => {
-    if (phase !== "plan" || !canAssign(roleId)) return;
-    const currentRole = playbook.roles.find((role) => assignments[role.id] === selected);
-    if (!currentRole || currentRole.id === roleId) return;
+  const chooseFormationForRole = (formationId) => {
+    if (phase !== "plan" || !pickerRoleId || !FORMATIONS.some((formation) => formation.id === formationId)) return;
+    const targetRole = playbook.roles.find((role) => role.id === pickerRoleId);
+    const currentRole = playbook.roles.find((role) => assignments[role.id] === formationId);
+    if (!targetRole || !currentRole) return;
+    if (targetRole.id === currentRole.id) {
+      setPickerRoleId(null);
+      return;
+    }
     setAssignments((current) => ({
       ...current,
-      [currentRole.id]: current[roleId],
-      [roleId]: selected,
+      [currentRole.id]: current[targetRole.id],
+      [targetRole.id]: formationId,
     }));
+    setSelected(formationId);
+    setPickerRoleId(null);
     setDrillComplete(false);
   };
 
@@ -773,6 +814,7 @@ export function App() {
     setResolvedDecisions([]);
     setRescueComplete(false);
     setShowCompletion(false);
+    setPickerRoleId(null);
   };
 
   return (
@@ -781,10 +823,11 @@ export function App() {
       <div className="mission-shell">
         <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} />
         <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} />
-        <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignments={assignments} selected={selected} onAssign={assignFormation} canAssign={canAssign} />
+        <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignments={assignments} onChooseRole={setPickerRoleId} improvisedCount={improvisedCount} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={branches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} onResolve={resolveDecision} />
+      <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
       {showCompletion && <CompletionOverlay rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} onClose={() => setShowCompletion(false)} />}
     </main>
   );
