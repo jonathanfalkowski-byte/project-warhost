@@ -147,6 +147,31 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .map-formation-label { position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%); padding: 2px 5px; background: rgba(7,10,10,.92); color: #d2d6d4; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .05em; white-space: nowrap; }
 .map-formation.in-motion { animation: formationPulse 1.4s ease-in-out infinite alternate; }
 .combo-panel { position: absolute; z-index: 10; left: 3%; top: 39%; width: 265px; padding: 10px; }
+.playbook-board { position: absolute; z-index: 15; left: 3%; top: 51%; width: min(720px, 76%); padding: 13px; background: rgba(8, 14, 14, .96); border-color: #3b6879; box-shadow: 0 14px 32px rgba(0, 0, 0, .48); }
+.playbook-board.incomplete { box-shadow: inset 0 0 0 1px rgba(41, 169, 232, .1), 0 14px 32px rgba(0, 0, 0, .48); }
+.playbook-board.ready { border-color: #5b8b53; }
+.playbook-board-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.playbook-board-heading > div { display: grid; gap: 2px; }
+.playbook-board-heading > div > b { font-family: "Barlow Condensed"; font-size: 19px; letter-spacing: .08em; color: #d7e6e8; }
+.playbook-board-heading > strong { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; color: #62c8f3; }
+.playbook-board.ready .playbook-board-heading > strong { color: #8bcf68; }
+.playbook-board > p { margin: 5px 0 11px; color: #a6b0ac; font-size: 11px; }
+.playbook-slot-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
+.playbook-slot { min-width: 0; min-height: 98px; position: relative; display: grid; grid-template-rows: 17px 1fr 19px; align-items: center; padding: 7px; border: 1px dashed #47788d; background: #0c171b; color: #b8c4c2; text-align: left; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+.playbook-slot:hover:not(:disabled) { transform: translateY(-2px); border-style: solid; border-color: #69cef7; background: #112933; box-shadow: 0 0 18px rgba(41, 169, 232, .16); }
+.playbook-slot:disabled { cursor: default; }
+.playbook-slot.filled { border-style: solid; border-color: #3e6b7e; background: #102027; }
+.slot-number { position: absolute; top: 6px; right: 7px; font-family: "Barlow Condensed"; font-size: 10px; color: #5386a0; }
+.slot-role { min-width: 0; padding-right: 22px; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 600; letter-spacing: .05em; color: #9bb4bd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-empty { align-self: stretch; display: grid; place-content: center; justify-items: center; gap: 4px; color: #64c8f2; }
+.slot-empty svg { width: 25px; height: 25px; padding: 4px; border: 1px solid #4a91ae; background: #102a35; }
+.slot-empty b { font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .08em; }
+.slot-formation { min-width: 0; align-self: stretch; display: grid; grid-template-columns: 31px minmax(0, 1fr); align-items: center; gap: 6px; }
+.slot-formation img { width: 31px; height: 31px; object-fit: cover; border-radius: 50%; border: 1px solid #4b879e; filter: brightness(1.15) contrast(1.1); }
+.slot-formation b { min-width: 0; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-result { display: flex; align-items: end; justify-content: space-between; gap: 5px; padding-top: 3px; border-top: 1px solid #29424c; font-family: "Barlow Condensed"; }
+.slot-result b { font-size: 14px; color: #69cef7; }
+.slot-result small { font-size: 8px; letter-spacing: .06em; color: #7d918f; }
 
 .enemy-formation { position: absolute; z-index: 8; width: 88px; height: 88px; overflow: visible; background: transparent; transition: opacity .5s, filter .5s; }
 .enemy-formation img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; border: 1px solid #a85a31; filter: brightness(1.16) contrast(1.18) saturate(.95); box-shadow: 0 7px 14px rgba(0,0,0,.72); }
@@ -195,23 +220,8 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .progress-row { display: flex; align-items: center; gap: 7px; color: #7e8883; font-size: 11px; }
 .progress-row svg { width: 16px; height: 16px; }
 .progress-row.done { color: #91cc69; }
-.role-board { padding-bottom: 8px; }
-.role-instruction { margin: 6px 0 8px !important; font-size: 10px !important; color: #737e79 !important; }
-.role-list { display: grid; gap: 4px; }
-.role-slot { min-height: 49px; display: grid; grid-template-columns: 27px minmax(0, 1fr) auto 16px; align-items: center; gap: 6px; padding: 4px 7px; border: 1px solid #33403b; background: #101615; color: #b7bfbb; text-align: left; cursor: pointer; }
-.role-slot > span:first-child { height: 25px; display: grid; place-items: center; border-right: 1px solid #315266; color: #59bce8; font-family: "Barlow Condensed"; font-size: 12px; }
-.role-slot > span:nth-child(2) { min-width: 0; display: grid; }
-.role-slot b { font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .06em; }
-.role-slot small { color: #78837e; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.role-slot > svg { width: 16px; color: #56829a; }
-.role-output { min-width: 48px; display: grid; justify-items: end; color: #6bc8f2; font-family: "Barlow Condensed"; }
-.role-output b { font-size: 13px; letter-spacing: .05em; }
-.role-output small { font-size: 8px; letter-spacing: .05em; color: #778983; }
-.role-slot.empty { border-style: dashed; border-color: #42514b; }
-.role-slot.empty .role-output b { color: #7f8b86; font-size: 9px; }
-.role-slot.filled { border-color: #3d6474; }
-.role-slot:hover:not(:disabled) { border-color: #4e8ba6; background: #12232a; }
-.role-slot:disabled { cursor: not-allowed; opacity: .42; }
+.assignment-pointer { margin-top: 9px !important; display: flex; align-items: center; gap: 5px; color: #67c8f2 !important; }
+.assignment-pointer svg { width: 15px; flex: 0 0 auto; }
 
 .mission-footer { display: grid; grid-template-columns: minmax(410px, 1.15fr) 275px minmax(460px, 1fr); border-top: 1px solid var(--line); background: #0b0f0e; z-index: 20; }
 .contingency-block, .seals-block { padding: 10px 12px; border-right: 1px solid var(--line); }
@@ -303,4 +313,6 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
   .formation-row { grid-template-columns: 22px 54px minmax(0, 1fr); }
   .formation-image.compact { width: 54px; }
   .combo-panel { width: 235px; }
+  .playbook-board { width: 92%; left: 4%; }
+  .playbook-slot { min-height: 91px; }
 }

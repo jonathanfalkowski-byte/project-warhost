@@ -22,6 +22,7 @@ import {
   MapPin,
   Pause,
   Play,
+  Plus,
   Radio,
   Seal,
   Shield,
@@ -376,19 +377,61 @@ function ObjectiveMarker({ className, number, title, description, state = "activ
   );
 }
 
-function ComboPanel({ active, drillStep, playbook }) {
+function PlaybookBoard({ active, assignments, drillStep, onChooseRole, outputs, phase, playbook }) {
+  if (phase === "battle" || phase === "complete") {
+    return (
+      <div className={`combo-panel panel-surface ${active ? "ready" : "broken"}`}>
+        <span className="panel-label">{playbook.name}: {playbook.stages.map((stage) => stage.label).join(" → ")}</span>
+        <p>{active ? playbook.intent : "One or more tactical roles are unresolved."}</p>
+        <div className="combo-steps">
+          {playbook.stages.map((stage, index) => {
+            const Icon = stage.icon;
+            return (
+              <Fragment key={stage.label}>
+                <div className={drillStep >= index + 1 ? `lit ${stage.warm ? "warm" : ""}` : ""}><Icon weight="duotone" /><b>{stage.label}</b><small>{stage.detail}</small></div>
+                {index < playbook.stages.length - 1 && <ArrowRight />}
+              </Fragment>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const assignedCount = Object.values(assignments).filter(Boolean).length;
   return (
-    <div className={`combo-panel panel-surface ${active ? "ready" : "broken"}`}>
-      <span className="panel-label">{playbook.name}: {playbook.stages.map((stage) => stage.label).join(" → ")}</span>
-      <p>{active ? playbook.intent : "One or more tactical roles are unresolved."}</p>
-      <div className="combo-steps">
-        {playbook.stages.map((stage, index) => {
-          const Icon = stage.icon;
+    <div className={`playbook-board panel-surface ${active ? "ready" : "incomplete"}`}>
+      <div className="playbook-board-heading">
+        <div>
+          <span className="panel-label">{playbook.name} FORMATION BOARD</span>
+          <b>BUILD THE PLAY</b>
+        </div>
+        <strong>{assignedCount} / {playbook.roles.length} ASSIGNED</strong>
+      </div>
+      <p>Select any empty slot, then choose a staged formation. Results appear after placement.</p>
+      <div className="playbook-slot-strip">
+        {playbook.roles.map((role, index) => {
+          const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
+          const output = outputs[role.id];
           return (
-            <Fragment key={stage.label}>
-              <div className={drillStep >= index + 1 ? `lit ${stage.warm ? "warm" : ""}` : ""}><Icon weight="duotone" /><b>{stage.label}</b><small>{stage.detail}</small></div>
-              {index < playbook.stages.length - 1 && <ArrowRight />}
-            </Fragment>
+            <button
+              key={role.id}
+              className={`playbook-slot ${formation ? "filled" : "empty"}`}
+              onClick={() => onChooseRole(role.id)}
+              disabled={phase !== "plan"}
+              aria-label={`Assign formation to ${role.label}. Currently ${formation?.name ?? "empty"}`}
+            >
+              <span className="slot-number">{String(index + 1).padStart(2, "0")}</span>
+              <span className="slot-role">{role.label}</span>
+              {formation ? (
+                <>
+                  <span className="slot-formation"><img src={formation.asset} alt="" /><b>{formation.name}</b></span>
+                  <span className="slot-result"><b>{output.score}%</b><small>{output.links} {output.links === 1 ? "LINK" : "LINKS"}</small></span>
+                </>
+              ) : (
+                <span className="slot-empty"><Plus weight="bold" /><b>ASSIGN UNIT</b></span>
+              )}
+            </button>
           );
         })}
       </div>
@@ -396,7 +439,7 @@ function ComboPanel({ active, drillStep, playbook }) {
   );
 }
 
-function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, planReady, playbook, drillSteps }) {
+function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, planReady, playbook, drillSteps, assignments, outputs, onChooseRole }) {
   const activeFormations = phase === "complete" ? ["harpoon", "furnace", "breaker", "railjack"] : FORMATIONS.map((f) => f.id);
   const alphaState = battleTime >= 60 ? "secured" : "active";
   const betaState = battleTime >= 150 ? "secured" : "threat";
@@ -454,7 +497,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
         );
       })}
 
-      <ComboPanel active={planReady} drillStep={drillStep} playbook={playbook} />
+      <PlaybookBoard active={planReady} assignments={assignments} drillStep={drillStep} onChooseRole={onChooseRole} outputs={outputs} phase={phase} playbook={playbook} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -476,44 +519,14 @@ function BattlePulse({ battleTime }) {
   );
 }
 
-function RoleBoard({ playbook, assignments, outputs, onChooseRole, phase }) {
-  return (
-    <div className="intel-block role-board">
-      <span className="panel-label">PLAYBOOK ROLE SLOTS</span>
-      <p className="role-instruction">Assign every formation. Output appears only after placement and changes with neighboring links.</p>
-      <div className="role-list">
-        {playbook.roles.map((role, index) => {
-          const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
-          const output = outputs[role.id];
-          return (
-            <button
-              key={role.id}
-              className={`role-slot ${formation ? "filled" : "empty"}`}
-              onClick={() => onChooseRole(role.id)}
-              disabled={phase !== "plan"}
-              aria-label={`Choose formation for ${role.label}. Currently ${formation?.name ?? "unassigned"}`}
-              title={role.brief}
-            >
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <span><b>{role.label}</b><small>{formation?.name ?? "EMPTY · CHOOSE FORMATION"}</small></span>
-              <span className="role-output">{output ? <><b>{output.score}%</b><small>{output.links} {output.links === 1 ? "LINK" : "LINKS"}</small></> : <b>ASSIGN</b>}</span>
-              <ArrowRight weight="bold" />
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignments, outputs, onChooseRole, assignedCount }) {
+function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignedCount }) {
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
-      {(phase === "plan" || phase === "drill") && <RoleBoard playbook={playbook} assignments={assignments} outputs={outputs} onChooseRole={onChooseRole} phase={phase} />}
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planReady ? "viable" : "at-risk"}>{planReady ? "VIABLE" : `${assignedCount} / 5 ASSIGNED`}</strong>
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
+        {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Build the play on the battlefield formation board.</p>}
       </div>
       <div className="intel-block enemy-intel">
         <span className="panel-label">ENEMY INTELLIGENCE</span>
@@ -859,8 +872,8 @@ export function App() {
       <AppHeader phase={phase} battleTime={battleTime} />
       <div className="mission-shell">
         <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} />
-        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} />
-        <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignments={assignments} outputs={roleOutputs} onChooseRole={setPickerRoleId} assignedCount={assignedCount} />
+        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} outputs={roleOutputs} onChooseRole={setPickerRoleId} />
+        <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={branches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} onResolve={resolveDecision} />
