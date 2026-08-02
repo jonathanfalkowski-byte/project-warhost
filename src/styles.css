@@ -219,9 +219,25 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .slot-formation { min-width: 0; align-self: stretch; display: grid; grid-template-columns: 31px minmax(0, 1fr); align-items: center; gap: 6px; }
 .slot-formation img { width: 31px; height: 31px; object-fit: cover; border-radius: 50%; border: 1px solid #4b879e; filter: brightness(1.15) contrast(1.1); }
 .slot-formation b { min-width: 0; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slot-result { display: flex; align-items: end; justify-content: space-between; gap: 5px; padding-top: 3px; border-top: 1px solid #29424c; font-family: "Barlow Condensed"; }
-.slot-result b { font-size: 14px; color: #69cef7; }
-.slot-result small { font-size: 8px; letter-spacing: .06em; color: #7d918f; }
+.slot-result { min-width: 0; display: grid; gap: 1px; padding-top: 3px; border-top: 1px solid #29424c; font-family: "Barlow Condensed"; }
+.slot-result b { min-width: 0; font-size: 11px; color: #69cef7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-result small { font-size: 7px; letter-spacing: .08em; color: #7d918f; }
+.slot-result.transformed b { color: #9ada78; text-shadow: 0 0 8px rgba(130, 202, 99, .28); }
+.handoff-board { margin-top: 10px; padding-top: 8px; border-top: 1px solid #273c43; }
+.handoff-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; font-family: "Barlow Condensed"; }
+.handoff-heading > span { color: #8fb8c8; font-size: 10px; letter-spacing: .11em; }
+.handoff-heading > small { color: #687773; font-size: 8px; letter-spacing: .04em; }
+.handoff-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.handoff-card { min-width: 0; min-height: 51px; display: grid; align-content: center; gap: 2px; padding: 5px 7px; border: 1px dashed #344b52; background: #0b1213; color: #687a80; font-family: "Barlow Condensed"; }
+.handoff-card > span { display: flex; align-items: center; gap: 3px; font-size: 8px; letter-spacing: .08em; }
+.handoff-card > span svg, .handoff-card small svg { width: 9px; height: 9px; flex: 0 0 auto; }
+.handoff-card > b { min-width: 0; font-size: 11px; letter-spacing: .05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.handoff-card > small { min-width: 0; display: flex; align-items: center; gap: 4px; color: #697773; font-size: 8px; }
+.handoff-card > small em { min-width: 0; font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.handoff-card.discovered { border-style: solid; border-color: #5f8f4e; background: linear-gradient(100deg, #102317, #0c1717); color: #9bd879; box-shadow: inset 0 0 12px rgba(91, 151, 64, .08); }
+.handoff-card.discovered > small { color: #a8bba6; }
+.handoff-card.discovered > small em:last-child { color: #a5e181; }
+.handoff-card.independent { border-color: #564b3f; color: #998c7d; }
 
 .enemy-formation { position: absolute; z-index: 8; width: 88px; height: 88px; overflow: visible; background: transparent; transition: opacity .5s, filter .5s; }
 .enemy-formation img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; border: 1px solid #a85a31; filter: brightness(1.16) contrast(1.18) saturate(.95); box-shadow: 0 7px 14px rgba(0,0,0,.72); }
@@ -243,6 +259,13 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .combo-steps > div.lit > svg { color: var(--blue); }
 .combo-steps > div.lit.warm { border-color: var(--orange); background: #2c1a0f; }
 .combo-steps > div.lit.warm > svg { color: var(--orange); }
+.battle-handoffs { margin-top: 8px; display: grid; gap: 4px; }
+.battle-handoffs > span { font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .1em; color: #76919b; }
+.battle-handoffs > div { min-width: 0; display: grid; grid-template-columns: 15px minmax(0, 1fr); align-items: center; gap: 2px 5px; padding: 4px 5px; border-left: 2px solid #6fa654; background: #102017; }
+.battle-handoffs > div > svg { grid-row: 1 / 3; width: 13px; color: #91d16e; }
+.battle-handoffs > div > b { min-width: 0; font-family: "Barlow Condensed"; font-size: 10px; color: #a5dd82; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.battle-handoffs > div > small { font-size: 8px; color: #849681; }
+.battle-handoffs > p { margin: 0; color: #78827e; font-size: 9px; }
 .drill-status, .battle-pulse { position: absolute; z-index: 16; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 360px; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border: 1px solid var(--blue); background: rgba(6, 18, 24, .96); box-shadow: 0 0 40px rgba(19, 121, 167, .25); }
 .drill-status > svg, .battle-pulse > svg { color: #55c6f4; width: 30px; height: 30px; }
 .drill-status div, .battle-pulse div { display: grid; }
@@ -333,13 +356,16 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .formation-picker-panel { width: min(680px, 92vw); }
 .formation-picker-panel > h2 { font-size: 30px; }
 .formation-picker-list { margin-top: 18px; display: grid; gap: 6px; }
-.formation-picker-list > button { min-height: 82px; display: grid; grid-template-columns: 62px minmax(0, 1fr) 22px; align-items: center; gap: 10px; padding: 8px; border: 1px solid #35423d; background: #121817; color: #c4cac7; text-align: left; cursor: pointer; }
+.formation-picker-list > button { min-height: 92px; display: grid; grid-template-columns: 62px minmax(0, 1fr) 22px; align-items: center; gap: 10px; padding: 8px; border: 1px solid #35423d; background: #121817; color: #c4cac7; text-align: left; cursor: pointer; }
 .formation-picker-list > button:hover { border-color: #4b9bc0; background: #11252d; }
 .formation-picker-list > button.current { border-color: var(--blue); background: #102630; }
 .formation-picker-list .formation-image.compact { width: 60px; height: 60px; }
 .picker-formation-copy { min-width: 0; display: grid; gap: 2px; }
 .formation-picker-list b { font-family: "Barlow Condensed"; font-size: 15px; letter-spacing: .06em; }
 .formation-picker-list small { color: #9aa5a0; font-size: 10px; line-height: 1.3; }
+.tactic-vocabulary { min-width: 0; display: flex; gap: 5px; margin: 2px 0; }
+.tactic-vocabulary em { min-width: 0; padding: 2px 5px; border: 1px solid #385462; background: #0d1d22; color: #85bdd2; font-size: 8px !important; letter-spacing: .06em !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tactic-vocabulary em:last-child { border-color: #4c5039; background: #1b1b11; color: #b9b278; }
 .picker-formation-copy em { margin-top: 2px; font-style: normal; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .07em; }
 .picker-formation-copy em.available { color: #69c9ef; }
 .picker-formation-copy em.assigned { color: #8bcf68; }
