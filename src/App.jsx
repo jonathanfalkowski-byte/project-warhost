@@ -187,68 +187,94 @@ const BREAKPOINTS = [
 
 const FIELD_PLANS = {
   trapline: {
-    entry: { x: 12, y: 46 },
     positions: [
-      { x: 29, y: 40 },
-      { x: 43, y: 35 },
-      { x: 58, y: 29 },
-      { x: 68, y: 39 },
-      { x: 90, y: 34 },
+      { x: 35, y: 32 },
+      { x: 49, y: 38 },
+      { x: 62, y: 32 },
+      { x: 70, y: 25 },
+      { x: 73, y: 47 },
     ],
-    baseLinks: [["entry", 0], [0, 1], [2, 3]],
+    routes: [
+      { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha", { x: 48, y: 25 }] },
+      { role: 1, start: { x: 26, y: 80 }, points: [1, { x: 57, y: 39 }, { x: 67, y: 46 }] },
+      { role: 2, start: { x: 35, y: 76 }, points: [2], breakpoint: "beta" },
+      { role: 3, start: { x: 44, y: 80 }, points: [3, "beta"] },
+      { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
+    ],
+    breakpointRoles: { beta: 2, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [1, 2],
-        protect: [1, { x: 51, y: 18 }, 2],
+        tempo: [2, "reactor"],
+        protect: [2, { x: 67, y: 20 }, { x: 72, y: 34 }, "reactor"],
       },
       rescue: {
-        clock: [3, 4],
-        recover: [3, { x: 88, y: 45 }, 4],
+        clock: [4, "extraction"],
+        recover: [4, "rescue", "extraction"],
       },
     },
   },
   spear: {
-    entry: { x: 12, y: 46 },
     positions: [
-      { x: 28, y: 43 },
-      { x: 42, y: 38 },
-      { x: 58, y: 30 },
-      { x: 69, y: 38 },
-      { x: 90, y: 34 },
+      { x: 34, y: 36 },
+      { x: 49, y: 27 },
+      { x: 61, y: 36 },
+      { x: 54, y: 43 },
+      { x: 73, y: 48 },
     ],
-    baseLinks: [["entry", 0], [0, 1], [2, 3]],
+    routes: [
+      { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha"] },
+      { role: 1, start: { x: 26, y: 80 }, points: [1, "beta"] },
+      { role: 2, start: { x: 35, y: 76 }, points: [2], breakpoint: "beta" },
+      { role: 3, start: { x: 44, y: 80 }, points: [3, { x: 66, y: 43 }] },
+      { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
+    ],
+    breakpointRoles: { beta: 2, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [1, 2],
-        protect: [1, { x: 49, y: 24 }, { x: 55, y: 20 }, 2],
+        tempo: [2, "reactor"],
+        protect: [2, { x: 65, y: 23 }, { x: 72, y: 34 }, "reactor"],
       },
       rescue: {
-        clock: [3, 4],
-        recover: [3, { x: 88, y: 45 }, 4],
+        clock: [4, "extraction"],
+        recover: [4, "rescue", "extraction"],
       },
     },
   },
   pressure: {
-    entry: { x: 12, y: 46 },
     positions: [
-      { x: 29, y: 41 },
-      { x: 59, y: 20 },
-      { x: 47, y: 34 },
-      { x: 68, y: 39 },
-      { x: 90, y: 34 },
+      { x: 34, y: 32 },
+      { x: 60, y: 18 },
+      { x: 48, y: 40 },
+      { x: 64, y: 38 },
+      { x: 73, y: 48 },
     ],
-    baseLinks: [["entry", 0], ["entry", 1], [0, 2], [2, 3]],
+    routes: [
+      { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha"] },
+      { role: 1, start: { x: 26, y: 80 }, points: [1, "beta"] },
+      { role: 2, start: { x: 35, y: 76 }, points: [2, { x: 56, y: 33 }] },
+      { role: 3, start: { x: 44, y: 80 }, points: [3], breakpoint: "beta" },
+      { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
+    ],
+    breakpointRoles: { beta: 3, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [1, 2],
-        protect: [1, { x: 63, y: 34 }, 2],
+        tempo: [3, "reactor"],
+        protect: [3, { x: 68, y: 25 }, { x: 73, y: 35 }, "reactor"],
       },
       rescue: {
-        clock: [3, 4],
-        recover: [3, { x: 88, y: 45 }, 4],
+        clock: [4, "extraction"],
+        recover: [4, "rescue", "extraction"],
       },
     },
   },
+};
+
+const FIELD_LANDMARKS = {
+  alpha: { x: 35, y: 24 },
+  beta: { x: 76, y: 12 },
+  reactor: { x: 76, y: 46 },
+  extraction: { x: 91, y: 18 },
+  rescue: { x: 83, y: 75 },
 };
 
 const EVENTS = [
@@ -449,8 +475,8 @@ function ObjectiveMarker({ className, number, title, description, state = "activ
 }
 
 const resolveFieldPoint = (plan, reference) => {
-  if (reference === "entry") return plan.entry;
   if (typeof reference === "number") return plan.positions[reference];
+  if (typeof reference === "string") return FIELD_LANDMARKS[reference];
   return reference;
 };
 
@@ -487,35 +513,64 @@ function TacticalFieldPlan({ assignments, branches, phase, playbook }) {
 
   if (!plan || phase === "battle" || phase === "complete") return null;
 
-  const baseSegments = plan.baseLinks.map(([from, to], index) => ({
-    id: `base-${index}`,
-    start: resolveFieldPoint(plan, from),
-    end: resolveFieldPoint(plan, to),
-    className: "base",
-  }));
-  const branchSegments = BREAKPOINTS.flatMap((breakpoint, breakpointIndex) => {
-    const optionId = branches[breakpoint.id];
-    const route = plan.branchRoutes[breakpoint.id][optionId];
-    const changed = optionId !== breakpoint.defaultOption;
-    return route.slice(0, -1).map((point, index) => ({
-      id: `${breakpoint.id}-${optionId}-${index}`,
-      start: resolveFieldPoint(plan, point),
-      end: resolveFieldPoint(plan, route[index + 1]),
-      className: `branch breakpoint-${breakpointIndex + 1} ${changed ? "changed" : ""}`,
+  const routes = plan.routes.map((route) => {
+    const roleIndex = route.role;
+    const role = playbook.roles[roleIndex];
+    const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
+    const staging = formation ? STAGING_NODES[formation.id] : null;
+    const start = staging ? { x: staging.left, y: staging.top - 3 } : route.start;
+    return { ...route, roleIndex, role, formation, start };
+  });
+  const baseSegments = routes.flatMap((route) => {
+    const points = [route.start, ...route.points].map((point) => resolveFieldPoint(plan, point));
+    return points.slice(0, -1).map((point, index) => ({
+      id: `route-${route.roleIndex}-${index}`,
+      start: point,
+      end: points[index + 1],
+      className: `base lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""}`,
     }));
   });
+  const branchSegments = BREAKPOINTS.flatMap((breakpoint, breakpointIndex) => {
+    const selectedOptionId = branches[breakpoint.id];
+    const roleIndex = plan.breakpointRoles[breakpoint.id];
+    const role = playbook.roles[roleIndex];
+    const staffed = Boolean(assignments[role.id]);
+    const orderedOptions = [
+      ...breakpoint.options.filter((option) => option.id !== selectedOptionId),
+      ...breakpoint.options.filter((option) => option.id === selectedOptionId),
+    ];
+    return orderedOptions.flatMap((option) => {
+      const route = plan.branchRoutes[breakpoint.id][option.id];
+      const selectedRoute = option.id === selectedOptionId;
+      const changed = selectedRoute && option.id !== breakpoint.defaultOption;
+      return route.slice(0, -1).map((point, index) => ({
+        id: `${breakpoint.id}-${option.id}-${index}`,
+        start: resolveFieldPoint(plan, point),
+        end: resolveFieldPoint(plan, route[index + 1]),
+        className: `branch breakpoint-${breakpointIndex + 1} lane-${roleIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"} ${staffed ? "staffed" : ""} ${changed ? "changed" : ""}`,
+      }));
+    });
+  });
   const branchTurns = BREAKPOINTS.flatMap((breakpoint, breakpointIndex) => {
-    const optionId = branches[breakpoint.id];
-    const option = breakpoint.options.find((item) => item.id === optionId);
-    return plan.branchRoutes[breakpoint.id][optionId]
-      .filter((point) => typeof point === "object")
-      .map((point, index) => ({ id: `${breakpoint.id}-turn-${index}`, point, label: option.routeLabel, className: `breakpoint-${breakpointIndex + 1}` }));
+    const selectedOptionId = branches[breakpoint.id];
+    return breakpoint.options.flatMap((option) => {
+      const selectedRoute = option.id === selectedOptionId;
+      return plan.branchRoutes[breakpoint.id][option.id]
+        .filter((point) => typeof point === "object" || point === "rescue")
+        .slice(0, 1)
+        .map((point, index) => ({
+          id: `${breakpoint.id}-${option.id}-turn-${index}`,
+          point: resolveFieldPoint(plan, point),
+          label: `${selectedRoute ? "" : "ALT · "}${option.routeLabel}`,
+          className: `breakpoint-${breakpointIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"}`,
+        }));
+    });
   });
 
   return (
     <div className="field-plan-layer" ref={layerRef} aria-label={`${playbook.name} authored battlefield plan`}>
       <div className="field-plan-caption panel-surface" aria-live="polite">
-        <div><span>FIELD PLAN</span><b>{playbook.name}</b></div>
+        <div><span>5 FORMATION ROUTES</span><b>{playbook.name}</b></div>
         <div className="field-plan-branch-state">
           {BREAKPOINTS.map((breakpoint, index) => {
             const option = breakpoint.options.find((item) => item.id === branches[breakpoint.id]);
@@ -534,12 +589,18 @@ function TacticalFieldPlan({ assignments, branches, phase, playbook }) {
           <MapPin weight="fill" /><span>{turn.label}</span>
         </div>
       ))}
-      <div className="field-plan-entry" style={{ left: `${plan.entry.x}%`, top: `${plan.entry.y}%` }}><Flag weight="fill" /><span>DEPLOY</span></div>
+      {routes.map((route) => (
+        <div className={`field-plan-entry lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""}`} style={{ left: `${route.start.x}%`, top: `${route.start.y}%` }} key={`origin-${route.roleIndex}`}>
+          <Flag weight="fill" />
+          <span>{route.formation ? route.formation.number : String(route.roleIndex + 1).padStart(2, "0")}</span>
+          <small>{route.formation ? route.formation.name : `ROUTE ${String(route.roleIndex + 1).padStart(2, "0")}`}</small>
+        </div>
+      ))}
       {plan.positions.map((position, index) => {
         const role = playbook.roles[index];
         const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
         return (
-          <div className={`field-plan-position ${formation ? "staffed" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
+          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
             <b>{String(index + 1).padStart(2, "0")}</b>
             <span>{role.label.split(" / ")[0]}</span>
             {formation && <em>{formation.name}</em>}
@@ -583,8 +644,8 @@ function PlaybookBoard({ active, assignments, drillStep, onChooseRole, onAssignF
         </div>
         <strong>{assignedCount} / {playbook.roles.length} PLACED</strong>
       </div>
-      <p>The route and action stops are fixed. Select a breakpoint order below to redraw the affected leg; drag or click to staff each stop.</p>
-      <div className="route-terminals" aria-hidden="true"><span>ENTRY</span><span>OBJECTIVE</span></div>
+      <p>Each stop belongs to a separate formation route. Drag or click to staff it; the lightning links show placement combos, not movement.</p>
+      <div className="route-terminals" aria-hidden="true"><span>FORMATION LANES</span><span>COMBO ORDER</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
           const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
@@ -621,7 +682,7 @@ function PlaybookBoard({ active, assignments, drillStep, onChooseRole, onAssignF
                   <span className="slot-empty"><Plus weight="bold" /><b>DROP UNIT</b><small>OR CLICK</small></span>
                 )}
               </button>
-              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${linked ? "linked" : ""}`} aria-hidden="true"><ArrowRight weight="bold" /></span>}
+              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${linked ? "linked" : ""}`} aria-hidden="true" title="Placement combo link, not a movement route"><Lightning weight="fill" /></span>}
             </Fragment>
           );
         })}
