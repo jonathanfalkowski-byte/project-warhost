@@ -291,7 +291,7 @@ function AppHeader({ phase, battleTime }) {
   );
 }
 
-function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook, phase }) {
+function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook, phase, onFormationDragStart }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -324,20 +324,25 @@ function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook
           const Icon = formation.icon;
           const active = selected === formation.id;
           const assignedRole = roleByFormation[formation.id];
+          const assignedIndex = assignedRole ? playbook.roles.findIndex((role) => role.id === assignedRole.id) : -1;
           return (
             <button
               key={formation.id}
-              className={`formation-row ${active ? "selected" : ""}`}
+              className={`formation-row ${active ? "selected" : ""} ${assignedRole ? "assigned" : "available"}`}
               onClick={() => onSelect(formation.id)}
+              draggable={phase === "plan"}
+              onDragStart={(event) => onFormationDragStart(event, formation.id)}
               disabled={phase !== "plan" && phase !== "drill"}
               aria-pressed={active}
+              aria-label={`${formation.name}. ${assignedRole ? `Assigned to action stop ${assignedIndex + 1}, ${assignedRole.label}` : "Available. Drag to an action stop"}.`}
+              title={phase === "plan" ? "Drag to an action stop or click to inspect on the field" : undefined}
             >
               <span className="formation-number">{formation.number}</span>
               <FormationPortrait formation={formation} compact />
               <span className="formation-copy">
                 <b>{formation.name}</b>
                 <small><Icon weight="duotone" /> {formation.role}</small>
-                <em>{assignedRole?.label ?? "UNASSIGNED · STAGING"}</em>
+                <em>{assignedRole ? `STOP ${String(assignedIndex + 1).padStart(2, "0")} · ${assignedRole.label}` : "AVAILABLE · DRAG TO STOP"}</em>
               </span>
             </button>
           );
@@ -377,7 +382,9 @@ function ObjectiveMarker({ className, number, title, description, state = "activ
   );
 }
 
-function PlaybookBoard({ active, assignments, drillStep, onChooseRole, outputs, phase, playbook }) {
+function PlaybookBoard({ active, assignments, drillStep, onChooseRole, onAssignFormation, outputs, phase, playbook }) {
+  const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
+
   if (phase === "battle" || phase === "complete") {
     return (
       <div className={`combo-panel panel-surface ${active ? "ready" : "broken"}`}>
@@ -403,35 +410,51 @@ function PlaybookBoard({ active, assignments, drillStep, onChooseRole, outputs, 
     <div className={`playbook-board panel-surface ${active ? "ready" : "incomplete"}`}>
       <div className="playbook-board-heading">
         <div>
-          <span className="panel-label">{playbook.name} FORMATION BOARD</span>
-          <b>BUILD THE PLAY</b>
+          <span className="panel-label">{playbook.name} · AUTHORED TACTICAL ROUTE</span>
+          <b>PLACE THE FORMATIONS</b>
         </div>
-        <strong>{assignedCount} / {playbook.roles.length} ASSIGNED</strong>
+        <strong>{assignedCount} / {playbook.roles.length} PLACED</strong>
       </div>
-      <p>Select any empty slot, then choose a staged formation. Results appear after placement.</p>
-      <div className="playbook-slot-strip">
+      <p>The route and action stops are fixed. Drag a formation into each stop, or click a stop to choose; output appears only after placement.</p>
+      <div className="route-terminals" aria-hidden="true"><span>ENTRY</span><span>OBJECTIVE</span></div>
+      <div className="playbook-route">
         {playbook.roles.map((role, index) => {
           const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
           const output = outputs[role.id];
+          const nextRole = playbook.roles[index + 1];
+          const nextFormation = nextRole ? FORMATIONS.find((item) => item.id === assignments[nextRole.id]) : null;
+          const linked = formation && nextFormation ? formationsLink(formation.id, nextFormation.id) : false;
           return (
-            <button
-              key={role.id}
-              className={`playbook-slot ${formation ? "filled" : "empty"}`}
-              onClick={() => onChooseRole(role.id)}
-              disabled={phase !== "plan"}
-              aria-label={`Assign formation to ${role.label}. Currently ${formation?.name ?? "empty"}`}
-            >
-              <span className="slot-number">{String(index + 1).padStart(2, "0")}</span>
-              <span className="slot-role">{role.label}</span>
-              {formation ? (
-                <>
-                  <span className="slot-formation"><img src={formation.asset} alt="" /><b>{formation.name}</b></span>
-                  <span className="slot-result"><b>{output.score}%</b><small>{output.links} {output.links === 1 ? "LINK" : "LINKS"}</small></span>
-                </>
-              ) : (
-                <span className="slot-empty"><Plus weight="bold" /><b>ASSIGN UNIT</b></span>
-              )}
-            </button>
+            <Fragment key={role.id}>
+              <button
+                className={`playbook-slot ${formation ? "filled" : "empty"} ${dropTargetRoleId === role.id ? "drop-target" : ""}`}
+                onClick={() => onChooseRole(role.id)}
+                onDragEnter={(event) => { event.preventDefault(); setDropTargetRoleId(role.id); }}
+                onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
+                onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropTargetRoleId(null); }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const formationId = event.dataTransfer.getData("application/x-warhost-formation") || event.dataTransfer.getData("text/plain");
+                  setDropTargetRoleId(null);
+                  onAssignFormation(role.id, formationId);
+                }}
+                disabled={phase !== "plan"}
+                aria-label={`Action stop ${index + 1}, ${role.label}. Currently ${formation?.name ?? "empty"}`}
+              >
+                <span className="slot-number">STOP {String(index + 1).padStart(2, "0")}</span>
+                <span className="slot-role">{role.label}</span>
+                <span className="slot-task">{role.brief}</span>
+                {formation ? (
+                  <>
+                    <span className="slot-formation"><img src={formation.asset} alt="" /><b>{formation.name}</b></span>
+                    <span className="slot-result"><b>{output.score}%</b><small>{output.links} {output.links === 1 ? "LINK" : "LINKS"}</small></span>
+                  </>
+                ) : (
+                  <span className="slot-empty"><Plus weight="bold" /><b>DROP UNIT</b><small>OR CLICK</small></span>
+                )}
+              </button>
+              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${linked ? "linked" : ""}`} aria-hidden="true"><ArrowRight weight="bold" /></span>}
+            </Fragment>
           );
         })}
       </div>
@@ -439,7 +462,7 @@ function PlaybookBoard({ active, assignments, drillStep, onChooseRole, outputs, 
   );
 }
 
-function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, planReady, playbook, drillSteps, assignments, outputs, onChooseRole }) {
+function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, planReady, playbook, drillSteps, assignments, outputs, onChooseRole, onAssignFormation, onFormationDragStart }) {
   const activeFormations = phase === "complete" ? ["harpoon", "furnace", "breaker", "railjack"] : FORMATIONS.map((f) => f.id);
   const alphaState = battleTime >= 60 ? "secured" : "active";
   const betaState = battleTime >= 150 ? "secured" : "threat";
@@ -488,6 +511,8 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
             className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""}`}
             style={{ left: `${node.left + progressShift}%`, top: `${node.top - progressShift * 0.45}%` }}
             onClick={() => onSelect(formation.id)}
+            draggable={phase === "plan"}
+            onDragStart={(event) => onFormationDragStart(event, formation.id)}
             aria-label={`${formation.name}, ${assignedNode ? formation.role : "unassigned"}, at ${node.label}`}
           >
             <FormationPortrait formation={formation} />
@@ -497,7 +522,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
         );
       })}
 
-      <PlaybookBoard active={planReady} assignments={assignments} drillStep={drillStep} onChooseRole={onChooseRole} outputs={outputs} phase={phase} playbook={playbook} />
+      <PlaybookBoard active={planReady} assignments={assignments} drillStep={drillStep} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -526,7 +551,7 @@ function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, ass
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planReady ? "viable" : "at-risk"}>{planReady ? "VIABLE" : `${assignedCount} / 5 ASSIGNED`}</strong>
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
-        {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Build the play on the battlefield formation board.</p>}
+        {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Place formations on the authored tactical route.</p>}
       </div>
       <div className="intel-block enemy-intel">
         <span className="panel-label">ENEMY INTELLIGENCE</span>
@@ -648,23 +673,28 @@ function FormationPicker({ role, playbook, assignments, onChoose, onClose }) {
   return (
     <div className="decision-backdrop formation-picker-backdrop" role="dialog" aria-modal="true" aria-labelledby="formation-picker-title">
       <div className="decision-panel formation-picker-panel">
-        <p className="eyebrow">ASSIGN PLAYBOOK ROLE</p>
-        <h2 id="formation-picker-title">Choose who performs {role.label}</h2>
-        <p>{role.brief} The playbook provides the job. You decide who performs it; results are revealed after placement.</p>
+        <p className="eyebrow">STAFF ACTION STOP</p>
+        <h2 id="formation-picker-title">Who executes {role.label}?</h2>
+        <p>{role.brief} The route and timing are already authored. Choose the formation; its output and neighboring connections are revealed after placement.</p>
         <div className="formation-picker-list">
           {FORMATIONS.map((formation) => {
             const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
+            const currentRoleIndex = currentRole ? playbook.roles.findIndex((item) => item.id === currentRole.id) : -1;
             const current = assignedFormationId === formation.id;
             return (
               <button key={formation.id} className={current ? "current" : ""} onClick={() => onChoose(formation.id)}>
                 <FormationPortrait formation={formation} compact />
-                <span><b>{formation.name}</b><small>Currently: {currentRole?.label ?? "UNASSIGNED"}</small></span>
+                <span className="picker-formation-copy">
+                  <b>{formation.name}</b>
+                  <small>{formation.role} · {formation.purpose}</small>
+                  <em className={currentRole ? "assigned" : "available"}>{currentRole ? `ASSIGNED · STOP ${String(currentRoleIndex + 1).padStart(2, "0")} ${currentRole.label}` : "AVAILABLE"}</em>
+                </span>
                 {current ? <CheckCircle weight="fill" /> : <ArrowRight weight="bold" />}
               </button>
             );
           })}
         </div>
-        <button className="picker-cancel" onClick={onClose}>KEEP CURRENT ASSIGNMENT</button>
+        <button className="picker-cancel" onClick={onClose}>{assignedFormationId ? "KEEP CURRENT PLACEMENT" : "LEAVE STOP EMPTY"}</button>
       </div>
     </div>
   );
@@ -799,9 +829,9 @@ export function App() {
     setDrillComplete(false);
   };
 
-  const chooseFormationForRole = (formationId) => {
-    if (phase !== "plan" || !pickerRoleId || !FORMATIONS.some((formation) => formation.id === formationId)) return;
-    const targetRole = playbook.roles.find((role) => role.id === pickerRoleId);
+  const assignFormationToRole = (roleId, formationId) => {
+    if (phase !== "plan" || !FORMATIONS.some((formation) => formation.id === formationId)) return;
+    const targetRole = playbook.roles.find((role) => role.id === roleId);
     const sourceRole = playbook.roles.find((role) => assignments[role.id] === formationId);
     if (!targetRole) return;
     if (targetRole.id === sourceRole?.id) {
@@ -816,6 +846,22 @@ export function App() {
     setSelected(formationId);
     setPickerRoleId(null);
     setDrillComplete(false);
+  };
+
+  const chooseFormationForRole = (formationId) => {
+    if (!pickerRoleId) return;
+    assignFormationToRole(pickerRoleId, formationId);
+  };
+
+  const beginFormationDrag = (event, formationId) => {
+    if (phase !== "plan" || !FORMATIONS.some((formation) => formation.id === formationId)) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-warhost-formation", formationId);
+    event.dataTransfer.setData("text/plain", formationId);
+    setSelected(formationId);
   };
 
   const chooseBranch = (breakpointId, optionId) => {
@@ -871,8 +917,8 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} />
       <div className="mission-shell">
-        <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} />
-        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} outputs={roleOutputs} onChooseRole={setPickerRoleId} />
+        <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} />
+        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} outputs={roleOutputs} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} />
         <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={branches} onBranch={chooseBranch} />

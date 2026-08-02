@@ -17,6 +17,11 @@
 - Placement-feedback capture: `C:\Users\Admin\Documents\Project-Warhost\audit-08-board-placement-feedback.png`
 - Complete formation-board capture: `C:\Users\Admin\Documents\Project-Warhost\audit-09-complete-formation-board.png`
 - Compact formation-board capture: `C:\Users\Admin\Documents\Project-Warhost\audit-10-visible-board-1440.png`
+- Pre-route formation-board capture: `C:\Users\Admin\Documents\Project-Warhost\audit-11-board-before-route-model.png`
+- Authored-route empty-state capture: `C:\Users\Admin\Documents\Project-Warhost\audit-12-authored-route-empty.png`
+- Route placement and availability capture: `C:\Users\Admin\Documents\Project-Warhost\audit-13-route-placement-and-status.png`
+- Unit-information picker capture: `C:\Users\Admin\Documents\Project-Warhost\audit-14-unit-information-picker.png`
+- Authored-route comparison: `C:\Users\Admin\Documents\Project-Warhost\design-qa-authored-route-comparison.png`
 - Role-board comparison: `C:\Users\Admin\Documents\Project-Warhost\design-qa-role-board-comparison.png`
 - Full comparison: `C:\Users\Admin\Documents\Project-Warhost\design-qa-full-comparison.png`
 - Battlefield comparison: `C:\Users\Admin\Documents\Project-Warhost\design-qa-battlefield-comparison.png`
@@ -24,7 +29,7 @@
 - Targeted assignment-board viewport: 1694 × 1465 CSS pixels at device scale 1
 - Targeted comparison dimensions: two equal 1694 × 1465 captures combined into one 3388 × 1465 image with no scaling or density conversion
 - Source normalization: original 1536 × 1024 mock center-cropped by 48 pixels on each horizontal edge
-- Captured state: initial planning board with five empty role slots, followed by a player-authored Trapline whose output percentages and combo links are visible only after placement
+- Captured state: initial planning board with five empty action stops, followed by a player-staffed Trapline whose output percentages and combo links are visible only after placement
 - Full-view comparison evidence: `design-qa-role-board-comparison.png` shows the obscured right-rail controls beside the corrected central formation board at the same viewport and state.
 - Focused-region evidence: a separate crop was unnecessary because all five slot labels, plus actions, assignment count, and nearby objectives remain legible in the full-resolution comparison; `audit-10-visible-board-1440.png` separately confirms the board clears mission markers at the compact desktop viewport.
 
@@ -40,14 +45,17 @@
 | Product character | Pass | Round tactical formation plaques replace collectible-card silhouettes and keep the battlefield readable and selectable. |
 | Playbook planning | Pass | Three maneuvers, five unmistakable central assignment slots, and two authored breakpoint responses are visible without adding freehand paths, card hands, or RTS controls. |
 | Goal clarity | Pass | The planning map now states the exact victory formula before commitment; the debrief states `VICTORY` and repeats the achieved threshold. |
-| Assignment agency | Pass | Each role begins as a large dashed slot with a plus symbol and `ASSIGN UNIT`. Every slot opens the same unranked chooser; output appears only after a choice and changes with neighboring combo links. |
+| Assignment agency | Pass | Each action stop begins as a large dashed drop target with a plus symbol and explicit click fallback. Every stop opens the same unranked chooser; output appears only after a choice and changes with neighboring combo links. |
+| Authored-route clarity | Pass | The board now shows one fixed route from `ENTRY` to `OBJECTIVE`, with visible continuation lines through five numbered action stops. Copy consistently says the player places formations instead of building the play. |
+| Placement state | Pass | The roster and chooser identify each used formation by exact stop number and role, while unused formations remain explicitly `AVAILABLE`; no recommended slot or candidate ranking is exposed. |
 
 ## Interaction review
 
 - Formation selection works from both the roster and battlefield.
 - Playbook selection swaps the complete maneuver, role grammar, and battlefield disposition.
 - Direct role assignment opens an explicit, unranked formation picker and swaps the chosen formation with the role's prior occupant.
-- The central formation board is now the assignment surface; the right rail only reports mission intelligence and points the player toward the board.
+- Formations are draggable from the roster or battlefield to any fixed action stop; the same placement and swap rules are retained through the click-and-choose fallback.
+- The central authored-route board is now the assignment surface; the right rail only reports mission intelligence and points the player toward it.
 - Every assignment remains legal. Post-placement output and combo-link counts recalculate immediately without exposing the hidden scoring formula.
 - Breakpoint responses are authored before the mission and remain visible in the command footer.
 - Ghost Drill runs a deterministic five-step simulation and reaches `DRILL VERIFIED`.
@@ -68,6 +76,7 @@
 5. User testing exposed an unclear result and undiscoverable role assignment. Victory orders, explicit formation pickers, unrestricted assignments, and an unmistakable victory debrief replaced those ambiguous states.
 6. Further testing showed that prefilling roles and labeling fit removed the placement puzzle. Playbooks now begin empty, the chooser is unranked, and performance feedback is revealed only after the player experiments.
 7. A player screenshot then exposed a P1 discoverability failure: empty-role controls were visually buried in the intelligence rail while the central Trapline panel was passive. The panel became a five-slot `BUILD THE PLAY` formation board, with equal-viewport evidence in `design-qa-role-board-comparison.png`; the revised state makes all five actions visible without changing the hidden-solution rule.
+8. Player feedback clarified that the play itself is authored and only its performers are chosen. The central board became a connected `AUTHORED TACTICAL ROUTE` with fixed action stops, drag-and-drop placement, exact assigned-stop labels, neutral unit-purpose information, and a click fallback. Equal-viewport evidence is in `design-qa-authored-route-comparison.png`.
 
 ## Residual variance
 

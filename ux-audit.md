@@ -13,9 +13,14 @@ Understand how to win, freely decide which formation performs each tactical role
 1. `audit-06-role-slots-obscured.png` — previous planning state, where the central Trapline panel was passive and the only assignment controls resembled status rows in the right rail.
 2. `audit-07-visible-formation-board.png` — corrected empty state with five large assignment slots in the central formation board.
 3. `audit-08-board-placement-feedback.png` — first placement showing post-placement output without revealing a preferred answer beforehand.
-4. `audit-09-complete-formation-board.png` — complete player-authored formation with output and neighbor links.
+4. `audit-09-complete-formation-board.png` — complete player-staffed formation sequence with output and neighbor links.
 5. `design-qa-role-board-comparison.png` — equal-viewport before-and-after comparison.
 6. `audit-03-explicit-victory.png` — completed mission result.
+7. `audit-11-board-before-route-model.png` — prior board that incorrectly framed staffing as building the play.
+8. `audit-12-authored-route-empty.png` — corrected fixed route with five connected action stops.
+9. `audit-13-route-placement-and-status.png` — two staffed stops showing revealed output, a linked route leg, and exact roster assignments.
+10. `audit-14-unit-information-picker.png` — neutral unit capability and task-purpose information with explicit assigned and available states.
+11. `design-qa-authored-route-comparison.png` — equal 1440 × 1024 before-and-after route-model comparison.
 
 ## Findings and resolution
 
@@ -28,9 +33,16 @@ Understand how to win, freely decide which formation performs each tactical role
 ### 2. Formation assignment — healthy after revision
 
 - Previous risk: after prefilling was removed, the only assignment controls lived in the narrow intelligence rail and looked like passive status rows. The central Trapline panel displayed role names but was not interactive, so the player reasonably concluded that no slots existed.
-- Resolution: all five roles now begin as large, dashed slots inside the central `BUILD THE PLAY` formation board. Each slot has an explicit plus symbol and `ASSIGN UNIT` action. Clicking a slot opens the same unranked five-formation chooser, and choosing an occupied formation swaps it into the selected role.
+- Resolution: all five roles begin as large, dashed action stops inside the central authored-route board. Each stop has an explicit plus symbol, drag target, and click fallback. Clicking a stop opens the same unranked five-formation chooser, and choosing an occupied formation swaps it into the selected stop.
 - Player agency: no recommendation or suitability hint appears before selection. Output percentage and linked-neighbor count appear only after placement, then recalculate when an adjacent assignment changes.
 - Accessibility: each slot and formation is a semantic button with a complete accessible label. Keyboard traversal and focus indicators still require hands-on assistive-technology testing.
+
+### 2a. Authored play versus player placement — healthy after revision
+
+- Previous risk: `BUILD THE PLAY` implied that the player was creating the maneuver, even though the intended decision was which formation should execute each already-authored action.
+- Resolution: the board now presents a continuous route from `ENTRY` to `OBJECTIVE`, interrupted by five fixed, numbered action stops. The player drags a formation into a stop or uses the click picker; they do not draw, edit, or redirect the route.
+- Availability: assigned formations identify their exact stop in both roster and chooser. Unused formations remain explicitly `AVAILABLE`, so the remaining decision space is visible without offering recommendations.
+- Decision support: the chooser exposes each formation's broad capability and task purpose. Fit percentages and adjacency links remain hidden until placement, preserving experimentation.
 
 ### 3. Mission result — healthy after revision
 
