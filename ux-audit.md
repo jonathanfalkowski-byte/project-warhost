@@ -21,6 +21,12 @@ Understand how to win, freely decide which formation performs each tactical role
 9. `audit-13-route-placement-and-status.png` — two staffed stops showing revealed output, a linked route leg, and exact roster assignments.
 10. `audit-14-unit-information-picker.png` — neutral unit capability and task-purpose information with explicit assigned and available states.
 11. `design-qa-authored-route-comparison.png` — equal 1440 × 1024 before-and-after route-model comparison.
+12. `audit-15-before-field-plan.png` — planning state before battlefield geometry was exposed.
+13. `audit-22-final-authored-field-plan.png` — Trapline drawn as a numbered directional route across the battlefield.
+14. `audit-25-final-route-change-preview.png` — covered-diversion and recovery-loop legs visible after alternate breakpoint selections.
+15. `audit-26-final-divided-pressure-plan.png` — playbook switch redrawing the opening as a split formation.
+16. `audit-20-breakpoint-route-comparison.png` — live event comparing the authored path with the paid override path.
+17. `design-qa-field-plan-comparison.png` — equal 1280 × 720 before-and-after field-plan comparison.
 
 ## Findings and resolution
 
@@ -43,6 +49,13 @@ Understand how to win, freely decide which formation performs each tactical role
 - Resolution: the board now presents a continuous route from `ENTRY` to `OBJECTIVE`, interrupted by five fixed, numbered action stops. The player drags a formation into a stop or uses the click picker; they do not draw, edit, or redirect the route.
 - Availability: assigned formations identify their exact stop in both roster and chooser. Unused formations remain explicitly `AVAILABLE`, so the remaining decision space is visible without offering recommendations.
 - Decision support: the chooser exposes each formation's broad capability and task purpose. Fit percentages and adjacency links remain hidden until placement, preserving experimentation.
+
+### 2b. Battlefield plan comprehension — healthy after revision
+
+- Previous risk: the staffing board established sequence but did not reveal where the maneuver traveled across the actual battlefield. Players could not compare Trapline, Armored Spear, or Divided Pressure spatially.
+- Resolution: every playbook now draws a directional field plan from `DEPLOY` through five numbered action positions. Switching playbooks redraws the entire formation geometry; Divided Pressure visibly forks before converging.
+- Breakpoint consequence: selecting an alternate order redraws only its affected leg and labels the new diversion. At contact, the decision screen compares the authored path and override path before a Command Seal can be spent.
+- Accessibility: position names, route summaries, and live route comparisons are present as text in addition to color and geometry. Exact spatial relationships still require visual perception; a full screen-reader route narration remains a future test area.
 
 ### 3. Mission result — healthy after revision
 

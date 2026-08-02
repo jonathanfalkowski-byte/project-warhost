@@ -169,8 +169,8 @@ const BREAKPOINTS = [
     id: "beta",
     trigger: "IF Beta lane is ranged",
     options: [
-      { id: "tempo", label: "PRESERVE TEMPO", effect: "Cross exposed; keep reactor timing." },
-      { id: "protect", label: "PROTECT BREACHER", effect: "Lay smoke and divert the thrust." },
+      { id: "tempo", label: "PRESERVE TEMPO", effect: "Cross exposed; keep reactor timing.", routeLabel: "DIRECT CROSSING", path: ["BETA LANE", "REACTOR"] },
+      { id: "protect", label: "PROTECT BREACHER", effect: "Lay smoke and divert the thrust.", routeLabel: "COVERED DIVERSION", path: ["SMOKE LINE", "COVERED ARC", "REACTOR"] },
     ],
     defaultOption: "tempo",
   },
@@ -178,12 +178,78 @@ const BREAKPOINTS = [
     id: "rescue",
     trigger: "IF salvage crew is located",
     options: [
-      { id: "clock", label: "PRESERVE CLOCK", effect: "Leave the crew; secure extraction." },
-      { id: "recover", label: "RECOVER CREW", effect: "Divert the Hauler before sabotage." },
+      { id: "clock", label: "PRESERVE CLOCK", effect: "Leave the crew; secure extraction.", routeLabel: "BYPASS SALVAGE", path: ["REACTOR", "EXTRACTION"] },
+      { id: "recover", label: "RECOVER CREW", effect: "Divert the Hauler before sabotage.", routeLabel: "RECOVERY LOOP", path: ["REACTOR", "SALVAGE PEN", "EXTRACTION"] },
     ],
     defaultOption: "clock",
   },
 ];
+
+const FIELD_PLANS = {
+  trapline: {
+    entry: { x: 12, y: 46 },
+    positions: [
+      { x: 29, y: 40 },
+      { x: 43, y: 35 },
+      { x: 58, y: 29 },
+      { x: 68, y: 39 },
+      { x: 90, y: 34 },
+    ],
+    baseLinks: [["entry", 0], [0, 1], [2, 3]],
+    branchRoutes: {
+      beta: {
+        tempo: [1, 2],
+        protect: [1, { x: 51, y: 18 }, 2],
+      },
+      rescue: {
+        clock: [3, 4],
+        recover: [3, { x: 88, y: 45 }, 4],
+      },
+    },
+  },
+  spear: {
+    entry: { x: 12, y: 46 },
+    positions: [
+      { x: 28, y: 43 },
+      { x: 42, y: 38 },
+      { x: 58, y: 30 },
+      { x: 69, y: 38 },
+      { x: 90, y: 34 },
+    ],
+    baseLinks: [["entry", 0], [0, 1], [2, 3]],
+    branchRoutes: {
+      beta: {
+        tempo: [1, 2],
+        protect: [1, { x: 49, y: 24 }, { x: 55, y: 20 }, 2],
+      },
+      rescue: {
+        clock: [3, 4],
+        recover: [3, { x: 88, y: 45 }, 4],
+      },
+    },
+  },
+  pressure: {
+    entry: { x: 12, y: 46 },
+    positions: [
+      { x: 29, y: 41 },
+      { x: 59, y: 20 },
+      { x: 47, y: 34 },
+      { x: 68, y: 39 },
+      { x: 90, y: 34 },
+    ],
+    baseLinks: [["entry", 0], ["entry", 1], [0, 2], [2, 3]],
+    branchRoutes: {
+      beta: {
+        tempo: [1, 2],
+        protect: [1, { x: 63, y: 34 }, 2],
+      },
+      rescue: {
+        clock: [3, 4],
+        recover: [3, { x: 88, y: 45 }, 4],
+      },
+    },
+  },
+};
 
 const EVENTS = [
   { at: 30, text: "Forward role has contact. Playbook in motion." },
@@ -382,6 +448,108 @@ function ObjectiveMarker({ className, number, title, description, state = "activ
   );
 }
 
+const resolveFieldPoint = (plan, reference) => {
+  if (reference === "entry") return plan.entry;
+  if (typeof reference === "number") return plan.positions[reference];
+  return reference;
+};
+
+const fieldSegmentStyle = (start, end, size) => {
+  const width = Math.max(size.width, 1);
+  const height = Math.max(size.height, 1);
+  const dx = ((end.x - start.x) / 100) * width;
+  const dy = ((end.y - start.y) / 100) * height;
+  return {
+    left: `${start.x}%`,
+    top: `${start.y}%`,
+    width: `${Math.hypot(dx, dy)}px`,
+    transform: `translateY(-50%) rotate(${Math.atan2(dy, dx)}rad)`,
+  };
+};
+
+function TacticalFieldPlan({ assignments, branches, phase, playbook }) {
+  const layerRef = useRef(null);
+  const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
+  const plan = FIELD_PLANS[playbook.id];
+
+  useEffect(() => {
+    if (!layerRef.current || phase === "battle" || phase === "complete") return undefined;
+    const element = layerRef.current;
+    const measure = () => {
+      const bounds = element.getBoundingClientRect();
+      setLayerSize({ width: bounds.width, height: bounds.height });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [phase, playbook.id]);
+
+  if (!plan || phase === "battle" || phase === "complete") return null;
+
+  const baseSegments = plan.baseLinks.map(([from, to], index) => ({
+    id: `base-${index}`,
+    start: resolveFieldPoint(plan, from),
+    end: resolveFieldPoint(plan, to),
+    className: "base",
+  }));
+  const branchSegments = BREAKPOINTS.flatMap((breakpoint, breakpointIndex) => {
+    const optionId = branches[breakpoint.id];
+    const route = plan.branchRoutes[breakpoint.id][optionId];
+    const changed = optionId !== breakpoint.defaultOption;
+    return route.slice(0, -1).map((point, index) => ({
+      id: `${breakpoint.id}-${optionId}-${index}`,
+      start: resolveFieldPoint(plan, point),
+      end: resolveFieldPoint(plan, route[index + 1]),
+      className: `branch breakpoint-${breakpointIndex + 1} ${changed ? "changed" : ""}`,
+    }));
+  });
+  const branchTurns = BREAKPOINTS.flatMap((breakpoint, breakpointIndex) => {
+    const optionId = branches[breakpoint.id];
+    const option = breakpoint.options.find((item) => item.id === optionId);
+    return plan.branchRoutes[breakpoint.id][optionId]
+      .filter((point) => typeof point === "object")
+      .map((point, index) => ({ id: `${breakpoint.id}-turn-${index}`, point, label: option.routeLabel, className: `breakpoint-${breakpointIndex + 1}` }));
+  });
+
+  return (
+    <div className="field-plan-layer" ref={layerRef} aria-label={`${playbook.name} authored battlefield plan`}>
+      <div className="field-plan-caption panel-surface" aria-live="polite">
+        <div><span>FIELD PLAN</span><b>{playbook.name}</b></div>
+        <div className="field-plan-branch-state">
+          {BREAKPOINTS.map((breakpoint, index) => {
+            const option = breakpoint.options.find((item) => item.id === branches[breakpoint.id]);
+            const changed = branches[breakpoint.id] !== breakpoint.defaultOption;
+            return <span className={changed ? "changed" : ""} key={breakpoint.id}>BP{index + 1} · {option.routeLabel}</span>;
+          })}
+        </div>
+      </div>
+      {[...baseSegments, ...branchSegments].map((segment) => (
+        <div className={`field-plan-segment ${segment.className}`} style={fieldSegmentStyle(segment.start, segment.end, layerSize)} key={segment.id}>
+          <ArrowRight weight="bold" />
+        </div>
+      ))}
+      {branchTurns.map((turn) => (
+        <div className={`field-plan-turn ${turn.className}`} style={{ left: `${turn.point.x}%`, top: `${turn.point.y}%` }} key={turn.id}>
+          <MapPin weight="fill" /><span>{turn.label}</span>
+        </div>
+      ))}
+      <div className="field-plan-entry" style={{ left: `${plan.entry.x}%`, top: `${plan.entry.y}%` }}><Flag weight="fill" /><span>DEPLOY</span></div>
+      {plan.positions.map((position, index) => {
+        const role = playbook.roles[index];
+        const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
+        return (
+          <div className={`field-plan-position ${formation ? "staffed" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
+            <b>{String(index + 1).padStart(2, "0")}</b>
+            <span>{role.label.split(" / ")[0]}</span>
+            {formation && <em>{formation.name}</em>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PlaybookBoard({ active, assignments, drillStep, onChooseRole, onAssignFormation, outputs, phase, playbook }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
 
@@ -415,7 +583,7 @@ function PlaybookBoard({ active, assignments, drillStep, onChooseRole, onAssignF
         </div>
         <strong>{assignedCount} / {playbook.roles.length} PLACED</strong>
       </div>
-      <p>The route and action stops are fixed. Drag a formation into each stop, or click a stop to choose; output appears only after placement.</p>
+      <p>The route and action stops are fixed. Select a breakpoint order below to redraw the affected leg; drag or click to staff each stop.</p>
       <div className="route-terminals" aria-hidden="true"><span>ENTRY</span><span>OBJECTIVE</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
@@ -462,7 +630,7 @@ function PlaybookBoard({ active, assignments, drillStep, onChooseRole, onAssignF
   );
 }
 
-function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, planReady, playbook, drillSteps, assignments, outputs, onChooseRole, onAssignFormation, onFormationDragStart }) {
+function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, planReady, playbook, drillSteps, assignments, branches, outputs, onChooseRole, onAssignFormation, onFormationDragStart }) {
   const activeFormations = phase === "complete" ? ["harpoon", "furnace", "breaker", "railjack"] : FORMATIONS.map((f) => f.id);
   const alphaState = battleTime >= 60 ? "secured" : "active";
   const betaState = battleTime >= 150 ? "secured" : "threat";
@@ -473,6 +641,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
     <section className={`battlefield phase-${phase}`} aria-label="Operation Dead Circuit mission map">
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt="Isometric industrial foundry battlefield" />
       <div className="battlefield-wash" />
+      <TacticalFieldPlan assignments={assignments} branches={branches} phase={phase} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} />
       <div className="map-sector entry-sector"><span>ENTRY / BREACH</span><small>Player deployment edge</small></div>
       <ObjectiveMarker className="alpha-objective" number="1" title="CONTROL NODE ALPHA" description={alphaState === "secured" ? "SECURED · Railjack anchoring" : "Seize and hold"} state={alphaState} />
@@ -605,6 +774,7 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
                       onClick={() => onBranch(breakpoint.id, option.id)}
                       disabled={phase !== "plan"}
                       aria-pressed={branches[breakpoint.id] === option.id}
+                      title={`${option.routeLabel}: ${option.effect}`}
                     >{option.label}</button>
                   ))}
                 </div>
@@ -658,6 +828,19 @@ function DecisionOverlay({ decision, seals, branches, onResolve }) {
         <h2 id="decision-title">{isBeta ? "Beta lane is collapsing" : "Salvage crew is cut off"}</h2>
         <p>{isBeta ? "Helioch fire has the planned transit lane ranged. Your authored response is ready for execution." : "The optional rescue now conflicts with the reactor timetable. Your playbook already contains a response."}</p>
         <div className="authored-order"><span>AUTHORED ORDER</span><b>{authored.label}</b><small>{authored.effect}</small></div>
+        <div className="decision-route-compare">
+          <span className="panel-label">HOW THE PLAN CHANGES</span>
+          {breakpoint.options.map((option) => {
+            const isAuthored = option.id === branches[decision];
+            return (
+              <div className={isAuthored ? "authored" : "alternate"} key={option.id}>
+                <strong>{isAuthored ? "AUTHORED PATH" : "IF OVERRIDDEN"}</strong>
+                <b>{option.routeLabel}</b>
+                <span>{option.path.map((step, index) => <Fragment key={step}>{index > 0 && <ArrowRight weight="bold" />}<em>{step}</em></Fragment>)}</span>
+              </div>
+            );
+          })}
+        </div>
         <div className="decision-actions">
           <button onClick={() => onResolve("plan")}><Play weight="duotone" /><span><b>EXECUTE PLAYBOOK</b><small>{authored.label} · spend no seal.</small></span></button>
           <button className="spend-seal" onClick={() => onResolve("override")} disabled={seals <= 0}><Seal weight="duotone" /><span><b>BREAK PLAYBOOK</b><small>{alternative.label} · spend 1 seal.</small></span></button>
@@ -918,7 +1101,7 @@ export function App() {
       <AppHeader phase={phase} battleTime={battleTime} />
       <div className="mission-shell">
         <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} />
-        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} outputs={roleOutputs} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} />
+        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={branches} outputs={roleOutputs} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} />
         <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={branches} onBranch={chooseBranch} />
