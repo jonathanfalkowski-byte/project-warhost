@@ -10,8 +10,8 @@ Understand how to win, freely decide which formation performs each tactical role
 
 ## Evidence
 
-1. `audit-01-goal-and-roles.png` — planning state with victory orders and an improvised assignment.
-2. `audit-02-formation-picker.png` — direct role-to-formation chooser.
+1. `audit-04-empty-playbook.png` — planning state with five unresolved roles and every formation staged.
+2. `audit-05-discovered-combo-output.png` — a player-authored formation with post-placement output and combo-link feedback.
 3. `audit-03-explicit-victory.png` — completed mission result.
 4. `audit-result-before-after.png` — user-provided result beside the corrected result.
 
@@ -25,9 +25,9 @@ Understand how to win, freely decide which formation performs each tactical role
 
 ### 2. Formation assignment — healthy after revision
 
-- Previous risk: the player had to infer a select-formation-then-click-compatible-role interaction, while disabled slots made valid intent appear impossible.
-- Resolution: clicking any role opens a named formation chooser containing all five formations. Choosing an occupied formation swaps it into the selected role.
-- Player agency: every assignment is legal. `RECOMMENDED` and `IMPROVISED` communicate fit without enforcing a designer-authored answer.
+- Previous risk: the interface solved the formation puzzle by prefilling roles and labeling the intended answer.
+- Resolution: all five roles now begin empty. Clicking any role opens the same unranked five-formation chooser, and choosing an occupied formation swaps it into the selected role.
+- Player agency: no recommendation or suitability hint appears before selection. Output percentage and linked-neighbor count appear only after placement, then recalculate when an adjacent assignment changes.
 - Accessibility: each slot and formation is a semantic button with a complete accessible label. Keyboard traversal and focus indicators still require hands-on assistive-technology testing.
 
 ### 3. Mission result — healthy after revision
@@ -39,4 +39,3 @@ Understand how to win, freely decide which formation performs each tactical role
 ## Evidence limits
 
 The visual and interaction checks cover the implemented desktop prototype. They do not establish full screen-reader behavior, zoom reflow, or campaign balance.
-

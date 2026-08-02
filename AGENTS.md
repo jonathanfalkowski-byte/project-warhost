@@ -21,6 +21,6 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - The primary planning interaction is a tactical playbook: choose a maneuver, assign formations to compatible roles, and author breakpoint responses before contact. Never require freehand path drawing or continuous unit micro.
 - Executing an authored breakpoint costs nothing. Breaking the playbook after contact costs one Command Seal, making foresight the core skill.
 - Retreat, if added, should be an authored contingency with an explicit objective and opportunity cost. Do not add a universal panic/retreat button or persistent damage until campaign recovery has a proven design purpose.
-- A playbook defines battlefield jobs, but the player decides which formation fills every role. Role suitability is advisory (`RECOMMENDED` or `IMPROVISED`) and must never prohibit a legal assignment.
+- A playbook defines battlefield jobs, but every role begins empty and the player decides which formation fills it. Never prefill roles or reveal a recommended answer in the chooser. Reveal output and combo-link feedback only after placement, allow adjacency to change that feedback, and keep the underlying scoring formula hidden so discovery remains part of play.
 - State the mission's victory formula before commitment and use unambiguous result language (`VICTORY`, `DEFEAT`, or a specifically defined partial result) in the debrief.
 - Fighting Withdrawal belongs to a later mission designed around force preservation; do not present it as an approach to Operation Dead Circuit.

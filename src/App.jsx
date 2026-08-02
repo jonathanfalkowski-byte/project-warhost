@@ -95,6 +95,14 @@ const NODES = {
   rescuePen: { left: 69, top: 72, label: "Salvage enclosure" },
 };
 
+const STAGING_NODES = {
+  harpoon: { left: 17, top: 83, label: "Staging line" },
+  furnace: { left: 26, top: 87, label: "Staging line" },
+  breaker: { left: 35, top: 83, label: "Staging line" },
+  railjack: { left: 44, top: 87, label: "Staging line" },
+  hauler: { left: 53, top: 83, label: "Staging line" },
+};
+
 const PLAYBOOKS = [
   {
     id: "trapline",
@@ -108,11 +116,11 @@ const PLAYBOOKS = [
       { label: "BREAK", detail: "Collapse hold.", icon: Hammer },
     ],
     roles: [
-      { id: "pull", label: "PULL / DISPLACER", brief: "Draw Alpha into the kill zone.", node: "alphaApproach", accepts: ["harpoon", "breaker"], defaultFormation: "harpoon" },
-      { id: "burn", label: "BURN / DENIER", brief: "Seal the hostile response lane.", node: "fireLine", accepts: ["furnace", "railjack"], defaultFormation: "furnace" },
-      { id: "break", label: "BREAK / BREACHER", brief: "Exploit the opened route.", node: "breachLine", accepts: ["breaker", "harpoon"], defaultFormation: "breaker" },
-      { id: "anchor", label: "ANCHOR", brief: "Hold the captured control node.", node: "anchorLine", accepts: ["railjack", "furnace"], defaultFormation: "railjack" },
-      { id: "recover", label: "RECOVERY", brief: "Preserve extraction capacity.", node: "recoveryLine", accepts: ["hauler"], defaultFormation: "hauler" },
+      { id: "pull", label: "PULL / DISPLACER", brief: "Draw Alpha into the kill zone.", node: "alphaApproach", accepts: ["harpoon", "breaker"] },
+      { id: "burn", label: "BURN / DENIER", brief: "Seal the hostile response lane.", node: "fireLine", accepts: ["furnace", "railjack"] },
+      { id: "break", label: "BREAK / BREACHER", brief: "Exploit the opened route.", node: "breachLine", accepts: ["breaker", "harpoon"] },
+      { id: "anchor", label: "ANCHOR", brief: "Hold the captured control node.", node: "anchorLine", accepts: ["railjack", "furnace"] },
+      { id: "recover", label: "RECOVERY", brief: "Preserve extraction capacity.", node: "recoveryLine", accepts: ["hauler"] },
     ],
   },
   {
@@ -127,11 +135,11 @@ const PLAYBOOKS = [
       { label: "EXPLOIT", detail: "Drive on reactor.", icon: Lightning },
     ],
     roles: [
-      { id: "screen", label: "SCREEN", brief: "Take first contact at Alpha.", node: "alphaApproach", accepts: ["railjack", "breaker"], defaultFormation: "railjack" },
-      { id: "point", label: "POINT", brief: "Mark the narrow transit lane.", node: "highWalk", accepts: ["harpoon", "breaker"], defaultFormation: "harpoon" },
-      { id: "punch", label: "PUNCH / BREACHER", brief: "Crack Beta and the reactor shell.", node: "breachLine", accepts: ["breaker", "harpoon"], defaultFormation: "breaker" },
-      { id: "suppress", label: "SUPPRESSION", brief: "Deny flanking reinforcements.", node: "fireLine", accepts: ["furnace", "railjack"], defaultFormation: "furnace" },
-      { id: "recover", label: "RECOVERY", brief: "Follow the armored corridor.", node: "recoveryLine", accepts: ["hauler"], defaultFormation: "hauler" },
+      { id: "screen", label: "SCREEN", brief: "Take first contact at Alpha.", node: "alphaApproach", accepts: ["railjack", "breaker"] },
+      { id: "point", label: "POINT", brief: "Mark the narrow transit lane.", node: "highWalk", accepts: ["harpoon", "breaker"] },
+      { id: "punch", label: "PUNCH / BREACHER", brief: "Crack Beta and the reactor shell.", node: "breachLine", accepts: ["breaker", "harpoon"] },
+      { id: "suppress", label: "SUPPRESSION", brief: "Deny flanking reinforcements.", node: "fireLine", accepts: ["furnace", "railjack"] },
+      { id: "recover", label: "RECOVERY", brief: "Follow the armored corridor.", node: "recoveryLine", accepts: ["hauler"] },
     ],
   },
   {
@@ -146,11 +154,11 @@ const PLAYBOOKS = [
       { label: "CONVERGE", detail: "Collapse on reactor.", icon: Factory },
     ],
     roles: [
-      { id: "alpha", label: "ALPHA PIN", brief: "Hold the known defenders in place.", node: "alphaApproach", accepts: ["railjack", "harpoon"], defaultFormation: "railjack" },
-      { id: "beta", label: "BETA RAID", brief: "Pressure the uncertain control node.", node: "betaLane", accepts: ["harpoon", "breaker"], defaultFormation: "harpoon" },
-      { id: "deny", label: "LANE DENIAL", brief: "Prevent either defense from reinforcing.", node: "fireLine", accepts: ["furnace", "railjack"], defaultFormation: "furnace" },
-      { id: "reactor", label: "REACTOR TEAM", brief: "Converge through the opening and sabotage.", node: "breachLine", accepts: ["breaker", "harpoon"], defaultFormation: "breaker" },
-      { id: "recover", label: "EXTRACTION", brief: "Collect the split force at the gantry.", node: "recoveryLine", accepts: ["hauler", "railjack"], defaultFormation: "hauler" },
+      { id: "alpha", label: "ALPHA PIN", brief: "Hold the known defenders in place.", node: "alphaApproach", accepts: ["railjack", "harpoon"] },
+      { id: "beta", label: "BETA RAID", brief: "Pressure the uncertain control node.", node: "betaLane", accepts: ["harpoon", "breaker"] },
+      { id: "deny", label: "LANE DENIAL", brief: "Prevent either defense from reinforcing.", node: "fireLine", accepts: ["furnace", "railjack"] },
+      { id: "reactor", label: "REACTOR TEAM", brief: "Converge through the opening and sabotage.", node: "breachLine", accepts: ["breaker", "harpoon"] },
+      { id: "recover", label: "EXTRACTION", brief: "Collect the split force at the gantry.", node: "recoveryLine", accepts: ["hauler", "railjack"] },
     ],
   },
 ];
@@ -187,8 +195,34 @@ const EVENTS = [
   { at: 345, text: "Warhost crossing the Extraction Gantry." },
 ];
 
-const defaultAssignments = (playbook) => Object.fromEntries(
-  playbook.roles.map((role) => [role.id, role.defaultFormation]),
+const emptyAssignments = (playbook) => Object.fromEntries(
+  playbook.roles.map((role) => [role.id, null]),
+);
+
+const SYNERGY_LINKS = new Set([
+  "breaker:harpoon",
+  "breaker:hauler",
+  "breaker:railjack",
+  "furnace:harpoon",
+  "furnace:railjack",
+  "hauler:railjack",
+]);
+
+const formationsLink = (leftId, rightId) => {
+  if (!leftId || !rightId) return false;
+  return SYNERGY_LINKS.has([leftId, rightId].sort().join(":"));
+};
+
+const calculateRoleOutputs = (playbook, assignments) => Object.fromEntries(
+  playbook.roles.map((role, index) => {
+    const formationId = assignments[role.id];
+    if (!formationId) return [role.id, null];
+    const neighbors = [playbook.roles[index - 1], playbook.roles[index + 1]].filter(Boolean);
+    const links = neighbors.filter((neighbor) => formationsLink(formationId, assignments[neighbor.id])).length;
+    const hiddenFit = role.accepts.includes(formationId) ? 72 : 58;
+    const score = Math.min(96, hiddenFit + links * 10 + (links === 2 ? 4 : 0));
+    return [role.id, { score, links }];
+  }),
 );
 
 const defaultBranches = () => Object.fromEntries(
@@ -258,7 +292,7 @@ function AppHeader({ phase, battleTime }) {
 
 function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook, phase }) {
   const roleByFormation = Object.fromEntries(
-    playbook.roles.map((role) => [assignments[role.id], role]),
+    playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
   return (
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
@@ -302,7 +336,7 @@ function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook
               <span className="formation-copy">
                 <b>{formation.name}</b>
                 <small><Icon weight="duotone" /> {formation.role}</small>
-                <em>{assignedRole?.label ?? "UNASSIGNED"}</em>
+                <em>{assignedRole?.label ?? "UNASSIGNED · STAGING"}</em>
               </span>
             </button>
           );
@@ -399,7 +433,8 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
       </div>
 
       {FORMATIONS.filter((formation) => activeFormations.includes(formation.id)).map((formation) => {
-        const node = NODES[deployments[formation.id]];
+        const assignedNode = deployments[formation.id] ? NODES[deployments[formation.id]] : null;
+        const node = assignedNode ?? STAGING_NODES[formation.id];
         const active = selected === formation.id;
         const progressShift = phase === "battle" || phase === "complete"
           ? Math.min(22, Math.floor(battleTime / 30) * 2.2)
@@ -410,7 +445,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
             className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""}`}
             style={{ left: `${node.left + progressShift}%`, top: `${node.top - progressShift * 0.45}%` }}
             onClick={() => onSelect(formation.id)}
-            aria-label={`${formation.name}, ${formation.role}, at ${node.label}`}
+            aria-label={`${formation.name}, ${assignedNode ? formation.role : "unassigned"}, at ${node.label}`}
           >
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
@@ -441,27 +476,27 @@ function BattlePulse({ battleTime }) {
   );
 }
 
-function RoleBoard({ playbook, assignments, onChooseRole, phase }) {
+function RoleBoard({ playbook, assignments, outputs, onChooseRole, phase }) {
   return (
     <div className="intel-block role-board">
       <span className="panel-label">PLAYBOOK ROLE SLOTS</span>
-      <p className="role-instruction">You decide who performs every job. Recommendations never lock a slot.</p>
+      <p className="role-instruction">Assign every formation. Output appears only after placement and changes with neighboring links.</p>
       <div className="role-list">
         {playbook.roles.map((role, index) => {
           const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
-          const recommended = role.accepts.includes(formation?.id);
+          const output = outputs[role.id];
           return (
             <button
               key={role.id}
-              className={`role-slot ${recommended ? "recommended" : "improvised"}`}
+              className={`role-slot ${formation ? "filled" : "empty"}`}
               onClick={() => onChooseRole(role.id)}
               disabled={phase !== "plan"}
               aria-label={`Choose formation for ${role.label}. Currently ${formation?.name ?? "unassigned"}`}
               title={role.brief}
             >
               <span>{String(index + 1).padStart(2, "0")}</span>
-              <span><b>{role.label}</b><small>{formation?.name ?? "CHOOSE FORMATION"}</small></span>
-              <span className="role-fit">{recommended ? "RECOMMENDED" : "IMPROVISED"}</span>
+              <span><b>{role.label}</b><small>{formation?.name ?? "EMPTY · CHOOSE FORMATION"}</small></span>
+              <span className="role-output">{output ? <><b>{output.score}%</b><small>{output.links} {output.links === 1 ? "LINK" : "LINKS"}</small></> : <b>ASSIGN</b>}</span>
               <ArrowRight weight="bold" />
             </button>
           );
@@ -471,15 +506,14 @@ function RoleBoard({ playbook, assignments, onChooseRole, phase }) {
   );
 }
 
-function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignments, onChooseRole, improvisedCount }) {
+function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignments, outputs, onChooseRole, assignedCount }) {
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
-      {(phase === "plan" || phase === "drill") && <RoleBoard playbook={playbook} assignments={assignments} onChooseRole={onChooseRole} phase={phase} />}
+      {(phase === "plan" || phase === "drill") && <RoleBoard playbook={playbook} assignments={assignments} outputs={outputs} onChooseRole={onChooseRole} phase={phase} />}
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
-        <strong className={planReady ? "viable" : "at-risk"}>{planReady ? "VIABLE" : "INCOMPLETE"}</strong>
+        <strong className={planReady ? "viable" : "at-risk"}>{planReady ? "VIABLE" : `${assignedCount} / 5 ASSIGNED`}</strong>
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
-        {improvisedCount > 0 && <p className="improvised-note"><Warning weight="fill" /> {improvisedCount} improvised {improvisedCount === 1 ? "assignment" : "assignments"}. Allowed, but riskier.</p>}
       </div>
       <div className="intel-block enemy-intel">
         <span className="panel-label">ENEMY INTELLIGENCE</span>
@@ -603,17 +637,15 @@ function FormationPicker({ role, playbook, assignments, onChoose, onClose }) {
       <div className="decision-panel formation-picker-panel">
         <p className="eyebrow">ASSIGN PLAYBOOK ROLE</p>
         <h2 id="formation-picker-title">Choose who performs {role.label}</h2>
-        <p>{role.brief} Every formation is legal. Recommended choices fit the role naturally; improvised choices trade efficiency for your plan.</p>
+        <p>{role.brief} The playbook provides the job. You decide who performs it; results are revealed after placement.</p>
         <div className="formation-picker-list">
           {FORMATIONS.map((formation) => {
             const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
-            const recommended = role.accepts.includes(formation.id);
             const current = assignedFormationId === formation.id;
             return (
-              <button key={formation.id} className={`${current ? "current" : ""} ${recommended ? "recommended" : "improvised"}`} onClick={() => onChoose(formation.id)}>
+              <button key={formation.id} className={current ? "current" : ""} onClick={() => onChoose(formation.id)}>
                 <FormationPortrait formation={formation} compact />
                 <span><b>{formation.name}</b><small>Currently: {currentRole?.label ?? "UNASSIGNED"}</small></span>
-                <span className="picker-fit">{recommended ? "RECOMMENDED" : "IMPROVISED"}</span>
                 {current ? <CheckCircle weight="fill" /> : <ArrowRight weight="bold" />}
               </button>
             );
@@ -651,7 +683,7 @@ export function App() {
   const [phase, setPhase] = useState("plan");
   const [selected, setSelected] = useState("harpoon");
   const [playbookId, setPlaybookId] = useState("trapline");
-  const [assignments, setAssignments] = useState(() => defaultAssignments(PLAYBOOKS[0]));
+  const [assignments, setAssignments] = useState(() => emptyAssignments(PLAYBOOKS[0]));
   const [branches, setBranches] = useState(defaultBranches);
   const [drillStep, setDrillStep] = useState(-1);
   const [drillComplete, setDrillComplete] = useState(false);
@@ -670,18 +702,23 @@ export function App() {
   );
 
   const deployments = useMemo(
-    () => Object.fromEntries(playbook.roles.map((role) => [assignments[role.id], role.node])),
+    () => Object.fromEntries(playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role.node])),
     [assignments, playbook],
+  );
+
+  const assignedCount = useMemo(
+    () => Object.values(assignments).filter(Boolean).length,
+    [assignments],
   );
 
   const planReady = useMemo(
     () => playbook.roles.every((role) => Boolean(assignments[role.id]))
-      && new Set(Object.values(assignments)).size === FORMATIONS.length,
+      && new Set(Object.values(assignments).filter(Boolean)).size === FORMATIONS.length,
     [assignments, playbook],
   );
 
-  const improvisedCount = useMemo(
-    () => playbook.roles.filter((role) => !role.accepts.includes(assignments[role.id])).length,
+  const roleOutputs = useMemo(
+    () => calculateRoleOutputs(playbook, assignments),
     [assignments, playbook],
   );
 
@@ -689,10 +726,10 @@ export function App() {
     () => [
       `Loading ${playbook.name} geometry`,
       ...playbook.stages.map((stage) => `${stage.label} timing and support arcs confirmed`),
-      improvisedCount > 0 ? `${improvisedCount} improvised role assignments accepted` : "All role assignments fit recommended capabilities",
+      `All ${assignedCount} assigned formations evaluated against neighboring links`,
       `Both authored breakpoints remain inside the mission window`,
     ],
-    [improvisedCount, playbook],
+    [assignedCount, playbook],
   );
 
   useEffect(() => {
@@ -741,9 +778,9 @@ export function App() {
     const next = PLAYBOOKS.find((item) => item.id === nextId);
     if (!next) return;
     setPlaybookId(next.id);
-    setAssignments(defaultAssignments(next));
+    setAssignments(emptyAssignments(next));
     setBranches(defaultBranches());
-    setSelected(next.roles[0].defaultFormation);
+    setSelected("harpoon");
     setPickerRoleId(null);
     setDrillStep(-1);
     setDrillComplete(false);
@@ -752,15 +789,15 @@ export function App() {
   const chooseFormationForRole = (formationId) => {
     if (phase !== "plan" || !pickerRoleId || !FORMATIONS.some((formation) => formation.id === formationId)) return;
     const targetRole = playbook.roles.find((role) => role.id === pickerRoleId);
-    const currentRole = playbook.roles.find((role) => assignments[role.id] === formationId);
-    if (!targetRole || !currentRole) return;
-    if (targetRole.id === currentRole.id) {
+    const sourceRole = playbook.roles.find((role) => assignments[role.id] === formationId);
+    if (!targetRole) return;
+    if (targetRole.id === sourceRole?.id) {
       setPickerRoleId(null);
       return;
     }
     setAssignments((current) => ({
       ...current,
-      [currentRole.id]: current[targetRole.id],
+      ...(sourceRole ? { [sourceRole.id]: current[targetRole.id] ?? null } : {}),
       [targetRole.id]: formationId,
     }));
     setSelected(formationId);
@@ -804,7 +841,7 @@ export function App() {
     setPhase("plan");
     setBattleTime(0);
     setPlaybookId("trapline");
-    setAssignments(defaultAssignments(PLAYBOOKS[0]));
+    setAssignments(emptyAssignments(PLAYBOOKS[0]));
     setBranches(defaultBranches());
     setSelected("harpoon");
     setDrillStep(-1);
@@ -823,7 +860,7 @@ export function App() {
       <div className="mission-shell">
         <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} />
         <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} />
-        <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignments={assignments} onChooseRole={setPickerRoleId} improvisedCount={improvisedCount} />
+        <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignments={assignments} outputs={roleOutputs} onChooseRole={setPickerRoleId} assignedCount={assignedCount} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={branches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} onResolve={resolveDecision} />

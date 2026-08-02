@@ -16,7 +16,7 @@ Open `http://localhost:5173/`.
 ## Core loop
 
 1. Choose Trapline, Armored Spear, or Divided Pressure from the detachment's tactical playbook.
-2. Open any role slot and choose any formation. Recommended assignments are efficient; improvised assignments remain legal.
+2. Start with an empty playbook and assign one formation to every role. The chooser reveals no preferred answer; output percentages and combo links appear only after placement and change when neighboring assignments change.
 3. Author two responses at known battlefield breakpoints.
 4. Run the Ghost Drill, commit the playbook, and watch it execute autonomously.
 5. Execute the authored response for free or spend a scarce Command Seal to break the playbook after contact.
