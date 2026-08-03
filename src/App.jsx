@@ -452,6 +452,27 @@ const evaluateTacticalSequence = (playbook, assignments) => {
   return { handoffs, outputs };
 };
 
+const calculatePlacementReadiness = (playbook, assignments, handoffs) => Object.fromEntries(
+  playbook.roles.map((role, index) => {
+    const formationId = assignments[role.id];
+    if (!formationId) return [role.id, null];
+
+    const taskAligned = role.accepts.includes(formationId);
+    const inboundReaction = index > 0 && Boolean(handoffs[index - 1]?.maneuver);
+    const outboundLink = index < handoffs.length && Boolean(handoffs[index]?.maneuver);
+    const score = Math.min(100, 52 + (taskAligned ? 20 : 0) + (inboundReaction ? 14 : 0) + (outboundLink ? 14 : 0));
+    const label = score >= 95 ? "SYNCHRONIZED" : score >= 80 ? "READY" : score >= 65 ? "CAPABLE" : "STRAINED";
+
+    return [role.id, {
+      score,
+      label,
+      taskAligned,
+      inboundReaction,
+      outboundLink,
+    }];
+  }),
+);
+
 const calculateEnemyClashes = (maneuvers) => ENEMY_PLAN.stages.map((stage) => {
   const counterManeuver = maneuvers.find((maneuver) => stage.counteredBy.includes(maneuver.name));
   const formation = ENEMY_PLAN.formations.find((item) => item.id === stage.formationId);
@@ -630,10 +651,50 @@ function AppHeader({ phase, battleTime, profile }) {
   );
 }
 
-function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook, phase, onFormationDragStart }) {
+function FormationDossier({ formation, assignedRole, assignedIndex, readiness }) {
+  if (!formation) return null;
+  const Icon = formation.icon;
+  const observations = readiness ? [
+    readiness.taskAligned ? "TASK ALIGNED" : "IMPROVISED TASK",
+    readiness.inboundReaction ? "INBOUND REACTION" : "NO INBOUND REACTION",
+    readiness.outboundLink ? "FEEDS NEXT STOP" : "NO OUTBOUND REACTION",
+  ] : [];
+
+  return (
+    <aside className="formation-dossier panel-surface" aria-label={`${formation.name} formation dossier`}>
+      <div className="dossier-heading"><span>FORMATION DOSSIER</span><em>NEUTRAL INTEL</em></div>
+      <div className="dossier-identity">
+        <FormationPortrait formation={formation} compact />
+        <div><span>FORMATION {formation.number}</span><b>{formation.name}</b><small><Icon weight="duotone" /> {formation.role}</small></div>
+      </div>
+      <p>{formation.purpose}</p>
+      <div className="dossier-condition">
+        <span>CREATES</span>
+        <b>{formation.creates}</b>
+      </div>
+      <div className="dossier-reactions">
+        <span>CAN REACT TO</span>
+        <div>{formation.uses.map((condition) => <em key={condition}>{condition}</em>)}</div>
+      </div>
+      {assignedRole && readiness ? (
+        <div className="dossier-placement">
+          <div><span>OBSERVED AT STOP {String(assignedIndex + 1).padStart(2, "0")}</span><b>{readiness.score}% <em>{readiness.label}</em></b><small>{assignedRole.label}</small></div>
+          <div className="dossier-observations">{observations.map((observation) => <em key={observation}>{observation}</em>)}</div>
+        </div>
+      ) : (
+        <div className="dossier-unplaced"><b>PLACE TO MEASURE READINESS</b><small>Task fit and neighboring reactions are revealed only after assignment.</small></div>
+      )}
+    </aside>
+  );
+}
+
+function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook, phase, onFormationDragStart, readiness }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
+  const selectedFormation = FORMATIONS.find((formation) => formation.id === selected);
+  const selectedRole = roleByFormation[selected];
+  const selectedRoleIndex = selectedRole ? playbook.roles.findIndex((role) => role.id === selectedRole.id) : -1;
   return (
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
       <div className="doctrine-heading"><span>TACTICAL PLAYBOOK</span><Radio weight="duotone" /></div>
@@ -687,6 +748,7 @@ function FormationRoster({ selected, onSelect, assignments, playbook, onPlaybook
           );
         })}
       </div>
+      <FormationDossier formation={selectedFormation} assignedRole={selectedRole} assignedIndex={selectedRoleIndex} readiness={selectedRole ? readiness[selectedRole.id] : null} />
     </section>
   );
 }
@@ -1001,7 +1063,7 @@ function TacticalHandoffBoard({ feedback, handoffs, profile }) {
   );
 }
 
-function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook, profile }) {
+function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook, profile, readiness }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
@@ -1100,7 +1162,10 @@ function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, h
                 {formation ? (
                   <>
                     <span className="slot-formation"><img src={formation.asset} alt="" /><b>{formation.name}</b></span>
-                    <span className={`slot-result ${output.incoming ? "transformed" : ""}`}><b>{output.result}</b><small>{output.incoming ? "HANDOFF RESULT" : "CREATES"}</small></span>
+                    <span className={`slot-result ${output.incoming ? "transformed" : ""}`}>
+                      <span className="slot-output"><b>{output.result}</b><small>{output.incoming ? "COMBO RESULT" : "CREATES"}</small></span>
+                      <span className={`slot-readiness readiness-${readiness[role.id].label.toLowerCase()}`} title="Observed after placement; task fit and neighboring combo links affect readiness."><b>{readiness[role.id].score}%</b><small>{readiness[role.id].label}</small></span>
+                    </span>
                   </>
                 ) : (
                   <span className="slot-empty"><Plus weight="bold" /><b>DROP UNIT</b><small>OR CLICK</small></span>
@@ -1116,7 +1181,7 @@ function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, h
   );
 }
 
-function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart }) {
+function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart, readiness }) {
   const [confirmedCombo, setConfirmedCombo] = useState(null);
   const confirmedComboIdRef = useRef(null);
   const confirmedComboTimerRef = useRef(null);
@@ -1213,7 +1278,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
         );
       })}
 
-      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} drillStep={drillStep} feedback={placementFeedback} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} />
+      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} drillStep={drillStep} feedback={placementFeedback} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -1533,6 +1598,10 @@ export function App() {
   );
   const tacticalHandoffs = tacticalSequence.handoffs;
   const roleOutputs = tacticalSequence.outputs;
+  const placementReadiness = useMemo(
+    () => calculatePlacementReadiness(playbook, assignments, tacticalHandoffs),
+    [assignments, playbook, tacticalHandoffs],
+  );
 
   const activeBranches = phase === "plan" || phase === "drill" ? branches : battleBranches;
 
@@ -1747,8 +1816,8 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} />
-        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} />
+        <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
+        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
         <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />

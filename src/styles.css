@@ -70,6 +70,33 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .formation-copy small { display: flex; align-items: center; gap: 4px; color: #aab0ad; font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .05em; }
 .formation-copy small svg { width: 13px; color: var(--blue); }
 .formation-copy em { font-style: normal; color: #6f7774; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.formation-dossier { margin: 5px 6px 8px; padding: 9px; border-color: #3e5963; background: rgba(11, 22, 24, .97); }
+.dossier-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .1em; color: #6fc9ed; }
+.dossier-heading em { padding: 2px 4px; border: 1px solid #4b5440; background: #1b1e13; color: #aaa875; font-size: 7px; font-style: normal; }
+.dossier-identity { margin-top: 8px; display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 8px; }
+.dossier-identity .formation-image.compact { width: 52px; height: 52px; border-color: #4c8295; }
+.dossier-identity > div { min-width: 0; display: grid; }
+.dossier-identity span { color: #678a96; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .1em; }
+.dossier-identity b { color: #d3e4e7; font-family: "Barlow Condensed"; font-size: 16px; letter-spacing: .06em; }
+.dossier-identity small { display: flex; align-items: center; gap: 4px; color: #84c8e4; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .06em; }
+.dossier-identity small svg { width: 13px; }
+.formation-dossier > p { margin: 8px 0; color: #a7b0ac; font-size: 10px; line-height: 1.35; }
+.dossier-condition, .dossier-reactions { display: grid; gap: 3px; padding-top: 6px; border-top: 1px solid #2c4249; }
+.dossier-condition span, .dossier-reactions > span { color: #6f858c; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .1em; }
+.dossier-condition b { color: #68cdf3; font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .06em; }
+.dossier-reactions { margin-top: 6px; }
+.dossier-reactions > div, .dossier-observations { display: flex; flex-wrap: wrap; gap: 3px; }
+.dossier-reactions em, .dossier-observations em { padding: 2px 4px; border: 1px solid #48513c; background: #191d13; color: #aaa978; font-family: "Barlow Condensed"; font-size: 7px; font-style: normal; letter-spacing: .04em; }
+.dossier-placement, .dossier-unplaced { margin-top: 8px; padding: 7px; border-left: 3px solid #76b85a; background: #142118; }
+.dossier-placement > div:first-child { display: grid; }
+.dossier-placement span, .dossier-unplaced b { color: #8dca6c; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .09em; }
+.dossier-placement b { color: #b5e394; font-family: "Barlow Condensed"; font-size: 18px; }
+.dossier-placement b em { margin-left: 4px; color: #87a87c; font-size: 9px; font-style: normal; letter-spacing: .08em; }
+.dossier-placement small, .dossier-unplaced small { color: #87958b; font-size: 8px; line-height: 1.25; }
+.dossier-observations { margin-top: 6px; }
+.dossier-observations em { border-color: #46643a; background: #172514; color: #91c873; }
+.dossier-unplaced { display: grid; gap: 3px; border-color: #477b92; background: #102027; }
+.dossier-unplaced b { color: #68c9ef; }
 .playbook-list { padding: 6px; display: grid; gap: 4px; }
 .playbook-row { width: 100%; min-height: 52px; padding: 7px 9px; display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 8px; border: 1px solid #313a36; background: #111615; text-align: left; cursor: pointer; }
 .playbook-row > svg { width: 24px; height: 24px; color: #858c89; }
@@ -269,10 +296,15 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .slot-formation { min-width: 0; align-self: stretch; display: grid; grid-template-columns: 31px minmax(0, 1fr); align-items: center; gap: 6px; }
 .slot-formation img { width: 31px; height: 31px; object-fit: cover; border-radius: 50%; border: 1px solid #4b879e; filter: brightness(1.15) contrast(1.1); }
 .slot-formation b { min-width: 0; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slot-result { min-width: 0; display: grid; gap: 1px; padding-top: 3px; border-top: 1px solid #29424c; font-family: "Barlow Condensed"; }
-.slot-result b { min-width: 0; font-size: 11px; color: #69cef7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-result { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 5px; padding-top: 3px; border-top: 1px solid #29424c; font-family: "Barlow Condensed"; }
+.slot-result > span { min-width: 0; display: grid; gap: 1px; }
+.slot-output b { min-width: 0; font-size: 11px; color: #69cef7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot-result small { font-size: 7px; letter-spacing: .08em; color: #7d918f; }
-.slot-result.transformed b { color: #9ada78; text-shadow: 0 0 8px rgba(130, 202, 99, .28); }
+.slot-result.transformed .slot-output b { color: #9ada78; text-shadow: 0 0 8px rgba(130, 202, 99, .28); }
+.slot-readiness { justify-items: end; }
+.slot-readiness b { color: #9ac985; font-size: 12px; line-height: 1; }
+.slot-readiness small { max-width: 58px; color: #7f9c74; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-readiness.readiness-strained b { color: #d1835f; }
 .handoff-board { margin-top: 10px; padding-top: 8px; border-top: 1px solid #273c43; }
 .handoff-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; font-family: "Barlow Condensed"; }
 .handoff-heading > span { color: #8fb8c8; font-size: 10px; letter-spacing: .11em; }
