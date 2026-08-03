@@ -106,11 +106,11 @@ const NODES = {
 };
 
 const STAGING_NODES = {
-  harpoon: { left: 17, top: 83, label: "Staging line" },
-  furnace: { left: 26, top: 87, label: "Staging line" },
-  breaker: { left: 35, top: 83, label: "Staging line" },
-  railjack: { left: 44, top: 87, label: "Staging line" },
-  hauler: { left: 53, top: 83, label: "Staging line" },
+  harpoon: { left: 32, top: 10.5, label: "Formation staging" },
+  furnace: { left: 43, top: 10.5, label: "Formation staging" },
+  breaker: { left: 54, top: 10.5, label: "Formation staging" },
+  railjack: { left: 65, top: 10.5, label: "Formation staging" },
+  hauler: { left: 76, top: 10.5, label: "Formation staging" },
 };
 
 const PLAYBOOKS = [
@@ -498,6 +498,13 @@ const calculateOperationProfile = (handoffs, branchChoices) => {
   };
 };
 
+const comboWindowTimes = (profile) => [
+  profile.alphaAt,
+  profile.betaAt,
+  profile.reactorExposeAt,
+  profile.extractionAt,
+];
+
 const buildOperationEvents = (profile) => {
   const maneuverFor = (phase) => profile.effects.find((maneuver) => maneuver.impact.phase === phase)?.name;
   const alphaManeuver = maneuverFor("alpha");
@@ -873,62 +880,68 @@ function EnemyFieldPlan({ battleTime, phase, clashes }) {
   );
 }
 
-function TacticalHandoffBoard({ feedback, handoffs }) {
+function TacticalHandoffBoard({ feedback, handoffs, profile }) {
   const discovered = handoffs.filter((handoff) => handoff.maneuver);
   const fullyStaffed = handoffs.every((handoff) => handoff.sourceId && handoff.receiverId);
   const longestCascade = handoffs.reduce((state, handoff) => {
     const current = handoff.maneuver ? state.current + 1 : 0;
     return { current, longest: Math.max(state.longest, current) };
   }, { current: 0, longest: 0 }).longest;
-  const conditionTrace = discovered.map((handoff) => `${handoff.maneuver.passes} → ${handoff.maneuver.result}`).join(" · ");
   const cascadeLabel = longestCascade === discovered.length
-    ? `${longestCascade} LINK CASCADE`
-    : `${discovered.length} SEPARATE LINKS`;
+    ? `${longestCascade} COMBO CHAIN`
+    : `${discovered.length} SEPARATE COMBOS`;
   const FeedbackIcon = feedback?.tone === "weakened" ? Warning : Lightning;
+  const timing = comboWindowTimes(profile);
 
   return (
     <div className="handoff-board" aria-live="polite">
       <div className="handoff-heading">
-        <span>TACTICAL HANDOFFS</span>
-        <small>Transformed conditions continue into the next staffed stop.</small>
+        <span>COMBO WINDOWS</span>
+        <small>Automatic: one formation creates an opening; the next reacts before it closes.</small>
       </div>
       {feedback ? (
         <div className={`cascade-readout placement-impact ${feedback.tone}`} key={feedback.revision} role="status">
           <span><FeedbackIcon weight="fill" /> {feedback.title}</span>
-          <b>{feedback.formationName} → STOP {String(feedback.targetIndex + 1).padStart(2, "0")} · downstream recalculated</b>
+          <b>{feedback.formationName} → STOP {String(feedback.targetIndex + 1).padStart(2, "0")} · later combo windows recalculated</b>
           <div className="placement-impact-metrics">
-            <strong>{feedback.beforeLinks} → {feedback.afterLinks}<small>HANDOFFS</small></strong>
+            <strong>{feedback.beforeLinks} → {feedback.afterLinks}<small>COMBOS</small></strong>
             <strong>{feedback.forecast}<small>UPDATED MISSION OUTLOOK</small></strong>
           </div>
         </div>
       ) : (
         <div className={`cascade-readout ${discovered.length > 0 ? "active" : fullyStaffed ? "broken" : "unresolved"}`}>
-          <span><Lightning weight="fill" /> {discovered.length > 0 ? cascadeLabel : fullyStaffed ? "CHAIN BROKEN" : "CASCADE UNRESOLVED"}</span>
-          <b>{discovered.length > 0 ? conditionTrace : fullyStaffed ? "Every formation executes its own condition." : "Move a formation to test how conditions travel."}</b>
-          <small>{discovered.length > 0 ? `${discovered.length} tactical ${discovered.length === 1 ? "reaction" : "reactions"} discovered. Move any formation to rewire the chain.` : "Every downstream stop will recalculate after placement."}</small>
+          <span><Lightning weight="fill" /> {discovered.length > 0 ? cascadeLabel : fullyStaffed ? "NO COMBOS ARMED" : "COMBO WINDOWS UNKNOWN"}</span>
+          <b>{discovered.length > 0 ? "These reactions fire automatically during the mission." : fullyStaffed ? "The current formations act independently." : "Staff two neighboring stops to reveal their trigger and response."}</b>
+          <small>{discovered.length > 0 ? "Move any formation to change the later windows." : "Nothing activates manually during combat."}</small>
         </div>
       )}
       <div className="handoff-grid">
         {handoffs.map((handoff) => {
           const staffed = handoff.sourceId && handoff.receiverId;
           const changed = Boolean(feedback && staffed && handoff.from >= feedback.affectedFrom);
+          const source = FORMATIONS.find((formation) => formation.id === handoff.sourceId);
+          const receiver = FORMATIONS.find((formation) => formation.id === handoff.receiverId);
+          const windowAt = timing[handoff.from];
           return (
             <div
               className={`handoff-card ${handoff.maneuver ? "discovered" : staffed ? "independent" : "unresolved"} ${changed ? handoff.maneuver ? "cascade-powered" : "cascade-broken" : ""}`}
               key={`${handoff.id}-${changed ? feedback.revision : "static"}`}
               style={changed ? { "--cascade-delay": `${(handoff.from - feedback.affectedFrom + 1) * 110}ms` } : undefined}
             >
-              <span>{String(handoff.from + 1).padStart(2, "0")} <ArrowRight weight="bold" /> {String(handoff.to + 1).padStart(2, "0")}</span>
+              <span className="combo-window-time">T+{fmtDuration(windowAt)} · AFTER {String(handoff.from + 1).padStart(2, "0")} / BEFORE {String(handoff.to + 1).padStart(2, "0")}</span>
               {handoff.maneuver ? (
                 <>
-                  <b>{handoff.maneuver.name}</b>
-                  <small><em>{handoff.maneuver.passes}</em><ArrowRight weight="bold" /><em>{handoff.maneuver.result}</em></small>
-                  <p><Target weight="fill" /> {handoff.maneuver.impact.text}</p>
+                  <div className="combo-window-flow">
+                    <span><b>{source.name}</b><small>CREATES {handoff.maneuver.passes}</small></span>
+                    <ArrowRight weight="bold" />
+                    <span><b>{receiver.name}</b><small>REACTS: {handoff.maneuver.name}</small></span>
+                  </div>
+                  <p><Target weight="fill" /> RESULT: {handoff.maneuver.result} · {handoff.maneuver.impact.text}</p>
                 </>
               ) : (
                 <>
-                  <b>{staffed ? "INDEPENDENT ACTIONS" : "UNRESOLVED"}</b>
-                  <small>{staffed ? "No condition handoff." : "Staff both stops."}</small>
+                  <b>{staffed ? "NO REACTION IN THIS WINDOW" : "WINDOW NOT REVEALED"}</b>
+                  <small>{staffed ? `${source.name} creates ${handoff.incomingCondition}; ${receiver.name} cannot use it.` : "Staff both stops. The combo check happens automatically at this time."}</small>
                 </>
               )}
             </div>
@@ -939,9 +952,10 @@ function TacticalHandoffBoard({ feedback, handoffs }) {
   );
 }
 
-function PlaybookBoard({ active, assignments, drillStep, feedback, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook }) {
+function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook, profile }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
+  const timing = comboWindowTimes(profile);
 
   if (phase === "battle" || phase === "complete") {
     return (
@@ -960,10 +974,29 @@ function PlaybookBoard({ active, assignments, drillStep, feedback, handoffs, onC
           })}
         </div>
         <div className="battle-handoffs">
-          <span>ACTIVE HANDOFFS</span>
-          {discoveredHandoffs.length > 0 ? discoveredHandoffs.map((handoff) => (
-            <div key={handoff.id} title={`${handoff.maneuver.passes} becomes ${handoff.maneuver.result}`}><Lightning weight="fill" /><b>{handoff.maneuver.name}</b><small>{handoff.maneuver.impact.text}</small></div>
-          )) : <p>Formations execute independently.</p>}
+          <span>AUTOMATIC COMBO WINDOWS</span>
+          {discoveredHandoffs.length > 0 ? discoveredHandoffs.map((handoff) => {
+            const source = FORMATIONS.find((formation) => formation.id === handoff.sourceId);
+            const receiver = FORMATIONS.find((formation) => formation.id === handoff.receiverId);
+            const windowAt = timing[handoff.from];
+            const state = phase === "complete" || battleTime >= windowAt + 15
+              ? "resolved"
+              : battleTime >= windowAt
+                ? "live"
+                : "upcoming";
+            const timingLabel = state === "live"
+              ? "NOW"
+              : state === "resolved"
+                ? "RESOLVED"
+                : `IN ${fmtDuration(windowAt - battleTime)}`;
+            return (
+              <div className={state} key={handoff.id} title={`${source.name} creates ${handoff.maneuver.passes}; ${receiver.name} responds with ${handoff.maneuver.name}`}>
+                <Lightning weight="fill" />
+                <b>{timingLabel} · {handoff.maneuver.name}</b>
+                <small>{source.name} creates {handoff.maneuver.passes} → {receiver.name} turns it into {handoff.maneuver.result}</small>
+              </div>
+            );
+          }) : <p>No combo windows are armed; formations execute independently.</p>}
         </div>
       </div>
     );
@@ -979,7 +1012,7 @@ function PlaybookBoard({ active, assignments, drillStep, feedback, handoffs, onC
         </div>
         <strong>{assignedCount} / {playbook.roles.length} PLACED</strong>
       </div>
-      <p>Each stop belongs to a separate formation route. Drag or click to staff it; the lightning links show placement combos, not movement.</p>
+      <p>Drag a visible formation from staging into a stop. Neighboring stops are checked in order for an automatic trigger → response combo.</p>
       <div className="route-terminals" aria-hidden="true"><span>FORMATION LANES</span><span>COMBO ORDER</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
@@ -1024,12 +1057,12 @@ function PlaybookBoard({ active, assignments, drillStep, feedback, handoffs, onC
                   <span className="slot-empty"><Plus weight="bold" /><b>DROP UNIT</b><small>OR CLICK</small></span>
                 )}
               </button>
-              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${linked ? "linked" : ""} ${changedLeg ? linked ? "cascade-powered" : "cascade-broken" : ""}`} style={changedLeg ? { "--cascade-delay": `${(index - feedback.affectedFrom + 1) * 110}ms` } : undefined} aria-hidden="true" title={linked ? `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}` : formation && nextFormation ? "No tactical condition handoff discovered" : "Staff both stops to test a tactical handoff"}><Lightning weight="fill" /></span>}
+              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${linked ? "linked" : ""} ${changedLeg ? linked ? "cascade-powered" : "cascade-broken" : ""}`} style={changedLeg ? { "--cascade-delay": `${(index - feedback.affectedFrom + 1) * 110}ms` } : undefined} aria-hidden="true" title={linked ? `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}` : formation && nextFormation ? "No automatic reaction in this combo window" : "Staff both stops to reveal this combo window"}><Lightning weight="fill" /></span>}
             </Fragment>
           );
         })}
       </div>
-      <TacticalHandoffBoard feedback={feedback} handoffs={handoffs} />
+      <TacticalHandoffBoard feedback={feedback} handoffs={handoffs} profile={profile} />
     </div>
   );
 }
@@ -1040,6 +1073,12 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
   const reactorState = battleTime >= profile.reactorAt ? "secured" : "threat";
   const extractionState = phase === "complete" ? "secured" : "future";
+  const timing = comboWindowTimes(profile);
+  const activeBattleHandoff = phase === "battle"
+    ? handoffs.find((handoff) => handoff.maneuver && battleTime >= timing[handoff.from] && battleTime < timing[handoff.from] + 15)
+    : null;
+  const activeComboSource = FORMATIONS.find((formation) => formation.id === activeBattleHandoff?.sourceId);
+  const activeComboReceiver = FORMATIONS.find((formation) => formation.id === activeBattleHandoff?.receiverId);
 
   return (
     <section className={`battlefield phase-${phase}`} aria-label="Operation Dead Circuit mission map">
@@ -1048,7 +1087,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
       <EnemyFieldPlan battleTime={battleTime} phase={phase} clashes={profile.enemyClashes} />
       <TacticalFieldPlan assignments={assignments} branches={branches} phase={phase} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} profile={profile} />
-      <div className="map-sector entry-sector"><span>ENTRY / BREACH</span><small>Player deployment edge</small></div>
+      <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? "FORMATION STAGING" : "ENTRY / BREACH"}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
       <ObjectiveMarker className="alpha-objective" number="1" title="CONTROL NODE ALPHA" description={alphaState === "secured" ? "SECURED · Railjack anchoring" : "Seize and hold"} state={alphaState} />
       <ObjectiveMarker className="beta-objective" number="1" title="CONTROL NODE BETA" description={betaState === "secured" ? "SECURED · Transit lane open" : "Seize and hold"} state={betaState} />
       <ObjectiveMarker className="reactor-objective" number="2" title="REACTOR SPINE" description={reactorState === "secured" ? "SABOTAGED" : "Primary target"} state={reactorState} icon={Factory} />
@@ -1062,6 +1101,15 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
       <div className={`combo-path combo-burn ${planReady ? "active warm" : ""}`} aria-hidden="true" />
       <div className={`combo-path combo-break ${planReady ? "active" : ""}`} aria-hidden="true" />
       <div className={`kill-zone ${planReady ? "active" : ""}`}><span>DECISION AREA</span></div>
+      {activeBattleHandoff && (
+        <div className="battlefield-combo-beat" role="status">
+          <span><Lightning weight="fill" /> COMBO WINDOW · NOW</span>
+          <b>{activeComboSource.name} creates {activeBattleHandoff.maneuver.passes}</b>
+          <ArrowRight weight="bold" />
+          <b>{activeComboReceiver.name} reacts: {activeBattleHandoff.maneuver.name}</b>
+          <small>{activeBattleHandoff.maneuver.result} · {activeBattleHandoff.maneuver.impact.text}</small>
+        </div>
+      )}
 
       {FORMATIONS.filter((formation) => activeFormations.includes(formation.id)).map((formation) => {
         const assignedNode = deployments[formation.id] ? NODES[deployments[formation.id]] : null;
@@ -1073,7 +1121,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${activeBattleHandoff?.sourceId === formation.id ? "combo-source" : ""} ${activeBattleHandoff?.receiverId === formation.id ? "combo-receiver" : ""}`}
             style={{ left: `${node.left + progressShift}%`, top: `${node.top - progressShift * 0.45}%` }}
             onClick={() => onSelect(formation.id)}
             draggable={phase === "plan"}
@@ -1087,7 +1135,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
         );
       })}
 
-      <PlaybookBoard active={planReady} assignments={assignments} drillStep={drillStep} feedback={placementFeedback} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} />
+      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} drillStep={drillStep} feedback={placementFeedback} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
