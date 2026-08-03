@@ -82,6 +82,16 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .dossier-identity small svg { width: 13px; }
 .formation-dossier > p { margin: 8px 0; color: #a7b0ac; font-size: 10px; line-height: 1.35; }
 .dossier-condition, .dossier-reactions { display: grid; gap: 3px; padding-top: 6px; border-top: 1px solid #2c4249; }
+.dossier-refits { margin: 7px 0; display: grid; gap: 4px; padding: 7px 0; border-top: 1px solid #3c4c45; border-bottom: 1px solid #3c4c45; }
+.dossier-refits > span { color: #b69861; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .1em; }
+.dossier-refits > div { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.dossier-refits button { min-width: 0; display: grid; align-content: start; gap: 2px; padding: 5px; border: 1px solid #41463b; background: #141711; color: #aeb2a2; text-align: left; cursor: pointer; }
+.dossier-refits button:hover:not(:disabled) { border-color: #8d784d; background: #201e14; }
+.dossier-refits button.selected { border-color: #b99758; background: #242014; box-shadow: inset 2px 0 #d3a757; }
+.dossier-refits button:disabled { cursor: default; }
+.dossier-refits button b { color: #d1bd8b; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .05em; }
+.dossier-refits button small { color: #858980; font-size: 7px; line-height: 1.2; }
+.dossier-refits button em { margin-top: 2px; color: #7fb9cb; font-family: "Barlow Condensed"; font-size: 7px; font-style: normal; line-height: 1.2; letter-spacing: .04em; }
 .dossier-condition span, .dossier-reactions > span { color: #6f858c; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .1em; }
 .dossier-condition b { color: #68cdf3; font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .06em; }
 .dossier-reactions { margin-top: 6px; }
@@ -296,7 +306,9 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .slot-empty small { color: #748a91; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .09em; }
 .slot-formation { min-width: 0; align-self: stretch; display: grid; grid-template-columns: 31px minmax(0, 1fr); align-items: center; gap: 6px; }
 .slot-formation img { width: 31px; height: 31px; object-fit: cover; border-radius: 50%; border: 1px solid #4b879e; filter: brightness(1.15) contrast(1.1); }
+.slot-formation > span { min-width: 0; display: grid; gap: 1px; }
 .slot-formation b { min-width: 0; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-formation small { min-width: 0; color: #b79c68; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot-result { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 5px; padding-top: 3px; border-top: 1px solid #29424c; font-family: "Barlow Condensed"; }
 .slot-result > span { min-width: 0; display: grid; gap: 1px; }
 .slot-output b { min-width: 0; font-size: 11px; color: #69cef7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -515,9 +527,9 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .decision-route-compare > div > span svg { width: 11px; flex: 0 0 auto; color: #62889a; }
 .decision-route-compare em { min-width: 0; font-family: "Barlow Condensed"; font-size: 9px; font-style: normal; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .decision-route-compare .decision-impact { margin-top: 3px; padding-top: 4px; border-top: 1px solid #38443f; color: #a9b4af; font-size: 10px; line-height: 1.25; }
-.formation-picker-panel { width: min(680px, 92vw); }
+.formation-picker-panel { width: min(680px, 92vw); max-height: calc(100vh - 24px); display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; overflow: hidden; }
 .formation-picker-panel > h2 { font-size: 30px; }
-.formation-picker-list { margin-top: 18px; display: grid; gap: 6px; }
+.formation-picker-list { min-height: 0; margin-top: 18px; padding-right: 4px; display: grid; gap: 6px; overflow: auto; scrollbar-width: thin; scrollbar-color: #40524b #111; }
 .formation-picker-list > button { min-height: 92px; display: grid; grid-template-columns: 62px minmax(0, 1fr) 22px; align-items: center; gap: 10px; padding: 8px; border: 1px solid #35423d; background: #121817; color: #c4cac7; text-align: left; cursor: pointer; }
 .formation-picker-list > button:hover { border-color: #4b9bc0; background: #11252d; }
 .formation-picker-list > button.current { border-color: var(--blue); background: #102630; }
@@ -529,6 +541,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .tactic-vocabulary em { min-width: 0; padding: 2px 5px; border: 1px solid #385462; background: #0d1d22; color: #85bdd2; font-size: 8px !important; letter-spacing: .06em !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tactic-vocabulary em:last-child { border-color: #4c5039; background: #1b1b11; color: #b9b278; }
 .formation-capability-line { width: fit-content; padding: 2px 5px; border: 1px solid #3c6573; background: #10242b; color: #83c9e1; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .06em; }
+.formation-refit-line { width: fit-content; padding: 2px 5px; border: 1px solid #6d5c38; background: #211d12; color: #d2b576; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .06em; }
 .picker-formation-copy em { margin-top: 2px; font-style: normal; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .07em; }
 .picker-formation-copy em.available { color: #69c9ef; }
 .picker-formation-copy em.assigned { color: #8bcf68; }
