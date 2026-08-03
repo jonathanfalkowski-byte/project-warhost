@@ -873,7 +873,7 @@ function EnemyFieldPlan({ battleTime, phase, clashes }) {
   );
 }
 
-function TacticalHandoffBoard({ handoffs }) {
+function TacticalHandoffBoard({ feedback, handoffs }) {
   const discovered = handoffs.filter((handoff) => handoff.maneuver);
   const fullyStaffed = handoffs.every((handoff) => handoff.sourceId && handoff.receiverId);
   const longestCascade = handoffs.reduce((state, handoff) => {
@@ -884,6 +884,7 @@ function TacticalHandoffBoard({ handoffs }) {
   const cascadeLabel = longestCascade === discovered.length
     ? `${longestCascade} LINK CASCADE`
     : `${discovered.length} SEPARATE LINKS`;
+  const FeedbackIcon = feedback?.tone === "weakened" ? Warning : Lightning;
 
   return (
     <div className="handoff-board" aria-live="polite">
@@ -891,16 +892,32 @@ function TacticalHandoffBoard({ handoffs }) {
         <span>TACTICAL HANDOFFS</span>
         <small>Transformed conditions continue into the next staffed stop.</small>
       </div>
-      <div className={`cascade-readout ${discovered.length > 0 ? "active" : fullyStaffed ? "broken" : "unresolved"}`}>
-        <span><Lightning weight="fill" /> {discovered.length > 0 ? cascadeLabel : fullyStaffed ? "CHAIN BROKEN" : "CASCADE UNRESOLVED"}</span>
-        <b>{discovered.length > 0 ? conditionTrace : fullyStaffed ? "Every formation executes its own condition." : "Staff adjacent stops to test how conditions travel."}</b>
-        <small>{discovered.length > 0 ? `${discovered.length} tactical ${discovered.length === 1 ? "reaction" : "reactions"} discovered in this arrangement.` : "Independent actions remain valid."}</small>
-      </div>
+      {feedback ? (
+        <div className={`cascade-readout placement-impact ${feedback.tone}`} key={feedback.revision} role="status">
+          <span><FeedbackIcon weight="fill" /> {feedback.title}</span>
+          <b>{feedback.formationName} → STOP {String(feedback.targetIndex + 1).padStart(2, "0")} · downstream recalculated</b>
+          <div className="placement-impact-metrics">
+            <strong>{feedback.beforeLinks} → {feedback.afterLinks}<small>HANDOFFS</small></strong>
+            <strong>{feedback.forecast}<small>UPDATED MISSION OUTLOOK</small></strong>
+          </div>
+        </div>
+      ) : (
+        <div className={`cascade-readout ${discovered.length > 0 ? "active" : fullyStaffed ? "broken" : "unresolved"}`}>
+          <span><Lightning weight="fill" /> {discovered.length > 0 ? cascadeLabel : fullyStaffed ? "CHAIN BROKEN" : "CASCADE UNRESOLVED"}</span>
+          <b>{discovered.length > 0 ? conditionTrace : fullyStaffed ? "Every formation executes its own condition." : "Move a formation to test how conditions travel."}</b>
+          <small>{discovered.length > 0 ? `${discovered.length} tactical ${discovered.length === 1 ? "reaction" : "reactions"} discovered. Move any formation to rewire the chain.` : "Every downstream stop will recalculate after placement."}</small>
+        </div>
+      )}
       <div className="handoff-grid">
         {handoffs.map((handoff) => {
           const staffed = handoff.sourceId && handoff.receiverId;
+          const changed = Boolean(feedback && staffed && handoff.from >= feedback.affectedFrom);
           return (
-            <div className={`handoff-card ${handoff.maneuver ? "discovered" : staffed ? "independent" : "unresolved"}`} key={handoff.id}>
+            <div
+              className={`handoff-card ${handoff.maneuver ? "discovered" : staffed ? "independent" : "unresolved"} ${changed ? handoff.maneuver ? "cascade-powered" : "cascade-broken" : ""}`}
+              key={`${handoff.id}-${changed ? feedback.revision : "static"}`}
+              style={changed ? { "--cascade-delay": `${(handoff.from - feedback.affectedFrom + 1) * 110}ms` } : undefined}
+            >
               <span>{String(handoff.from + 1).padStart(2, "0")} <ArrowRight weight="bold" /> {String(handoff.to + 1).padStart(2, "0")}</span>
               {handoff.maneuver ? (
                 <>
@@ -922,7 +939,7 @@ function TacticalHandoffBoard({ handoffs }) {
   );
 }
 
-function PlaybookBoard({ active, assignments, drillStep, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook }) {
+function PlaybookBoard({ active, assignments, drillStep, feedback, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
 
@@ -972,10 +989,16 @@ function PlaybookBoard({ active, assignments, drillStep, handoffs, onChooseRole,
           const nextFormation = nextRole ? FORMATIONS.find((item) => item.id === assignments[nextRole.id]) : null;
           const handoff = handoffs[index];
           const linked = Boolean(handoff?.maneuver);
+          const changed = Boolean(feedback?.changedIndices.includes(index));
+          const downstream = Boolean(feedback && index >= feedback.affectedFrom && formation);
+          const cascadeState = changed ? "cascade-moved" : downstream ? output?.incoming ? "cascade-powered" : "cascade-broken" : "";
+          const cascadeDelay = feedback && downstream ? { "--cascade-delay": `${(index - feedback.affectedFrom) * 110}ms` } : undefined;
+          const changedLeg = Boolean(feedback && index >= feedback.affectedFrom && formation && nextFormation);
           return (
-            <Fragment key={role.id}>
+            <Fragment key={`${role.id}-${downstream ? feedback.revision : "static"}`}>
               <button
-                className={`playbook-slot ${formation ? "filled" : "empty"} ${dropTargetRoleId === role.id ? "drop-target" : ""}`}
+                className={`playbook-slot ${formation ? "filled" : "empty"} ${dropTargetRoleId === role.id ? "drop-target" : ""} ${cascadeState}`}
+                style={cascadeDelay}
                 onClick={() => onChooseRole(role.id)}
                 onDragEnter={(event) => { event.preventDefault(); setDropTargetRoleId(role.id); }}
                 onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
@@ -1001,17 +1024,17 @@ function PlaybookBoard({ active, assignments, drillStep, handoffs, onChooseRole,
                   <span className="slot-empty"><Plus weight="bold" /><b>DROP UNIT</b><small>OR CLICK</small></span>
                 )}
               </button>
-              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${linked ? "linked" : ""}`} aria-hidden="true" title={linked ? `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}` : formation && nextFormation ? "No tactical condition handoff discovered" : "Staff both stops to test a tactical handoff"}><Lightning weight="fill" /></span>}
+              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${linked ? "linked" : ""} ${changedLeg ? linked ? "cascade-powered" : "cascade-broken" : ""}`} style={changedLeg ? { "--cascade-delay": `${(index - feedback.affectedFrom + 1) * 110}ms` } : undefined} aria-hidden="true" title={linked ? `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}` : formation && nextFormation ? "No tactical condition handoff discovered" : "Staff both stops to test a tactical handoff"}><Lightning weight="fill" /></span>}
             </Fragment>
           );
         })}
       </div>
-      <TacticalHandoffBoard handoffs={handoffs} />
+      <TacticalHandoffBoard feedback={feedback} handoffs={handoffs} />
     </div>
   );
 }
 
-function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, planReady, playbook, drillSteps, assignments, branches, handoffs, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart }) {
+function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart }) {
   const activeFormations = phase === "complete" ? FORMATIONS.slice(0, profile.extractedCount).map((formation) => formation.id) : FORMATIONS.map((formation) => formation.id);
   const alphaState = battleTime >= profile.alphaAt ? "secured" : "active";
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
@@ -1064,7 +1087,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
         );
       })}
 
-      <PlaybookBoard active={planReady} assignments={assignments} drillStep={drillStep} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} />
+      <PlaybookBoard active={planReady} assignments={assignments} drillStep={drillStep} feedback={placementFeedback} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -1342,7 +1365,9 @@ export function App() {
   const [rescueComplete, setRescueComplete] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
   const [pickerRoleId, setPickerRoleId] = useState(null);
+  const [placementFeedback, setPlacementFeedback] = useState(null);
   const timerRef = useRef(null);
+  const placementRevisionRef = useRef(0);
 
   const playbook = useMemo(
     () => PLAYBOOKS.find((item) => item.id === playbookId) ?? PLAYBOOKS[0],
@@ -1453,6 +1478,7 @@ export function App() {
     setBattleBranches(defaultBranches());
     setSelected("harpoon");
     setPickerRoleId(null);
+    setPlacementFeedback(null);
     setDrillStep(-1);
     setDrillComplete(false);
   };
@@ -1466,11 +1492,47 @@ export function App() {
       setPickerRoleId(null);
       return;
     }
-    setAssignments((current) => ({
-      ...current,
-      ...(sourceRole ? { [sourceRole.id]: current[targetRole.id] ?? null } : {}),
+    const nextAssignments = {
+      ...assignments,
+      ...(sourceRole ? { [sourceRole.id]: assignments[targetRole.id] ?? null } : {}),
       [targetRole.id]: formationId,
-    }));
+    };
+    const previousSequence = evaluateTacticalSequence(playbook, assignments);
+    const nextSequence = evaluateTacticalSequence(playbook, nextAssignments);
+    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches);
+    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches);
+    const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
+    const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
+    const targetIndex = playbook.roles.findIndex((role) => role.id === targetRole.id);
+    const sourceIndex = sourceRole ? playbook.roles.findIndex((role) => role.id === sourceRole.id) : targetIndex;
+    const previousReady = playbook.roles.every((role) => Boolean(assignments[role.id]));
+    const nextReady = playbook.roles.every((role) => Boolean(nextAssignments[role.id]));
+    const previousWindow = previousProfile.timeSaved - previousProfile.overrun;
+    const nextWindow = nextProfile.timeSaved - nextProfile.overrun;
+    const improved = nextLinks > previousLinks || nextProfile.extractedCount > previousProfile.extractedCount || nextWindow > previousWindow;
+    const weakened = nextLinks < previousLinks || nextProfile.extractedCount < previousProfile.extractedCount || nextWindow < previousWindow;
+    const tone = nextReady && !previousReady ? "strengthened" : weakened ? "weakened" : improved ? "strengthened" : "rewired";
+    const title = nextReady && !previousReady ? "PLAN ONLINE" : tone === "weakened" ? "CHAIN BROKEN" : tone === "strengthened" ? "CHAIN STRENGTHENED" : "CHAIN REWIRED";
+    const forecast = nextReady
+      ? nextProfile.overrun > 0
+        ? `${nextProfile.extractedCount} / 5 EXTRACT · +${fmtDuration(nextProfile.overrun)} REINFORCEMENTS`
+        : `${nextProfile.extractedCount} / 5 EXTRACT · ${fmtClock(nextProfile.completeAt)} RESERVE`
+      : `${Object.values(nextAssignments).filter(Boolean).length} / 5 FORMATIONS PLACED`;
+
+    placementRevisionRef.current += 1;
+    setPlacementFeedback({
+      revision: placementRevisionRef.current,
+      affectedFrom: Math.min(targetIndex, sourceIndex),
+      changedIndices: [...new Set([targetIndex, sourceIndex])],
+      targetIndex,
+      formationName: FORMATIONS.find((formation) => formation.id === formationId).name,
+      beforeLinks: previousLinks,
+      afterLinks: nextLinks,
+      forecast,
+      title,
+      tone,
+    });
+    setAssignments(nextAssignments);
     setSelected(formationId);
     setPickerRoleId(null);
     setDrillComplete(false);
@@ -1543,6 +1605,7 @@ export function App() {
     setRescueComplete(false);
     setShowCompletion(false);
     setPickerRoleId(null);
+    setPlacementFeedback(null);
   };
 
   return (
@@ -1550,7 +1613,7 @@ export function App() {
       <AppHeader phase={phase} battleTime={battleTime} profile={operationProfile} />
       <div className="mission-shell">
         <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} />
-        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} />
+        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} />
         <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />

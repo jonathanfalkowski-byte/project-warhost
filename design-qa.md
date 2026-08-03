@@ -1,16 +1,16 @@
-# Player Combo Cascade Design QA
+# Placement Feedback Design QA
 
 **Source visual truth**
 
-- `C:\Users\Admin\AppData\Local\Temp\project-warhost-enemy-plan-audit\04-strong-counter-plan.png`
-- Prior strong-plan planning state using the established Objective Weave battlefield and handoff board.
+- `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-combos\final-strong-cascade-1280x720.png`
+- The established fully staffed Trapline state before the new post-placement feedback layer.
 
 **Implementation evidence**
 
-- `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-combos\final-strong-cascade-1280x720.png`
-- `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-combos\final-rearranged-cascade-1280x720.png`
-- Full-view comparison: `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-combos\matched-design-comparison.png`
-- Focused board comparison: `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-combos\focused-board-comparison.png`
+- Strong chain: `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-feedback\strong-impact-1280x720.png`
+- Broken chain: `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-feedback\broken-impact-1280x720.png`
+- Restored chain: `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-feedback\restored-impact-1280x720.png`
+- Full-view side-by-side comparison: `C:\Users\Admin\AppData\Local\Temp\project-warhost-player-feedback\source-vs-feedback-2560x720.png`
 
 **Capture conditions**
 
@@ -18,42 +18,43 @@
 - Source pixels: 1280 x 720.
 - Implementation pixels: 1280 x 720.
 - Device pixel ratio: 1.0; no density normalization required.
-- State: Trapline fully staffed. Source shows the prior pair-handoff model; implementation shows the same arrangement evaluated as a four-link condition cascade.
+- State: Trapline fully staffed with Harpoon Rig, Furnace Crew, Breaker Exo, Railjack, and Salvage Hauler. The comparison uses the same battlefield, playbook, placement order, mission outlook, and viewport.
 
 **Findings**
 
 - No actionable P0, P1, or P2 visual mismatches remain.
-- Fonts and typography: Barlow and Barlow Condensed hierarchy, weights, condensed labels, truncation behavior, and dense command tone remain consistent with the source.
-- Spacing and layout rhythm: the five-stop route, fixed footer controls, battlefield hierarchy, and intelligence rail retain their source proportions. The added cascade strip fits inside the existing board without hiding assignment controls.
-- Colors and visual tokens: the cobalt placement language, green discovered-state language, furnace orange mission accents, and gunmetal surfaces remain consistent.
-- Image quality and asset fidelity: all existing formation portraits and battlefield art remain unchanged and correctly cropped; no placeholder or fabricated visual assets were introduced.
-- Copy and content: the new readout describes the observed arrangement only. It does not recommend units, rank placements, expose an optimal chain, or confuse combo links with formation movement.
+- Fonts and typography: Barlow and Barlow Condensed hierarchy, weights, compact labels, and dense command tone remain consistent with the source. The new impact headline is legible without competing with the primary board title.
+- Spacing and layout rhythm: the five-stop route, handoff cards, battlefield, side rails, and fixed footer retain their proportions. The impact strip uses the existing handoff-board footprint and does not hide assignment or commit controls.
+- Colors and visual tokens: green communicates a strengthened chain, orange communicates a broken chain, and cobalt remains the neutral placement color. The new states use the established palette and retain sufficient contrast.
+- Image quality and asset fidelity: formation portraits and battlefield art are unchanged and correctly cropped. No placeholder or fabricated visual assets were introduced.
+- Copy and content: the feedback reports the player's completed move, before/after handoff count, and updated mission forecast. It does not recommend placements or reveal an optimal arrangement before the player experiments.
+- Focused region comparison was not required because the full-view side-by-side keeps the complete placement board, impact strip, and mission outlook readable at matched 1280 x 720 dimensions.
 
 **Interaction verification**
 
-- Empty stops show `CASCADE UNRESOLVED` and retain click and drag assignment affordances.
-- Harpoon Rig → Furnace Crew → Breaker Exo → Railjack → Salvage Hauler produces a four-link cascade and a 5 / 5 extraction forecast with 00:15 reserve.
-- Swapping Furnace Crew and Salvage Hauler rewires downstream conditions into two separate links and produces a 3 / 5 extraction forecast at the mission limit.
-- The formation chooser still shows neutral `CREATES` and `USES` vocabulary before placement.
+- Filling the fifth stop produces `PLAN ONLINE`, changes the handoff count from 3 to 4, and shows `5 / 5 EXTRACT · 00:15 RESERVE`.
+- Moving Salvage Hauler into stop 2 produces `CHAIN BROKEN`, changes the handoff count from 4 to 2, and immediately changes the mission forecast to `3 / 5 EXTRACT · 00:00 RESERVE`.
+- Moving Furnace Crew back into stop 2 produces `CHAIN STRENGTHENED`, changes the handoff count from 2 to 4, and restores the 5 / 5 forecast with 00:15 reserve.
+- Affected downstream slots, connectors, and handoff cards replay their state animation after each placement revision.
 - Browser console errors checked: none.
 
 **Comparison history**
 
-- Pass 1 interaction QA found that a rearranged plan with two disconnected one-link reactions was labeled `1 LINK CASCADE`, which could imply one continuous chain.
-- Fix: the headline now distinguishes a continuous cascade from disconnected reactions; the same rearranged plan reads `2 SEPARATE LINKS`.
-- Post-fix evidence: `final-rearranged-cascade-1280x720.png`; the strong arrangement remains `4 LINK CASCADE` in `final-strong-cascade-1280x720.png`.
+- Pass 1 source review showed that the prior cascade strip changed its internal text after a swap but did not explicitly announce which formation moved, whether the plan improved or degraded, or how the mission forecast changed.
+- Fix: added a persistent post-placement impact strip with `PLAN ONLINE`, `CHAIN BROKEN`, `CHAIN STRENGTHENED`, or `CHAIN REWIRED`; the moved formation and stop; the before/after handoff count; the updated extraction and reserve forecast; and ordered downstream state animation.
+- Post-fix evidence: `strong-impact-1280x720.png`, `broken-impact-1280x720.png`, and `restored-impact-1280x720.png`. The matched full-view comparison confirms the feedback is prominent without changing the board's overall hierarchy.
 
 **Follow-up polish**
 
-- P3: the long condition trace truncates at narrower widths, while the four detailed handoff cards preserve the full information. This is acceptable for the current desktop prototype.
+- P3: the forecast line may wrap at narrower desktop widths. The current 1280 x 720 target fits cleanly, and responsive verification can be expanded when the prototype adds a formal minimum supported resolution.
 
 **Implementation checklist**
 
-- [x] Preserve the selected battlefield composition and interaction hierarchy.
-- [x] Carry transformed conditions through downstream stops.
-- [x] Reveal results only after placement.
-- [x] Keep independent arrangements valid.
-- [x] Verify strong and broken chain outcomes.
-- [x] Check browser console and production build.
+- [x] Preserve the authored route and player-driven unit placement.
+- [x] Announce the completed move without recommending it beforehand.
+- [x] Show before/after combo strength and mission forecast.
+- [x] Animate every affected downstream stop and connector.
+- [x] Verify strong, broken, and restored chain outcomes.
+- [x] Check the matched source comparison, browser console, and production build.
 
 final result: passed
