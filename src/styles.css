@@ -47,6 +47,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .reinforcement-clock { align-self: stretch; min-width: 170px; display: grid; place-content: center; text-align: center; border-left: 1px solid var(--line); background: #111513; }
 .reinforcement-clock span, .reinforcement-clock small { font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .11em; color: #9c9a90; }
 .reinforcement-clock strong { font-family: "Barlow Condensed"; font-size: 30px; letter-spacing: .06em; color: var(--orange); line-height: 1; }
+.reinforcement-clock small { color: #d58a52; }
 
 .mission-shell { min-height: 0; display: grid; grid-template-columns: 260px minmax(0, 1fr) 280px; }
 .left-rail, .right-rail { background: #0b0f0e; z-index: 12; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: #3a4540 #111; }
@@ -147,6 +148,21 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .enemy-plan-formation.disrupted img { border-color: #7da25e; }
 .enemy-plan-formation.disrupted > small { color: #a4d17f; }
 .enemy-plan-formation.landed img { animation: enemyThreatPulse 1s ease-in-out infinite alternate; }
+.reinforcement-route { position: absolute; z-index: 2; height: 2px; transform-origin: 0 50%; border-top: 2px dashed #ff8a55; filter: drop-shadow(0 0 5px rgba(236, 102, 54, .6)); }
+.reinforcement-route > svg { position: absolute; right: -8px; top: -8px; width: 16px; height: 16px; padding: 2px; border: 1px solid #ef764d; border-radius: 50%; background: #2a110b; color: #ff9d6f; }
+.reinforcement-route.avoided { border-color: #779b5d; opacity: .54; filter: none; }
+.reinforcement-route.avoided > svg { border-color: #6e9653; background: #12200f; color: #9bcf77; }
+.reinforcement-intercept { position: absolute; z-index: 5; display: grid; justify-items: center; transform: translate(-50%, -50%); color: #f48656; }
+.reinforcement-intercept > svg { width: 24px; height: 24px; padding: 4px; border: 1px solid currentColor; border-radius: 50%; background: rgba(42, 15, 8, .96); box-shadow: 0 0 12px rgba(239, 103, 52, .45); }
+.reinforcement-intercept > span { margin-top: 3px; padding: 2px 5px; border: 1px solid #81442c; background: rgba(31, 13, 8, .95); color: #f39a70; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .07em; white-space: nowrap; }
+.reinforcement-intercept.avoided { color: #92c96f; opacity: .78; }
+.reinforcement-intercept.avoided > svg, .reinforcement-intercept.avoided > span { border-color: #5f8249; background: rgba(16, 30, 13, .95); color: #9dd179; }
+.reinforcement-wave { width: 66px; height: 66px; }
+.reinforcement-wave.queued { width: 46px; height: 46px; opacity: .72; }
+.reinforcement-wave.queued img { border-style: dashed; filter: brightness(.72) saturate(.55); }
+.reinforcement-wave.avoided { opacity: .38; filter: grayscale(.65); }
+.reinforcement-wave.avoided img { border-color: #759b58; }
+.reinforcement-wave.avoided > small { color: #9bca78; }
 .panel-surface { background: rgba(10, 14, 13, .93); border: 1px solid #46504c; box-shadow: 0 8px 24px rgba(0,0,0,.34); }
 .panel-label { font-family: "Barlow Condensed"; font-weight: 600; font-size: 12px; letter-spacing: .09em; color: #aeb1ad; }
 .mission-route { position: absolute; z-index: 7; left: 2%; top: 2.5%; width: 178px; padding: 10px; }
@@ -368,6 +384,13 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .enemy-chain-step.threat .enemy-step-result { color: #ef8057; }
 .enemy-chain-step.resolved { box-shadow: inset 3px 0 currentColor; }
 .enemy-chain-arrow { width: 13px; height: 13px; margin: -1px auto; transform: rotate(90deg); color: #744733; }
+.reinforcement-order { min-width: 0; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 3px 6px; padding: 7px 6px; border: 1px solid #804029; background: #25120c; box-shadow: inset 3px 0 #da663a; }
+.reinforcement-order .enemy-step-number { color: #ff8757; }
+.reinforcement-order .enemy-step-copy em { color: #d47b55; }
+.reinforcement-order .enemy-step-copy b { color: #ff9b70; }
+.reinforcement-order .enemy-step-result { color: #ef8057; }
+.reinforcement-order.avoided { border-color: #587b44; background: #131e11; box-shadow: inset 3px 0 #719d54; }
+.reinforcement-order.avoided .enemy-step-number, .reinforcement-order.avoided .enemy-step-result { color: #91cb6b; }
 .victory-block { position: relative; }
 .victory-block > svg { position: absolute; right: 10px; bottom: 12px; width: 48px; height: 48px; color: #648d43; opacity: .5; }
 .victory-block p { max-width: 190px; margin: 8px 0 5px; color: #8fca68; }

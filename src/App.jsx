@@ -349,6 +349,17 @@ const BASE_OPERATION = {
   completeAt: 360,
 };
 
+const ENEMY_REINFORCEMENT_WAVE = {
+  number: "E4",
+  name: "HELIOCH RELIEF COLUMN",
+  order: "GANTRY INTERCEPT",
+  approach: "EAST ENTRY → GANTRY INTERCEPT",
+  arrivalAt: BASE_OPERATION.completeAt,
+  approachDuration: 45,
+  start: { x: 97, y: 26 },
+  intercept: { x: 86, y: 29 },
+};
+
 const emptyAssignments = (playbook) => Object.fromEntries(
   playbook.roles.map((role) => [role.id, null]),
 );
@@ -530,7 +541,7 @@ const buildOperationEvents = (profile) => {
         : `${clash.label} lands. ${clash.consequence}.`,
     });
   });
-  if (profile.overrun > 0) events.push({ at: BASE_OPERATION.completeAt, text: `Helioch reinforcements enter the foundry. ${profile.reinforcementLoss} formation recovery lost.` });
+  if (profile.overrun > 0) events.push({ at: ENEMY_REINFORCEMENT_WAVE.arrivalAt, text: `Helioch Relief Column reaches the Extraction Gantry. ${profile.reinforcementLoss} formation recovery lost.` });
   return events.sort((left, right) => left.at - right.at);
 };
 
@@ -548,6 +559,10 @@ const fmtClock = (seconds) => {
 const fmtDuration = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(
   seconds % 60,
 ).padStart(2, "0")}`;
+
+const reinforcementForecast = (profile) => profile.overrun > 0
+  ? `WAVE ARRIVES ${fmtDuration(profile.overrun)} BEFORE CLEAR`
+  : `CLEAR ${fmtDuration(profile.timeSaved)} BEFORE ENEMY WAVE`;
 
 function BrandMark() {
   return (
@@ -568,7 +583,16 @@ function FormationPortrait({ formation, compact = false }) {
 }
 
 function AppHeader({ phase, battleTime, profile }) {
-  const reinforcementsEngaged = phase === "battle" && battleTime >= BASE_OPERATION.completeAt;
+  const reinforcementsEngaged = (phase === "battle" || phase === "complete") && battleTime >= ENEMY_REINFORCEMENT_WAVE.arrivalAt;
+  const clock = phase === "plan" || phase === "drill"
+    ? { label: "ENEMY WAVE IN", value: "06:00", detail: "HELIOCH RELIEF COLUMN" }
+    : phase === "complete"
+      ? profile.overrun > 0
+        ? { label: "ENEMY WAVE CONTACT", value: fmtDuration(profile.overrun), detail: "BEFORE EXTRACTION CLEAR" }
+        : { label: "EXTRACTION CLEAR", value: fmtDuration(profile.timeSaved), detail: "BEFORE ENEMY WAVE" }
+      : reinforcementsEngaged
+        ? { label: "ENEMY WAVE ENGAGED", value: `+${fmtDuration(battleTime - ENEMY_REINFORCEMENT_WAVE.arrivalAt)}`, detail: "GANTRY INTERCEPT" }
+        : { label: "ENEMY WAVE IN", value: fmtClock(battleTime), detail: "EAST GANTRY APPROACH" };
   return (
     <header className="app-header">
       <div className="brand-block">
@@ -595,9 +619,9 @@ function AppHeader({ phase, battleTime, profile }) {
           <p className="operation-type">SABOTAGE &amp; EXTRACT</p>
         </div>
         <div className="reinforcement-clock" aria-live="polite">
-          <span>{reinforcementsEngaged ? "REINFORCEMENTS ENGAGED" : phase === "battle" ? "MISSION WINDOW" : phase === "complete" ? "MISSION COMPLETE" : "REINFORCEMENTS IN"}</span>
-          <strong>{phase === "battle" || phase === "complete" ? fmtClock(battleTime) : "06:00"}</strong>
-          <small>{reinforcementsEngaged ? `CONTACT +${fmtDuration(battleTime - BASE_OPERATION.completeAt)}` : phase === "complete" && profile.overrun > 0 ? `${fmtDuration(profile.overrun)} OVER WINDOW` : phase === "complete" ? "EXTRACTION CONFIRMED" : "UNKNOWN FORCE SIZE"}</small>
+          <span>{clock.label}</span>
+          <strong>{clock.value}</strong>
+          <small>{clock.detail}</small>
         </div>
       </div>
     </header>
@@ -832,7 +856,7 @@ function TacticalFieldPlan({ assignments, branches, phase, playbook }) {
   );
 }
 
-function EnemyFieldPlan({ battleTime, phase, clashes }) {
+function EnemyFieldPlan({ battleTime, phase, clashes, profile, planReady }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
 
@@ -848,6 +872,17 @@ function EnemyFieldPlan({ battleTime, phase, clashes }) {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  const waveApproachAt = ENEMY_REINFORCEMENT_WAVE.arrivalAt - ENEMY_REINFORCEMENT_WAVE.approachDuration;
+  const waveProgress = phase === "battle" || phase === "complete"
+    ? Math.max(0, Math.min(1, (battleTime - waveApproachAt) / ENEMY_REINFORCEMENT_WAVE.approachDuration))
+    : 0;
+  const wavePosition = {
+    x: ENEMY_REINFORCEMENT_WAVE.start.x + (ENEMY_REINFORCEMENT_WAVE.intercept.x - ENEMY_REINFORCEMENT_WAVE.start.x) * waveProgress,
+    y: ENEMY_REINFORCEMENT_WAVE.start.y + (ENEMY_REINFORCEMENT_WAVE.intercept.y - ENEMY_REINFORCEMENT_WAVE.start.y) * waveProgress,
+  };
+  const waveArrived = (phase === "battle" || phase === "complete") && battleTime >= ENEMY_REINFORCEMENT_WAVE.arrivalAt;
+  const clearsBeforeWave = planReady && profile.overrun === 0;
 
   return (
     <div className="enemy-plan-layer" ref={layerRef} aria-label={`${ENEMY_PLAN.name} enemy battlefield plan`}>
@@ -876,6 +911,18 @@ function EnemyFieldPlan({ battleTime, phase, clashes }) {
           </Fragment>
         );
       })}
+      <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"}`} style={fieldSegmentStyle(ENEMY_REINFORCEMENT_WAVE.start, ENEMY_REINFORCEMENT_WAVE.intercept, layerSize)}>
+        <ArrowRight weight="bold" />
+      </div>
+      <div className={`reinforcement-intercept ${clearsBeforeWave ? "avoided" : "threat"}`} style={{ left: `${ENEMY_REINFORCEMENT_WAVE.intercept.x}%`, top: `${ENEMY_REINFORCEMENT_WAVE.intercept.y}%` }}>
+        <Crosshair weight="duotone" />
+        <span>{!planReady ? "ENEMY WAVE · T+06:00" : clearsBeforeWave ? "WARHOST CLEARS FIRST" : `${fmtDuration(profile.overrun)} INTERCEPT WINDOW`}</span>
+      </div>
+      <div className={`enemy-plan-formation reinforcement-wave ${waveArrived ? "landed" : waveProgress > 0 ? "advancing" : "queued"} ${clearsBeforeWave ? "avoided" : ""}`} style={{ left: `${wavePosition.x}%`, top: `${wavePosition.y}%` }}>
+        <img src="/assets/helioch-sentinels.png" alt={`${ENEMY_REINFORCEMENT_WAVE.name} approaching the Extraction Gantry`} />
+        <span>{ENEMY_REINFORCEMENT_WAVE.number}</span>
+        <small>{waveArrived ? ENEMY_REINFORCEMENT_WAVE.order : `WAVE · T+${fmtDuration(ENEMY_REINFORCEMENT_WAVE.arrivalAt)}`}</small>
+      </div>
     </div>
   );
 }
@@ -1084,7 +1131,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
     <section className={`battlefield phase-${phase}`} aria-label="Operation Dead Circuit mission map">
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt="Isometric industrial foundry battlefield" />
       <div className="battlefield-wash" />
-      <EnemyFieldPlan battleTime={battleTime} phase={phase} clashes={profile.enemyClashes} />
+      <EnemyFieldPlan battleTime={battleTime} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} />
       <TacticalFieldPlan assignments={assignments} branches={branches} phase={phase} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? "FORMATION STAGING" : "ENTRY / BREACH"}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
@@ -1157,7 +1204,7 @@ function BattlePulse({ battleTime, events }) {
   );
 }
 
-function EnemyPlanIntel({ battleTime, phase, planReady, clashes }) {
+function EnemyPlanIntel({ battleTime, phase, planReady, clashes, profile }) {
   return (
     <div className="intel-block enemy-plan-intel">
       <span className="panel-label">ENEMY PLAYBOOK · EXECUTES IN PARALLEL</span>
@@ -1188,14 +1235,25 @@ function EnemyPlanIntel({ battleTime, phase, planReady, clashes }) {
           );
         })}
       </div>
+      <div className={`reinforcement-order ${planReady && profile.overrun === 0 ? "avoided" : "threat"}`}>
+        <span className="enemy-step-number">{ENEMY_REINFORCEMENT_WAVE.number}</span>
+        <span className="enemy-step-copy">
+          <em>ARRIVES T+{fmtDuration(ENEMY_REINFORCEMENT_WAVE.arrivalAt)}</em>
+          <b>{ENEMY_REINFORCEMENT_WAVE.name}</b>
+          <small>{ENEMY_REINFORCEMENT_WAVE.approach}</small>
+        </span>
+        <span className="enemy-step-result">
+          {!planReady ? "CONTINGENCY UNREAD" : profile.overrun > 0 ? `${reinforcementForecast(profile)} · ${profile.reinforcementLoss} RECOVERY LOST` : `${reinforcementForecast(profile)} · CONTACT AVOIDED`}
+        </span>
+      </div>
     </div>
   );
 }
 
 function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignedCount, profile }) {
   const forecast = profile.overrun > 0
-    ? `${profile.extractedCount} / 5 EXTRACT · +${fmtDuration(profile.overrun)} REINFORCEMENTS`
-    : `${profile.extractedCount} / 5 EXTRACT · ${fmtClock(profile.completeAt)} RESERVE`;
+    ? `${profile.extractedCount} / 5 EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
+    : `${profile.extractedCount} / 5 EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
       <div className="intel-block">
@@ -1204,7 +1262,7 @@ function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, ass
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
         {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Place formations on the authored tactical route.</p>}
       </div>
-      <EnemyPlanIntel battleTime={battleTime} phase={phase} planReady={planReady} clashes={profile.enemyClashes} />
+      <EnemyPlanIntel battleTime={battleTime} phase={phase} planReady={planReady} clashes={profile.enemyClashes} profile={profile} />
       <div className="intel-block victory-block">
         <span className="panel-label">VICTORY CONDITION</span>
         <Factory weight="duotone" />
@@ -1372,10 +1430,10 @@ function CompletionOverlay({ rescued, usedSeals, playbook, profile, onClose }) {
   const lostCount = FORMATIONS.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const timingResult = profile.overrun > 0
-    ? `Extraction completed ${profile.overrun} seconds after Helioch reinforcements arrived.`
+    ? `The Helioch Relief Column reached the gantry ${profile.overrun} seconds before extraction cleared.`
     : profile.timeSaved > 0
-    ? `${profile.timeSaved} seconds remained in the mission window.`
-    : "The Warhost cleared the gantry at the limit of the mission window.";
+    ? `The Warhost cleared extraction ${profile.timeSaved} seconds before the enemy wave arrived.`
+    : "The Warhost cleared the gantry as the enemy wave arrived.";
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className="decision-panel completion-panel">
@@ -1388,7 +1446,7 @@ function CompletionOverlay({ rescued, usedSeals, playbook, profile, onClose }) {
           <div><span>PRIMARY · COMPLETE</span><b>Reactor sabotaged</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · PASSED</span><b>{profile.extractedCount} extracted · 3 required</b><CheckCircle weight="fill" /></div>
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>PLAN VS PLAN</span><b>{profile.effects.length} handoffs · {disruptedEnemyOrders} / 3 enemy orders broken</b><Seal weight="duotone" /></div>
+          <div><span>PLAN VS PLAN</span><b>{profile.effects.length} combos · {disruptedEnemyOrders} / 3 enemy orders broken</b><Seal weight="duotone" /></div>
         </div>
         <p className="completion-note">{timingResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onClose}><span><b>RETURN TO BATTLEFIELD</b><small>Inspect the completed mission state.</small></span><ArrowRight /></button>
@@ -1463,14 +1521,14 @@ export function App() {
       ...playbook.stages.map((stage) => `${stage.label} timing and support arcs confirmed`),
       ...(tacticalHandoffs.some((handoff) => handoff.maneuver)
         ? tacticalHandoffs.filter((handoff) => handoff.maneuver).map((handoff) => `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}. ${handoff.maneuver.impact.text}`)
-        : [`All ${assignedCount} formations act independently; no condition handoffs discovered`]),
+        : [`All ${assignedCount} formations act independently; no automatic combo windows discovered`]),
       ...operationProfile.enemyClashes.map((clash) => clash.disrupted
         ? `${clash.counterManeuver.name} disrupts enemy ${clash.label}`
         : `Enemy ${clash.label} lands: ${clash.consequence}`),
       ...operationProfile.branchEffects.map((branch) => `${branch.option.label}: ${branch.impact.text}`),
       operationProfile.overrun > 0
-        ? `${operationProfile.extractedCount} formations forecast to extract ${operationProfile.overrun} seconds after reinforcements arrive`
-        : `${operationProfile.extractedCount} formations forecast to extract with ${operationProfile.timeSaved} seconds remaining`,
+        ? `${operationProfile.extractedCount} formations forecast to extract ${operationProfile.overrun} seconds after the enemy wave reaches the gantry`
+        : `${operationProfile.extractedCount} formations forecast to clear ${operationProfile.timeSaved} seconds before the enemy wave`,
     ],
     [assignedCount, operationProfile, playbook, tacticalHandoffs],
   );
@@ -1562,9 +1620,7 @@ export function App() {
     const tone = nextReady && !previousReady ? "strengthened" : weakened ? "weakened" : improved ? "strengthened" : "rewired";
     const title = nextReady && !previousReady ? "PLAN ONLINE" : tone === "weakened" ? "CHAIN BROKEN" : tone === "strengthened" ? "CHAIN STRENGTHENED" : "CHAIN REWIRED";
     const forecast = nextReady
-      ? nextProfile.overrun > 0
-        ? `${nextProfile.extractedCount} / 5 EXTRACT · +${fmtDuration(nextProfile.overrun)} REINFORCEMENTS`
-        : `${nextProfile.extractedCount} / 5 EXTRACT · ${fmtClock(nextProfile.completeAt)} RESERVE`
+      ? `${nextProfile.extractedCount} / 5 EXTRACT · ${reinforcementForecast(nextProfile)}`
       : `${Object.values(nextAssignments).filter(Boolean).length} / 5 FORMATIONS PLACED`;
 
     placementRevisionRef.current += 1;

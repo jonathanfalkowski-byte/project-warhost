@@ -1,65 +1,65 @@
-# Formation Staging and Combo Window Design QA
+# Enemy Reinforcement Wave Design QA
 
 **Source visual truth**
 
-- `C:\Users\Admin\AppData\Local\Temp\codex-clipboard-d213f893-f8c9-4aa2-99d5-9247dc595b7a.png`
-- User-reported empty Trapline planning state where the board obscures the unassigned formation portraits and the handoff section does not explain timing or behavior.
+- Existing Trapline planning composition: `C:\Users\Admin\Documents\Project-Warhost\audit-22-final-authored-field-plan.png`
+- User-selected combo-window reference: `C:\Users\Admin\AppData\Local\Temp\codex-clipboard-95bc90f2-87b8-42cd-8e59-21c09920ec56.png`
+- Product rule under test: reinforcements are an enemy moving plan, not a player assignment slot or RTS command surface.
 
 **Implementation evidence**
 
-- Matched empty planning state: `C:\Users\Admin\AppData\Local\Temp\project-warhost-combo-windows\final-visible-staging-empty-2167x1821-ready.png`
-- Compact empty planning state: `C:\Users\Admin\AppData\Local\Temp\project-warhost-combo-windows\final-visible-staging-1280x720-ready.png`
-- Staffed combo-window state: `C:\Users\Admin\AppData\Local\Temp\project-warhost-combo-windows\revealed-combo-windows-1280x720.png`
-- Live automatic combo state: `C:\Users\Admin\AppData\Local\Temp\project-warhost-combo-windows\live-combo-window-1280x720.png`
-- Full-view comparison: `C:\Users\Admin\AppData\Local\Temp\project-warhost-combo-windows\source-vs-final-full-ready-4334x1821.png`
-- Focused board comparison: `C:\Users\Admin\AppData\Local\Temp\project-warhost-combo-windows\source-vs-final-focus-ready-3200x1100.png`
+- Final empty planning state: `C:\Users\Admin\Documents\Project-Warhost\audit-35-enemy-wave-final-empty-visible.png`
+- Fully staffed safe forecast: `C:\Users\Admin\Documents\Project-Warhost\audit-28-enemy-wave-plan-safe.png`
+- Fully staffed threatened forecast: `C:\Users\Admin\Documents\Project-Warhost\audit-29-enemy-wave-plan-threat.png`
+- Enemy wave contact state: `C:\Users\Admin\Documents\Project-Warhost\audit-32-enemy-wave-contact-visible.png`
+- Full-view comparison: `C:\Users\Admin\Documents\Project-Warhost\design-qa-enemy-wave-full-comparison.png`
+- Focused header, battlefield, and intelligence comparison: `C:\Users\Admin\Documents\Project-Warhost\design-qa-enemy-wave-focus-comparison.png`
 
 **Capture conditions**
 
-- Matched source and implementation viewport: 2167 x 1821 CSS pixels.
-- Source pixels: 2167 x 1821.
-- Implementation pixels: 2167 x 1821.
+- Source and implementation pixels: 1280 x 720.
+- Browser CSS viewport: 1280 x 720.
 - Device pixel ratio: 1.0; no density normalization required.
-- Additional compact verification viewport: 1280 x 720 CSS pixels at device pixel ratio 1.0.
-- State: Trapline selected with all five formation roles empty for the matched comparison. Staffed and battle captures intentionally verify the revealed and live states that the source could not show.
+- States: Trapline empty planning, five-formation safe planning, five-formation threatened planning, and completed enemy contact.
 
 **Findings**
 
 - No actionable P0, P1, or P2 findings remain.
-- Fonts and typography: Barlow and Barlow Condensed remain unchanged. `COMBO WINDOWS`, timing labels, trigger-response verbs, and the live `NOW` banner preserve the established hierarchy. The smallest consequence copy remains legible at the 1280 x 720 floor.
-- Spacing and layout rhythm: all five 94-pixel formation portraits now occupy a dedicated row above the board. The board no longer intersects their drag targets, and the complete combo-window strip remains above the fixed footer at 1280 x 720.
-- Colors and visual tokens: cobalt still identifies player formations and placement; green identifies an armed or live automatic combo; orange remains reserved for mission and enemy pressure. No new visual language conflicts with the source.
-- Image quality and asset fidelity: the original formation portraits and battlefield art remain unchanged, fully loaded, and correctly cropped. No placeholders, approximate art, or new raster assets were introduced.
-- Copy and content: player-facing `handoff` terminology is replaced by `combo window`. Every revealed window states its T+ time, the earlier formation and condition it creates, the later formation and named reaction, the resulting condition, and the mission consequence. Empty windows explain that nothing is activated manually.
+- Fonts and typography: Barlow and Barlow Condensed remain unchanged. `ENEMY WAVE`, `HELIOCH RELIEF COLUMN`, E4 timing, and forecast language follow the established condensed command hierarchy without introducing a new type style.
+- Spacing and layout rhythm: the enemy-wave addition does not change the three-rail shell, footer, planning board, or staging row. At the 1280 x 720 floor, the E4 order remains reachable in the scrollable intelligence rail and the compact queued E4 formation stays outside the planning board's assignment surface.
+- Colors and visual tokens: furnace orange identifies the enemy wave and threatened interception; green identifies a player plan that clears before contact. Cobalt player formation language remains unchanged.
+- Image quality and asset fidelity: the E4 wave reuses the existing Helioch formation asset and the existing industrial battlefield art. No placeholder art, remote media, custom SVG, or approximate CSS illustration was introduced.
+- Copy and content: `Reinforcements` is replaced with explicit `ENEMY WAVE` language. The header identifies the Helioch Relief Column, the right rail states its T+06:00 east-entry order, and forecasts say whether the wave or extraction happens first. No player-facing outcome is revealed before all roles are staffed.
 
 **Interaction verification**
 
-- All five unassigned formation portraits are visible and remain draggable/clickable before placement.
-- Filling the standard sequence reveals four scheduled windows: T+00:45, T+02:30, T+03:45, and T+05:30.
-- Each revealed window presents `source creates condition -> receiver reacts -> result and consequence` without recommending a placement before the player commits it.
-- Committing the plan produces a live battlefield banner at the first automatic window: `HARPOON RIG creates DISPLACED -> FURNACE CREW reacts: FURNACE DRAGNET`, with the result and mission impact.
-- The two formations involved in the live window receive distinct source and receiver pulses, while the battle panel marks the window `NOW` and keeps later windows as countdowns.
-- Click assignment, Ghost Drill, Commit Playbook, live combo timing, breakpoint resolution, and Abort & Reset were exercised.
-- Clean browser session console errors checked: none.
+- Empty planning shows `ENEMY WAVE IN 06:00`, the E4 relief-column order, and `CONTINGENCY UNREAD` without adding another player slot.
+- The strong Harpoon Rig → Furnace Crew → Breaker Exo → Railjack → Salvage Hauler chain forecasts `5 / 5 EXTRACT · CLEAR 00:15 BEFORE ENEMY WAVE`; the field collision changes to `WARHOST CLEARS FIRST`.
+- Swapping Railjack into stop 02 and Furnace Crew into stop 04 reduces the chain to two combos and forecasts `3 / 5 EXTRACT · WAVE ARRIVES 00:15 BEFORE CLEAR`; E4 changes to a threatened gantry intercept.
+- During battle the header counts down to enemy arrival. The E4 Relief Column advances during its final 45-second approach and reaches the visible gantry-intercept marker at T+06:00.
+- The live operation event and debrief identify the Helioch Relief Column, its gantry arrival, the recovery consequence, and the final victory result.
+- Click assignment, automatic swap, both authored breakpoints, mission completion, return-to-battlefield, and mission reset were exercised.
+- Browser console errors checked after the final render: none.
 
 **Comparison history**
 
-- Pass 1 source finding [P1]: the board covered the only physical formation portraits on the battlefield, weakening drag-and-drop discoverability.
-- Pass 1 source finding [P1]: `TACTICAL HANDOFFS`, condition transformations, and green cards did not communicate when an event occurred or what the player would see during combat.
-- Fixes: moved the hard-coded formation staging row above the board; moved and compacted the board so its complete content fits at 1280 x 720; replaced player-facing handoff language with timed combo windows; added explicit creates/reacts/result/consequence anatomy; added upcoming/live/resolved battle states, a live battlefield banner, and formation pulses.
-- Post-fix evidence: matched full and focused comparisons show the visible staging row and unobstructed board; the staffed and live captures show the complete trigger-response loop.
+- Pass 1 [P2]: the initial E4 start point overlapped the existing E1 formation and the extraction objective, making the new formation difficult to distinguish.
+- Pass 1 [P2]: the battlefield intercept label showed a calculated 00:15 outcome before the player had completed formation placement.
+- Fixes: moved E4 to a distinct east-entry approach, offset the gantry interception point below the extraction label, reduced the queued marker footprint, and gated the field outcome behind a fully staffed plan.
+- Post-fix evidence: the full and focused comparisons preserve the established composition; the empty state shows only authored arrival information, while the safe, threatened, and contact captures show the calculated response after placement.
 
 **Follow-up polish**
 
-- P3: the four detailed combo cards are intentionally dense at 1280 x 720. A future unit-inspection pass could add keyboard focus or hover expansion without changing the current information hierarchy.
+- P3: on a 1280 x 720 viewport, the E4 intelligence result requires right-rail scrolling to read in full. This is acceptable because the persistent header and battlefield marker retain the essential timing and threat state.
 
 **Implementation checklist**
 
-- [x] Keep every unassigned formation visible above the planning board.
-- [x] Explain combo timing before placement without revealing an answer.
-- [x] Reveal source, trigger, receiver, reaction, result, and consequence after placement.
-- [x] Show the automatic combo during battle with a live banner and portrait feedback.
-- [x] Verify matched, compact, staffed, and battle states.
-- [x] Check browser console, production build, and Sites packaging tests.
+- [x] Make enemy ownership explicit.
+- [x] Show a real E4 moving formation and authored route.
+- [x] Make the gantry interception point visible.
+- [x] Update the contingency automatically from formation placement.
+- [x] Keep player formation slots unchanged.
+- [x] Use unambiguous safe/threat timing in planning, battle, and debrief.
+- [x] Verify interactions, console, production build, and Sites packaging.
 
 final result: passed

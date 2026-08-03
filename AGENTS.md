@@ -15,7 +15,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Placement, terrain, support arcs, doctrine, and authored contingencies create combination play. Moving a formation must be able to strengthen or break a plan.
 - Missions are won through objectives and extraction. Enemy annihilation is never the default victory condition.
 - Exactly two scarce Command Seals allow high-stakes order changes after contact; do not add a cooldown ability bar or click-heavy combat.
-- Operation Dead Circuit is the first playable slice: seize Alpha and Beta, sabotage the Reactor Spine, and extract at least three formations before reinforcements arrive.
+- Operation Dead Circuit is the first playable slice: seize Alpha and Beta, sabotage the Reactor Spine, and extract at least three formations before the enemy wave arrives.
 - The initial playable faction is the Scrapborn Freeholds, original voidbreakers who weaponize derelict starship machinery. Factions must change strategic values and mission solutions, not merely statistics.
 - Preserve the selected Objective Weave mock's cinematic industrial battlefield, gunmetal/furnace-orange/cobalt palette, dense command typography, and physical formation imagery.
 - The primary planning interaction is a tactical playbook: choose a maneuver, assign formations to compatible roles, and author breakpoint responses before contact. Never require freehand path drawing or continuous unit micro.
@@ -34,5 +34,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Use `combo window` rather than unexplained `handoff` language in player-facing UI. Show exactly when the automatic reaction occurs, which earlier formation creates the condition, which later formation reacts, the named maneuver produced, and its visible mission consequence.
 - Keep unassigned battlefield formation portraits fully visible above the planning board; the assignment surface must never obscure the units the player is deciding where to place.
 - Enemy formations must visibly move and execute battlefield actions, but faction AI, personality, and final enemy-plan design are deferred until the player-side formation puzzle is proven.
+- `Reinforcements` always means an enemy wave; player-side additions are `Reserves`. Reinforcement forecasts must say whether the enemy wave or extraction happens first, never use an ambiguous signed time.
+- An enemy reinforcement wave is a pre-authored moving formation with a visible entry route and interception point. It creates a timing/placement contingency inside the chosen playbook; it never adds a player assignment slot or asks the player to redraw paths during battle.
 - State the mission's victory formula before commitment and use unambiguous result language (`VICTORY`, `DEFEAT`, or a specifically defined partial result) in the debrief.
 - Fighting Withdrawal belongs to a later mission designed around force preservation; do not present it as an approach to Operation Dead Circuit.
