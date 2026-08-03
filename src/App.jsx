@@ -349,6 +349,8 @@ const BASE_OPERATION = {
   completeAt: 360,
 };
 
+const COMBO_CONFIRMATION_MS = 2600;
+
 const ENEMY_REINFORCEMENT_WAVE = {
   number: "E4",
   name: "HELIOCH RELIEF COLUMN",
@@ -1115,17 +1117,46 @@ function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, h
 }
 
 function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart }) {
+  const [confirmedCombo, setConfirmedCombo] = useState(null);
+  const confirmedComboIdRef = useRef(null);
+  const confirmedComboTimerRef = useRef(null);
   const activeFormations = phase === "complete" ? FORMATIONS.slice(0, profile.extractedCount).map((formation) => formation.id) : FORMATIONS.map((formation) => formation.id);
   const alphaState = battleTime >= profile.alphaAt ? "secured" : "active";
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
   const reactorState = battleTime >= profile.reactorAt ? "secured" : "threat";
   const extractionState = phase === "complete" ? "secured" : "future";
   const timing = comboWindowTimes(profile);
-  const activeBattleHandoff = phase === "battle"
-    ? handoffs.find((handoff) => handoff.maneuver && battleTime >= timing[handoff.from] && battleTime < timing[handoff.from] + 15)
-    : null;
-  const activeComboSource = FORMATIONS.find((formation) => formation.id === activeBattleHandoff?.sourceId);
-  const activeComboReceiver = FORMATIONS.find((formation) => formation.id === activeBattleHandoff?.receiverId);
+  const confirmedComboSource = FORMATIONS.find((formation) => formation.id === confirmedCombo?.sourceId);
+  const confirmedComboReceiver = FORMATIONS.find((formation) => formation.id === confirmedCombo?.receiverId);
+
+  useEffect(() => {
+    if (phase !== "battle") {
+      if (confirmedComboTimerRef.current) window.clearTimeout(confirmedComboTimerRef.current);
+      confirmedComboTimerRef.current = null;
+      confirmedComboIdRef.current = null;
+      setConfirmedCombo(null);
+      return;
+    }
+
+    const triggeredCombo = handoffs.find((handoff) => (
+      handoff.maneuver
+      && battleTime >= timing[handoff.from]
+      && battleTime < timing[handoff.from] + 15
+    ));
+    if (!triggeredCombo || confirmedComboIdRef.current === triggeredCombo.id) return;
+
+    confirmedComboIdRef.current = triggeredCombo.id;
+    setConfirmedCombo(triggeredCombo);
+    if (confirmedComboTimerRef.current) window.clearTimeout(confirmedComboTimerRef.current);
+    confirmedComboTimerRef.current = window.setTimeout(() => {
+      setConfirmedCombo(null);
+      confirmedComboTimerRef.current = null;
+    }, COMBO_CONFIRMATION_MS);
+  }, [battleTime, handoffs, phase, timing]);
+
+  useEffect(() => () => {
+    if (confirmedComboTimerRef.current) window.clearTimeout(confirmedComboTimerRef.current);
+  }, []);
 
   return (
     <section className={`battlefield phase-${phase}`} aria-label="Operation Dead Circuit mission map">
@@ -1148,13 +1179,13 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
       <div className={`combo-path combo-burn ${planReady ? "active warm" : ""}`} aria-hidden="true" />
       <div className={`combo-path combo-break ${planReady ? "active" : ""}`} aria-hidden="true" />
       <div className={`kill-zone ${planReady ? "active" : ""}`}><span>DECISION AREA</span></div>
-      {activeBattleHandoff && (
+      {confirmedCombo && (
         <div className="battlefield-combo-beat" role="status">
-          <span><Lightning weight="fill" /> COMBO WINDOW · NOW</span>
-          <b>{activeComboSource.name} creates {activeBattleHandoff.maneuver.passes}</b>
+          <span><Lightning weight="fill" /> AUTOMATIC COMBO · RESOLVED</span>
+          <b>{confirmedComboSource.name} creates {confirmedCombo.maneuver.passes}</b>
           <ArrowRight weight="bold" />
-          <b>{activeComboReceiver.name} reacts: {activeBattleHandoff.maneuver.name}</b>
-          <small>{activeBattleHandoff.maneuver.result} · {activeBattleHandoff.maneuver.impact.text}</small>
+          <b>{confirmedComboReceiver.name} reacts: {confirmedCombo.maneuver.name}</b>
+          <small>RESULT: {confirmedCombo.maneuver.result} · {confirmedCombo.maneuver.impact.text}</small>
         </div>
       )}
 
@@ -1168,7 +1199,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${activeBattleHandoff?.sourceId === formation.id ? "combo-source" : ""} ${activeBattleHandoff?.receiverId === formation.id ? "combo-receiver" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${confirmedCombo?.sourceId === formation.id ? "combo-source" : ""} ${confirmedCombo?.receiverId === formation.id ? "combo-receiver" : ""}`}
             style={{ left: `${node.left + progressShift}%`, top: `${node.top - progressShift * 0.45}%` }}
             onClick={() => onSelect(formation.id)}
             draggable={phase === "plan"}
