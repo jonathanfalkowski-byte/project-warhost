@@ -37,6 +37,7 @@ const FORMATIONS = [
     number: "1",
     name: "HARPOON RIG",
     role: "DISPLACE",
+    capabilities: ["CONTROL", "MOBILITY"],
     purpose: "Pull the Alpha blocker into the kill zone.",
     creates: "DISPLACED",
     uses: ["SCREENED", "SUPPLIED", "FORWARD HOLD"],
@@ -49,6 +50,7 @@ const FORMATIONS = [
     number: "2",
     name: "FURNACE CREW",
     role: "DENY",
+    capabilities: ["DENIAL", "AREA"],
     purpose: "Seal the reinforcement lane with heat.",
     creates: "OVERHEATED",
     uses: ["DISPLACED", "SCREENED", "SUPPLIED", "FORWARD HOLD"],
@@ -61,6 +63,7 @@ const FORMATIONS = [
     number: "3",
     name: "BREAKER EXO",
     role: "BREACH",
+    capabilities: ["BREACH", "SHOCK"],
     purpose: "Crack the Reactor Spine after Beta falls.",
     creates: "BREACHED",
     uses: ["DISPLACED", "OVERHEATED", "SCREENED", "SUPPLIED", "KILL ZONE", "SEALED LANE"],
@@ -73,6 +76,7 @@ const FORMATIONS = [
     number: "4",
     name: "RAILJACK",
     role: "HOLD",
+    capabilities: ["HOLD", "COVER"],
     purpose: "Anchor the captured Alpha control node.",
     creates: "SCREENED",
     uses: ["DISPLACED", "OVERHEATED", "BREACHED", "SUPPLIED", "OPEN CORE", "FRACTURED ARMOR"],
@@ -85,6 +89,7 @@ const FORMATIONS = [
     number: "5",
     name: "SALVAGE HAULER",
     role: "EXTRACT",
+    capabilities: ["RECOVERY", "SUPPORT"],
     purpose: "Recover the crew and damaged formations.",
     creates: "SUPPLIED",
     uses: ["OVERHEATED", "BREACHED", "SCREENED", "OPEN CORE", "SECURED BREACH", "SECURED CORRIDOR"],
@@ -126,11 +131,11 @@ const PLAYBOOKS = [
       { label: "BREAK", detail: "Collapse hold.", icon: Hammer },
     ],
     roles: [
-      { id: "pull", label: "PULL / DISPLACER", brief: "Draw Alpha into the kill zone.", node: "alphaApproach", accepts: ["harpoon", "breaker"] },
-      { id: "burn", label: "BURN / DENIER", brief: "Seal the hostile response lane.", node: "fireLine", accepts: ["furnace", "railjack"] },
-      { id: "break", label: "BREAK / BREACHER", brief: "Exploit the opened route.", node: "breachLine", accepts: ["breaker", "harpoon"] },
-      { id: "anchor", label: "ANCHOR", brief: "Hold the captured control node.", node: "anchorLine", accepts: ["railjack", "furnace"] },
-      { id: "recover", label: "RECOVERY", brief: "Preserve extraction capacity.", node: "recoveryLine", accepts: ["hauler"] },
+      { id: "pull", label: "PULL / DISPLACER", brief: "Draw Alpha into the kill zone.", node: "alphaApproach", demands: ["CONTROL", "SHOCK"] },
+      { id: "burn", label: "BURN / DENIER", brief: "Seal the hostile response lane.", node: "fireLine", demands: ["DENIAL", "COVER"] },
+      { id: "break", label: "BREAK / BREACHER", brief: "Exploit the opened route.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
+      { id: "anchor", label: "ANCHOR", brief: "Hold the captured control node.", node: "anchorLine", demands: ["HOLD", "DENIAL"] },
+      { id: "recover", label: "RECOVERY", brief: "Preserve extraction capacity.", node: "recoveryLine", demands: ["RECOVERY", "SUPPORT"] },
     ],
   },
   {
@@ -145,11 +150,11 @@ const PLAYBOOKS = [
       { label: "EXPLOIT", detail: "Drive on reactor.", icon: Lightning },
     ],
     roles: [
-      { id: "screen", label: "SCREEN", brief: "Take first contact at Alpha.", node: "alphaApproach", accepts: ["railjack", "breaker"] },
-      { id: "point", label: "POINT", brief: "Mark the narrow transit lane.", node: "highWalk", accepts: ["harpoon", "breaker"] },
-      { id: "punch", label: "PUNCH / BREACHER", brief: "Crack Beta and the reactor shell.", node: "breachLine", accepts: ["breaker", "harpoon"] },
-      { id: "suppress", label: "SUPPRESSION", brief: "Deny flanking reinforcements.", node: "fireLine", accepts: ["furnace", "railjack"] },
-      { id: "recover", label: "RECOVERY", brief: "Follow the armored corridor.", node: "recoveryLine", accepts: ["hauler"] },
+      { id: "screen", label: "SCREEN", brief: "Take first contact at Alpha.", node: "alphaApproach", demands: ["COVER", "SHOCK"] },
+      { id: "point", label: "POINT", brief: "Mark the narrow transit lane.", node: "highWalk", demands: ["MOBILITY", "SHOCK"] },
+      { id: "punch", label: "PUNCH / BREACHER", brief: "Crack Beta and the reactor shell.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
+      { id: "suppress", label: "SUPPRESSION", brief: "Deny flanking reinforcements.", node: "fireLine", demands: ["DENIAL", "COVER"] },
+      { id: "recover", label: "RECOVERY", brief: "Follow the armored corridor.", node: "recoveryLine", demands: ["RECOVERY", "SUPPORT"] },
     ],
   },
   {
@@ -164,14 +169,46 @@ const PLAYBOOKS = [
       { label: "CONVERGE", detail: "Collapse on reactor.", icon: Factory },
     ],
     roles: [
-      { id: "alpha", label: "ALPHA PIN", brief: "Hold the known defenders in place.", node: "alphaApproach", accepts: ["railjack", "harpoon"] },
-      { id: "beta", label: "BETA RAID", brief: "Pressure the uncertain control node.", node: "betaLane", accepts: ["harpoon", "breaker"] },
-      { id: "deny", label: "LANE DENIAL", brief: "Prevent either defense from reinforcing.", node: "fireLine", accepts: ["furnace", "railjack"] },
-      { id: "reactor", label: "REACTOR TEAM", brief: "Converge through the opening and sabotage.", node: "breachLine", accepts: ["breaker", "harpoon"] },
-      { id: "recover", label: "EXTRACTION", brief: "Collect the split force at the gantry.", node: "recoveryLine", accepts: ["hauler", "railjack"] },
+      { id: "alpha", label: "ALPHA PIN", brief: "Hold the known defenders in place.", node: "alphaApproach", demands: ["HOLD", "CONTROL"] },
+      { id: "beta", label: "BETA RAID", brief: "Pressure the uncertain control node.", node: "betaLane", demands: ["MOBILITY", "SHOCK"] },
+      { id: "deny", label: "LANE DENIAL", brief: "Prevent either defense from reinforcing.", node: "fireLine", demands: ["DENIAL", "COVER"] },
+      { id: "reactor", label: "REACTOR TEAM", brief: "Converge through the opening and sabotage.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
+      { id: "recover", label: "EXTRACTION", brief: "Collect the split force at the gantry.", node: "recoveryLine", demands: ["RECOVERY", "HOLD"] },
     ],
   },
 ];
+
+const MISSION_CONDITIONS = [
+  {
+    id: "clear",
+    name: "CLEAR LANES",
+    brief: "Foundry access is intact.",
+    effect: "Authored task profiles are unchanged.",
+    roleOverrides: {},
+  },
+  {
+    id: "blackout",
+    name: "SENSOR BLACKOUT",
+    brief: "Smoke severs visual contact across the approach.",
+    effect: "STOP 01 demands COVER / SHOCK. STOP 04 demands CONTROL / DENIAL.",
+    roleOverrides: {
+      0: ["COVER", "SHOCK"],
+      3: ["CONTROL", "DENIAL"],
+    },
+  },
+  {
+    id: "surge",
+    name: "REACTOR SURGE",
+    brief: "Core venting scrambles the center lane.",
+    effect: "STOP 02 demands BREACH / CONTROL. STOP 03 demands DENIAL / COVER.",
+    roleOverrides: {
+      1: ["BREACH", "CONTROL"],
+      2: ["DENIAL", "COVER"],
+    },
+  },
+];
+
+const roleDemandsFor = (role, index, condition) => condition.roleOverrides[index] ?? role.demands;
 
 const BREAKPOINTS = [
   {
@@ -453,12 +490,15 @@ const evaluateTacticalSequence = (playbook, assignments) => {
   return { handoffs, outputs };
 };
 
-const calculatePlacementReadiness = (playbook, assignments, handoffs) => Object.fromEntries(
+const calculatePlacementReadiness = (playbook, assignments, handoffs, condition) => Object.fromEntries(
   playbook.roles.map((role, index) => {
     const formationId = assignments[role.id];
     if (!formationId) return [role.id, null];
 
-    const taskAligned = role.accepts.includes(formationId);
+    const formation = FORMATIONS.find((item) => item.id === formationId);
+    const demands = roleDemandsFor(role, index, condition);
+    const matchedCapabilities = demands.filter((demand) => formation.capabilities.includes(demand));
+    const taskAligned = matchedCapabilities.length > 0;
     const inboundReaction = index > 0 && Boolean(handoffs[index - 1]?.maneuver);
     const outboundLink = index < handoffs.length && Boolean(handoffs[index]?.maneuver);
     const score = Math.min(100, 52 + (taskAligned ? 20 : 0) + (inboundReaction ? 14 : 0) + (outboundLink ? 14 : 0));
@@ -469,6 +509,8 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs) => Object.
       label,
       taskAligned,
       taskDelay: taskAligned ? 0 : IMPROVISED_TASK_DELAY,
+      demands,
+      matchedCapabilities,
       inboundReaction,
       outboundLink,
     }];
@@ -500,7 +542,7 @@ const calculateEnemyClashes = (maneuvers) => ENEMY_PLAN.stages.map((stage) => {
   };
 });
 
-const calculateOperationProfile = (handoffs, branchChoices, readiness) => {
+const calculateOperationProfile = (handoffs, branchChoices, readiness, condition) => {
   const maneuvers = handoffs.filter((handoff) => handoff.maneuver).map((handoff) => handoff.maneuver);
   const readinessSummary = summarizePlacementReadiness(readiness);
   const total = (key) => maneuvers.reduce((sum, maneuver) => sum + (maneuver.impact[key] ?? 0), 0);
@@ -546,6 +588,7 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness) => {
     enemyClashes,
     branchEffects,
     readiness: readinessSummary,
+    condition,
     effects: maneuvers,
   };
 };
@@ -686,6 +729,10 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness })
         <div><span>FORMATION {formation.number}</span><b>{formation.name}</b><small><Icon weight="duotone" /> {formation.role}</small></div>
       </div>
       <p>{formation.purpose}</p>
+      <div className="dossier-reactions">
+        <span>CAPABILITIES</span>
+        <div>{formation.capabilities.map((capability) => <em key={capability}>{capability}</em>)}</div>
+      </div>
       <div className="dossier-condition">
         <span>CREATES</span>
         <b>{formation.creates}</b>
@@ -1081,7 +1128,7 @@ function TacticalHandoffBoard({ feedback, handoffs, profile }) {
   );
 }
 
-function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook, profile, readiness }) {
+function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook, profile, readiness }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
@@ -1145,6 +1192,7 @@ function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, h
       <div className="route-terminals" aria-hidden="true"><span>FORMATION LANES</span><span>COMBO ORDER</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
+          const roleDemands = roleDemandsFor(role, index, condition);
           const formation = FORMATIONS.find((item) => item.id === assignments[role.id]);
           const output = outputs[role.id];
           const nextRole = playbook.roles[index + 1];
@@ -1176,7 +1224,7 @@ function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, h
               >
                 <span className="slot-number">STOP {String(index + 1).padStart(2, "0")}</span>
                 <span className="slot-role">{role.label}</span>
-                <span className="slot-task">{role.brief}</span>
+                <span className="slot-task">{role.brief}<small className="slot-demand">DEMANDS {roleDemands.join(" / ")}</small></span>
                 {formation ? (
                   <>
                     <span className="slot-formation"><img src={formation.asset} alt="" /><b>{formation.name}</b></span>
@@ -1199,7 +1247,7 @@ function PlaybookBoard({ active, assignments, battleTime, drillStep, feedback, h
   );
 }
 
-function Battlefield({ selected, onSelect, deployments, phase, battleTime, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart, readiness }) {
+function Battlefield({ selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart, readiness }) {
   const [confirmedCombo, setConfirmedCombo] = useState(null);
   const confirmedComboIdRef = useRef(null);
   const confirmedComboTimerRef = useRef(null);
@@ -1296,7 +1344,7 @@ function Battlefield({ selected, onSelect, deployments, phase, battleTime, drill
         );
       })}
 
-      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} drillStep={drillStep} feedback={placementFeedback} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} />
+      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -1364,12 +1412,37 @@ function EnemyPlanIntel({ battleTime, phase, planReady, clashes, profile }) {
   );
 }
 
-function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, assignedCount, profile }) {
+function MissionConditionSelector({ condition, phase, onCondition }) {
+  return (
+    <div className="intel-block condition-intel">
+      <span className="panel-label">MISSION CONDITION · DISCLOSED BEFORE DEPLOYMENT</span>
+      <div className="condition-options" role="group" aria-label="Prototype mission condition">
+        {MISSION_CONDITIONS.map((item) => (
+          <button
+            key={item.id}
+            className={condition.id === item.id ? "selected" : ""}
+            onClick={() => onCondition(item.id)}
+            disabled={phase !== "plan"}
+            aria-pressed={condition.id === item.id}
+          >
+            <b>{item.name}</b>
+            <small>{item.brief}</small>
+          </button>
+        ))}
+      </div>
+      <p className="condition-effect"><Warning weight="duotone" /><span><b>{condition.name}</b>{condition.effect}</span></p>
+      <small className="prototype-note">PROTOTYPE SWITCH · FINAL MISSIONS ASSIGN THIS CONDITION BEFORE DEPLOYMENT.</small>
+    </div>
+  );
+}
+
+function IntelRail({ phase, battleTime, condition, onCondition, planReady, rescueComplete, playbook, assignedCount, profile }) {
   const forecast = profile.overrun > 0
     ? `${profile.extractedCount} / 5 EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
     : `${profile.extractedCount} / 5 EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
+      <MissionConditionSelector condition={condition} phase={phase} onCondition={onCondition} />
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planReady ? forecast : `${assignedCount} / 5 ASSIGNED`}</strong>
@@ -1513,15 +1586,17 @@ function DecisionOverlay({ decision, seals, branches, onResolve }) {
   );
 }
 
-function FormationPicker({ role, playbook, assignments, onChoose, onClose }) {
+function FormationPicker({ role, playbook, condition, assignments, onChoose, onClose }) {
   if (!role) return null;
   const assignedFormationId = assignments[role.id];
+  const roleIndex = playbook.roles.findIndex((item) => item.id === role.id);
+  const roleDemands = roleDemandsFor(role, roleIndex, condition);
   return (
     <div className="decision-backdrop formation-picker-backdrop" role="dialog" aria-modal="true" aria-labelledby="formation-picker-title">
       <div className="decision-panel formation-picker-panel">
         <p className="eyebrow">STAFF ACTION STOP</p>
         <h2 id="formation-picker-title">Who executes {role.label}?</h2>
-        <p>{role.brief} The route and timing are already authored. Choose the formation; its created condition and any adjacent tactical handoff are revealed after placement.</p>
+        <p>{role.brief} This condition demands <b>{roleDemands.join(" / ")}</b>. Choose the formation; readiness and any adjacent tactical handoff are revealed after placement.</p>
         <div className="formation-picker-list">
           {FORMATIONS.map((formation) => {
             const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
@@ -1532,6 +1607,7 @@ function FormationPicker({ role, playbook, assignments, onChoose, onClose }) {
                 <FormationPortrait formation={formation} compact />
                 <span className="picker-formation-copy">
                   <b>{formation.name}</b>
+                  <span className="formation-capability-line">CAPABILITIES {formation.capabilities.join(" / ")}</span>
                   <small>{formation.role} · {formation.purpose}</small>
                   <span className="tactic-vocabulary"><em>CREATES {formation.creates}</em><em>USES {formation.uses.join(" · ")}</em></span>
                   <em className={currentRole ? "assigned" : "available"}>{currentRole ? `ASSIGNED · STOP ${String(currentRoleIndex + 1).padStart(2, "0")} ${currentRole.label}` : "AVAILABLE"}</em>
@@ -1572,7 +1648,7 @@ function CompletionOverlay({ rescued, usedSeals, playbook, profile, onClose }) {
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAN VS PLAN</span><b>{profile.effects.length} combos · {disruptedEnemyOrders} / 3 enemy orders broken</b><Seal weight="duotone" /></div>
         </div>
-        <p className="completion-note">{timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+        <p className="completion-note">Mission condition: {profile.condition.name}. {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onClose}><span><b>RETURN TO BATTLEFIELD</b><small>Inspect the completed mission state.</small></span><ArrowRight /></button>
       </div>
     </div>
@@ -1583,6 +1659,7 @@ export function App() {
   const [phase, setPhase] = useState("plan");
   const [selected, setSelected] = useState("harpoon");
   const [playbookId, setPlaybookId] = useState("trapline");
+  const [conditionId, setConditionId] = useState("clear");
   const [assignments, setAssignments] = useState(() => emptyAssignments(PLAYBOOKS[0]));
   const [branches, setBranches] = useState(defaultBranches);
   const [battleBranches, setBattleBranches] = useState(defaultBranches);
@@ -1602,6 +1679,10 @@ export function App() {
   const playbook = useMemo(
     () => PLAYBOOKS.find((item) => item.id === playbookId) ?? PLAYBOOKS[0],
     [playbookId],
+  );
+  const condition = useMemo(
+    () => MISSION_CONDITIONS.find((item) => item.id === conditionId) ?? MISSION_CONDITIONS[0],
+    [conditionId],
   );
 
   const deployments = useMemo(
@@ -1627,15 +1708,15 @@ export function App() {
   const tacticalHandoffs = tacticalSequence.handoffs;
   const roleOutputs = tacticalSequence.outputs;
   const placementReadiness = useMemo(
-    () => calculatePlacementReadiness(playbook, assignments, tacticalHandoffs),
-    [assignments, playbook, tacticalHandoffs],
+    () => calculatePlacementReadiness(playbook, assignments, tacticalHandoffs, condition),
+    [assignments, condition, playbook, tacticalHandoffs],
   );
 
   const activeBranches = phase === "plan" || phase === "drill" ? branches : battleBranches;
 
   const operationProfile = useMemo(
-    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness),
-    [activeBranches, placementReadiness, tacticalHandoffs],
+    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness, condition),
+    [activeBranches, condition, placementReadiness, tacticalHandoffs],
   );
 
   const operationEvents = useMemo(
@@ -1645,6 +1726,7 @@ export function App() {
 
   const drillSteps = useMemo(
     () => [
+      `Condition ${condition.name}: ${condition.effect}`,
       `Loading ${playbook.name} geometry`,
       ...playbook.stages.map((stage) => `${stage.label} timing and support arcs confirmed`),
       operationProfile.readiness.delay > 0
@@ -1661,7 +1743,7 @@ export function App() {
         ? `${operationProfile.extractedCount} formations forecast to extract ${operationProfile.overrun} seconds after the enemy wave reaches the gantry`
         : `${operationProfile.extractedCount} formations forecast to clear ${operationProfile.timeSaved} seconds before the enemy wave`,
     ],
-    [assignedCount, operationProfile, playbook, tacticalHandoffs],
+    [assignedCount, condition, operationProfile, playbook, tacticalHandoffs],
   );
 
   useEffect(() => {
@@ -1720,6 +1802,15 @@ export function App() {
     setDrillComplete(false);
   };
 
+  const changeCondition = (nextId) => {
+    if (phase !== "plan" || !MISSION_CONDITIONS.some((item) => item.id === nextId)) return;
+    setConditionId(nextId);
+    setPickerRoleId(null);
+    setPlacementFeedback(null);
+    setDrillStep(-1);
+    setDrillComplete(false);
+  };
+
   const assignFormationToRole = (roleId, formationId) => {
     if (phase !== "plan" || !FORMATIONS.some((formation) => formation.id === formationId)) return;
     const targetRole = playbook.roles.find((role) => role.id === roleId);
@@ -1736,10 +1827,10 @@ export function App() {
     };
     const previousSequence = evaluateTacticalSequence(playbook, assignments);
     const nextSequence = evaluateTacticalSequence(playbook, nextAssignments);
-    const previousReadiness = calculatePlacementReadiness(playbook, assignments, previousSequence.handoffs);
-    const nextReadiness = calculatePlacementReadiness(playbook, nextAssignments, nextSequence.handoffs);
-    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness);
-    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness);
+    const previousReadiness = calculatePlacementReadiness(playbook, assignments, previousSequence.handoffs, condition);
+    const nextReadiness = calculatePlacementReadiness(playbook, nextAssignments, nextSequence.handoffs, condition);
+    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition);
+    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition);
     const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const targetIndex = playbook.roles.findIndex((role) => role.id === targetRole.id);
@@ -1830,6 +1921,7 @@ export function App() {
     setPhase("plan");
     setBattleTime(0);
     setPlaybookId("trapline");
+    setConditionId("clear");
     setAssignments(emptyAssignments(PLAYBOOKS[0]));
     setBranches(defaultBranches());
     setBattleBranches(defaultBranches());
@@ -1850,12 +1942,12 @@ export function App() {
       <AppHeader phase={phase} battleTime={battleTime} profile={operationProfile} />
       <div className="mission-shell">
         <FormationRoster selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
-        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
-        <IntelRail phase={phase} battleTime={battleTime} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
+        <Battlefield selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
+        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} onResolve={resolveDecision} />
-      <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
+      <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
       {showCompletion && <CompletionOverlay rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} onClose={() => setShowCompletion(false)} />}
     </main>
   );
