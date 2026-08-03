@@ -260,6 +260,16 @@ const OPERATIONS = [
     primaryResult: "Reactor sabotaged",
     extractionTitle: "EXTRACTION GANTRY",
     primaryEvent: "Reactor Spine sabotaged. Extraction route open.",
+    primaryApproachEvent: "Reactor Spine exposed. Breach force advancing.",
+    firstDecisionEvent: "Helioch fire closes the Beta transit lane. Breakpoint order required.",
+    secondDecisionEvent: "Salvage crew located below the reactor deck.",
+    controlTitles: ["CONTROL NODE ALPHA", "CONTROL NODE BETA"],
+    controlProgress: ["Alpha", "Beta"],
+    entryPlanTitle: "FORMATION STAGING",
+    entryBattleTitle: "ENTRY / BREACH",
+    optionalTitle: "RESCUE SALVAGE CREW",
+    optionalDescription: "Optional · field repair reward",
+    battlefieldAlt: "Isometric industrial foundry battlefield",
   },
   {
     id: "ashen-passage",
@@ -269,7 +279,7 @@ const OPERATIONS = [
     conditionId: "blackout",
     conditionLocked: true,
     requiredExtraction: 4,
-    orders: ["SECURE BOTH NODES", "HOLD SIGNAL FURNACE", "EXTRACT 4+ FORMATIONS"],
+    orders: ["OPEN BOTH EMBER GATES", "HOLD SIGNAL FURNACE", "EXTRACT 4+ FORMATIONS"],
     victory: "Hold the Signal Furnace relay and extract at least 4 formations.",
     primaryTitle: "SIGNAL FURNACE",
     primaryDescription: "Maintain the evacuation uplink",
@@ -278,14 +288,52 @@ const OPERATIONS = [
     primaryResult: "Signal Furnace held",
     extractionTitle: "VOID LIFT GANTRY",
     primaryEvent: "Signal Furnace relay held. Void Lift corridor open.",
+    primaryApproachEvent: "Signal Furnace contact restored. Relay guard advancing.",
+    firstDecisionEvent: "Black Litany ash closes Ember Gate East. Breakpoint order required.",
+    secondDecisionEvent: "Relay crew broadcasts from the lower furnace deck.",
+    controlTitles: ["EMBER GATE WEST", "EMBER GATE EAST"],
+    controlProgress: ["Ember Gate West", "Ember Gate East"],
+    entryPlanTitle: "ASH DROP STAGING",
+    entryBattleTitle: "SOUTHERN ASH DROP",
+    optionalTitle: "RECOVER RELAY CREW",
+    optionalDescription: "Optional · preserve furnace intelligence",
+    battlefieldAlt: "Smoke-obscured void furnace evacuation battlefield",
   },
 ];
 
+const ASHEN_PASSAGE_PLAYBOOK_COPY = {
+  trapline: {
+    intent: "Open Ember Gate West by forcing veil units through overlapping fires.",
+    briefs: ["Draw the western screen into the lit kill zone.", "Seal the hostile ash lane.", "Exploit the opened relay route.", "Hold the Signal Furnace uplink.", "Preserve Void Lift capacity."],
+  },
+  spear: {
+    intent: "Concentrate protection around one decisive drive to the Signal Furnace.",
+    briefs: ["Take first contact at Ember Gate West.", "Mark the smoke-obscured transit lane.", "Crack the eastern gate and relay guard.", "Deny the north-shaft reserve.", "Follow the protected route to Void Lift."],
+  },
+  pressure: {
+    intent: "Split the veil at both Ember Gates, then reunite around the relay.",
+    briefs: ["Hold the western gate screen in place.", "Pressure the uncertain eastern gate.", "Prevent either screen from reinforcing.", "Converge through the smoke and hold the relay.", "Collect the split force at Void Lift."],
+  },
+};
+
+const playbookForOperation = (playbook, operation) => {
+  if (operation?.id !== "ashen-passage") return playbook;
+  const copy = ASHEN_PASSAGE_PLAYBOOK_COPY[playbook.id];
+  if (!copy) return playbook;
+  return {
+    ...playbook,
+    intent: copy.intent,
+    roles: playbook.roles.map((role, index) => ({ ...role, brief: copy.briefs[index] ?? role.brief })),
+  };
+};
+
 const roleDemandsFor = (role, index, condition) => condition.roleOverrides[index] ?? role.demands;
 
-const BREAKPOINTS = [
+const DEAD_CIRCUIT_BREAKPOINTS = [
   {
     id: "beta",
+    title: "Beta lane is collapsing",
+    description: "Helioch fire has the planned transit lane ranged. Your authored response is ready for execution.",
     trigger: "IF Beta lane is ranged",
     options: [
       { id: "tempo", label: "PRESERVE TEMPO", effect: "Cross exposed; keep reactor timing.", routeLabel: "DIRECT CROSSING", path: ["BETA LANE", "REACTOR"] },
@@ -295,6 +343,8 @@ const BREAKPOINTS = [
   },
   {
     id: "rescue",
+    title: "Salvage crew is cut off",
+    description: "The optional rescue now conflicts with the reactor timetable. Your playbook already contains a response.",
     trigger: "IF salvage crew is located",
     options: [
       { id: "clock", label: "PRESERVE CLOCK", effect: "Leave the crew; secure extraction.", routeLabel: "BYPASS SALVAGE", path: ["REACTOR", "EXTRACTION"] },
@@ -304,7 +354,39 @@ const BREAKPOINTS = [
   },
 ];
 
-const BREAKPOINT_IMPACTS = {
+const ASHEN_PASSAGE_BREAKPOINTS = [
+  {
+    id: "beta",
+    title: "Ash veil closes Ember Gate East",
+    description: "The Black Litany has drowned the eastern route in furnace smoke. Your authored crossing order is ready.",
+    trigger: "IF Ember Gate East is obscured",
+    options: [
+      { id: "tempo", label: "CROSS ON INSTRUMENTS", effect: "Trust the route marks; preserve relay timing.", routeLabel: "BLIND CROSSING", path: ["EMBER GATE EAST", "SIGNAL FURNACE"] },
+      { id: "protect", label: "LIGHT BEACON ROUTE", effect: "Mark a longer protected approach through the ash.", routeLabel: "BEACON DIVERSION", path: ["EMBER GATE EAST", "BEACON ARC", "SIGNAL FURNACE"] },
+    ],
+    defaultOption: "tempo",
+  },
+  {
+    id: "rescue",
+    title: "Relay crew is broadcasting",
+    description: "The stranded furnace crew can be recovered, but the Void Lift window is already closing.",
+    trigger: "IF relay crew broadcasts",
+    options: [
+      { id: "clock", label: "HOLD LIFT WINDOW", effect: "Leave the crew below; secure the evacuation corridor.", routeLabel: "BYPASS CREW", path: ["SIGNAL FURNACE", "VOID LIFT"] },
+      { id: "recover", label: "RECOVER RELAY CREW", effect: "Divert the Hauler through the lower furnace deck.", routeLabel: "RELAY RECOVERY", path: ["SIGNAL FURNACE", "RELAY DECK", "VOID LIFT"] },
+    ],
+    defaultOption: "clock",
+  },
+];
+
+const BREAKPOINTS_BY_OPERATION = {
+  "dead-circuit": DEAD_CIRCUIT_BREAKPOINTS,
+  "ashen-passage": ASHEN_PASSAGE_BREAKPOINTS,
+};
+
+const breakpointsFor = (operation) => BREAKPOINTS_BY_OPERATION[operation?.id] ?? DEAD_CIRCUIT_BREAKPOINTS;
+
+const DEAD_CIRCUIT_BREAKPOINT_IMPACTS = {
   beta: {
     tempo: { text: "No delay · Breacher remains exposed" },
     protect: { reactorDelay: 15, missionDelay: 15, protects: 1, text: "+00:15 · one formation protected" },
@@ -315,7 +397,25 @@ const BREAKPOINT_IMPACTS = {
   },
 };
 
-const ENEMY_PLAN = {
+const ASHEN_PASSAGE_BREAKPOINT_IMPACTS = {
+  beta: {
+    tempo: { text: "No delay · relay guard crosses blind" },
+    protect: { reactorDelay: 15, missionDelay: 15, protects: 1, text: "+00:15 · one formation protected" },
+  },
+  rescue: {
+    clock: { text: "No delay · relay crew left below" },
+    recover: { missionDelay: 15, protects: 1, rescue: true, text: "+00:15 · crew recovered · one formation protected" },
+  },
+};
+
+const BREAKPOINT_IMPACTS_BY_OPERATION = {
+  "dead-circuit": DEAD_CIRCUIT_BREAKPOINT_IMPACTS,
+  "ashen-passage": ASHEN_PASSAGE_BREAKPOINT_IMPACTS,
+};
+
+const breakpointImpactsFor = (operation) => BREAKPOINT_IMPACTS_BY_OPERATION[operation?.id] ?? DEAD_CIRCUIT_BREAKPOINT_IMPACTS;
+
+const DEAD_CIRCUIT_ENEMY_PLAN = {
   name: "IRON PROCESSION",
   intent: "Screen Beta, counter the breach, then sever the gantry.",
   formations: [
@@ -358,6 +458,57 @@ const ENEMY_PLAN = {
     },
   ],
 };
+
+const ASHEN_PASSAGE_ENEMY_PLAN = {
+  name: "BLACK LITANY",
+  intent: "Blind the Ember Gates, silence the relay, then occupy the Void Lift.",
+  formations: [
+    { id: "veil", number: "E1", name: "VEIL ENGINES", start: { x: 95, y: 67 }, end: { x: 61, y: 23 }, actionAt: 90 },
+    { id: "ward", number: "E2", name: "OATH WARD", start: { x: 97, y: 45 }, end: { x: 72, y: 39 }, actionAt: 225 },
+    { id: "ascendant", number: "E3", name: "ASCENDANT GUARD", start: { x: 82, y: 3 }, end: { x: 89, y: 15 }, actionAt: 330 },
+  ],
+  stages: [
+    {
+      id: "veil",
+      formationId: "veil",
+      label: "ASH VEIL",
+      creates: "BLINDED CORRIDOR",
+      intelligence: "KNOWN",
+      counteredBy: ["COVERED DRAG", "POWER WINCH", "FURNACE DRAGNET", "ASHEN CORDON"],
+      impact: { reactorDelay: 15 },
+      consequence: "Signal relay delayed +00:15",
+    },
+    {
+      id: "silence",
+      formationId: "ward",
+      label: "FURNACE SILENCE",
+      uses: "BLINDED CORRIDOR",
+      creates: "RELAY LOCK",
+      intelligence: "UNCERTAIN",
+      counteredBy: ["THERMAL BREACH", "COVERED ADVANCE", "LOCKED BREACH", "WEDGE & WALL", "LOCKSTEP HOLD"],
+      impact: { missionDelay: 15 },
+      consequence: "Void Lift opening delayed +00:15",
+    },
+    {
+      id: "occupy",
+      formationId: "ascendant",
+      label: "LIFT OCCUPATION",
+      uses: "RELAY LOCK",
+      creates: "LIFT SEALED",
+      intelligence: "UNKNOWN",
+      counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "MOBILE RESUPPLY"],
+      impact: { recoveryLoss: 1 },
+      consequence: "One formation sealed below the Void Lift",
+    },
+  ],
+};
+
+const ENEMY_PLANS = {
+  "dead-circuit": DEAD_CIRCUIT_ENEMY_PLAN,
+  "ashen-passage": ASHEN_PASSAGE_ENEMY_PLAN,
+};
+
+const enemyPlanFor = (operation) => ENEMY_PLANS[operation?.id] ?? DEAD_CIRCUIT_ENEMY_PLAN;
 
 const FIELD_PLANS = {
   trapline: {
@@ -451,6 +602,105 @@ const FIELD_LANDMARKS = {
   rescue: { x: 83, y: 75 },
 };
 
+const ASHEN_PASSAGE_FIELD_PLANS = {
+  trapline: {
+    positions: [
+      { x: 29, y: 42 },
+      { x: 43, y: 49 },
+      { x: 57, y: 40 },
+      { x: 68, y: 31 },
+      { x: 79, y: 24 },
+    ],
+    routes: [
+      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha", { x: 45, y: 31 }] },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, { x: 51, y: 46 }, "beta"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2], breakpoint: "beta" },
+      { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor"] },
+      { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
+    ],
+    breakpointRoles: { beta: 2, rescue: 4 },
+    branchRoutes: {
+      beta: {
+        tempo: [2, "reactor"],
+        protect: [2, { x: 59, y: 27 }, { x: 68, y: 22 }, "reactor"],
+      },
+      rescue: {
+        clock: [4, "extraction"],
+        recover: [4, "rescue", "extraction"],
+      },
+    },
+  },
+  spear: {
+    positions: [
+      { x: 28, y: 46 },
+      { x: 42, y: 35 },
+      { x: 56, y: 43 },
+      { x: 65, y: 51 },
+      { x: 79, y: 25 },
+    ],
+    routes: [
+      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha"] },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, "beta"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2], breakpoint: "beta" },
+      { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor"] },
+      { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
+    ],
+    breakpointRoles: { beta: 2, rescue: 4 },
+    branchRoutes: {
+      beta: {
+        tempo: [2, "reactor"],
+        protect: [2, { x: 58, y: 30 }, { x: 67, y: 23 }, "reactor"],
+      },
+      rescue: {
+        clock: [4, "extraction"],
+        recover: [4, "rescue", "extraction"],
+      },
+    },
+  },
+  pressure: {
+    positions: [
+      { x: 28, y: 40 },
+      { x: 55, y: 27 },
+      { x: 43, y: 51 },
+      { x: 66, y: 41 },
+      { x: 79, y: 25 },
+    ],
+    routes: [
+      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha"] },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, "beta"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2, { x: 52, y: 45 }] },
+      { role: 3, start: { x: 44, y: 81 }, points: [3], breakpoint: "beta" },
+      { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
+    ],
+    breakpointRoles: { beta: 3, rescue: 4 },
+    branchRoutes: {
+      beta: {
+        tempo: [3, "reactor"],
+        protect: [3, { x: 60, y: 28 }, { x: 68, y: 22 }, "reactor"],
+      },
+      rescue: {
+        clock: [4, "extraction"],
+        recover: [4, "rescue", "extraction"],
+      },
+    },
+  },
+};
+
+const ASHEN_PASSAGE_LANDMARKS = {
+  alpha: { x: 29, y: 32 },
+  beta: { x: 61, y: 21 },
+  reactor: { x: 72, y: 40 },
+  extraction: { x: 91, y: 13 },
+  rescue: { x: 84, y: 68 },
+};
+
+const OPERATION_FIELDS = {
+  "dead-circuit": { plans: FIELD_PLANS, landmarks: FIELD_LANDMARKS },
+  "ashen-passage": { plans: ASHEN_PASSAGE_FIELD_PLANS, landmarks: ASHEN_PASSAGE_LANDMARKS },
+};
+
+const operationFieldFor = (operation) => OPERATION_FIELDS[operation?.id] ?? OPERATION_FIELDS["dead-circuit"];
+
 const BASE_OPERATION = {
   alphaAt: 60,
   betaAt: 150,
@@ -462,7 +712,7 @@ const BASE_OPERATION = {
 const COMBO_CONFIRMATION_MS = 2600;
 const IMPROVISED_TASK_DELAY = 15;
 
-const ENEMY_REINFORCEMENT_WAVE = {
+const DEAD_CIRCUIT_REINFORCEMENT_WAVE = {
   number: "E4",
   name: "HELIOCH RELIEF COLUMN",
   order: "GANTRY INTERCEPT",
@@ -472,6 +722,24 @@ const ENEMY_REINFORCEMENT_WAVE = {
   start: { x: 97, y: 26 },
   intercept: { x: 86, y: 29 },
 };
+
+const ASHEN_PASSAGE_REINFORCEMENT_WAVE = {
+  number: "E4",
+  name: "CENSER RESERVE",
+  order: "VOID LIFT OCCUPATION",
+  approach: "NORTH SHAFT → VOID LIFT",
+  arrivalAt: BASE_OPERATION.completeAt,
+  approachDuration: 45,
+  start: { x: 91, y: 1 },
+  intercept: { x: 88, y: 14 },
+};
+
+const REINFORCEMENT_WAVES = {
+  "dead-circuit": DEAD_CIRCUIT_REINFORCEMENT_WAVE,
+  "ashen-passage": ASHEN_PASSAGE_REINFORCEMENT_WAVE,
+};
+
+const reinforcementWaveFor = (operation) => REINFORCEMENT_WAVES[operation?.id] ?? DEAD_CIRCUIT_REINFORCEMENT_WAVE;
 
 const emptyAssignments = (playbook) => Object.fromEntries(
   playbook.roles.map((role) => [role.id, null]),
@@ -604,29 +872,34 @@ const summarizePlacementReadiness = (readiness) => {
   };
 };
 
-const calculateEnemyClashes = (maneuvers) => ENEMY_PLAN.stages.map((stage) => {
+const calculateEnemyClashes = (maneuvers, operation) => {
+  const enemyPlan = enemyPlanFor(operation);
+  return enemyPlan.stages.map((stage) => {
   const counterManeuver = maneuvers.find((maneuver) => stage.counteredBy.includes(maneuver.name));
-  const formation = ENEMY_PLAN.formations.find((item) => item.id === stage.formationId);
+  const formation = enemyPlan.formations.find((item) => item.id === stage.formationId);
   return {
     ...stage,
     actionAt: formation.actionAt,
     disrupted: Boolean(counterManeuver),
     counterManeuver,
   };
-});
+  });
+};
 
-const calculateOperationProfile = (handoffs, branchChoices, readiness, condition) => {
+const calculateOperationProfile = (handoffs, branchChoices, readiness, condition, operation) => {
   const maneuvers = handoffs.filter((handoff) => handoff.maneuver).map((handoff) => handoff.maneuver);
   const readinessSummary = summarizePlacementReadiness(readiness);
   const total = (key) => maneuvers.reduce((sum, maneuver) => sum + (maneuver.impact[key] ?? 0), 0);
-  const enemyClashes = calculateEnemyClashes(maneuvers);
+  const enemyClashes = calculateEnemyClashes(maneuvers, operation);
   const enemyTotal = (key) => enemyClashes.reduce((sum, clash) => sum + (clash.disrupted ? 0 : clash.impact[key] ?? 0), 0);
-  const branchEffects = BREAKPOINTS.map((breakpoint) => {
+  const breakpoints = breakpointsFor(operation);
+  const breakpointImpacts = breakpointImpactsFor(operation);
+  const branchEffects = breakpoints.map((breakpoint) => {
     const optionId = branchChoices[breakpoint.id] ?? breakpoint.defaultOption;
     return {
       id: breakpoint.id,
       option: breakpoint.options.find((item) => item.id === optionId),
-      impact: BREAKPOINT_IMPACTS[breakpoint.id][optionId],
+      impact: breakpointImpacts[breakpoint.id][optionId],
     };
   });
   const branchTotal = (key) => branchEffects.reduce((sum, branch) => sum + (branch.impact[key] ?? 0), 0);
@@ -674,6 +947,7 @@ const comboWindowTimes = (profile) => [
 ];
 
 const buildOperationEvents = (profile, operation) => {
+  const reinforcementWave = reinforcementWaveFor(operation);
   const maneuverFor = (phase) => profile.effects.find((maneuver) => maneuver.impact.phase === phase)?.name;
   const alphaManeuver = maneuverFor("alpha");
   const betaManeuver = maneuverFor("beta");
@@ -683,10 +957,10 @@ const buildOperationEvents = (profile, operation) => {
   const events = [
     { at: 30, text: "Forward role has contact. Playbook in motion." },
     { at: profile.alphaAt, text: alphaManeuver ? `${alphaManeuver} secures Control Node Alpha.` : "Control Node Alpha seized under direct pressure." },
-    { at: profile.betaDecisionAt, text: "Helioch fire closes the Beta transit lane. Breakpoint order required." },
+    { at: profile.betaDecisionAt, text: operation.firstDecisionEvent },
     { at: profile.betaAt, text: betaManeuver ? `${betaManeuver} seals Control Node Beta.` : "Control Node Beta seized under pressure." },
-    { at: profile.rescueDecisionAt, text: "Salvage crew located below the reactor deck." },
-    { at: profile.reactorExposeAt, text: reactorManeuver ? `${reactorManeuver} exposes the Reactor Spine.` : "Reactor Spine exposed. Breach force advancing." },
+    { at: profile.rescueDecisionAt, text: operation.secondDecisionEvent },
+    { at: profile.reactorExposeAt, text: reactorManeuver ? `${reactorManeuver} opens the approach to ${operation.primaryTitle}.` : operation.primaryApproachEvent },
     { at: profile.reactorAt, text: operation.primaryEvent },
     { at: profile.extractionAt, text: extractionManeuver ? `${extractionManeuver}: ${profile.extractedCount} formations crossing the gantry.` : `${profile.extractedCount} formations crossing the ${operation.extractionTitle}.` },
   ];
@@ -698,12 +972,12 @@ const buildOperationEvents = (profile, operation) => {
         : `${clash.label} lands. ${clash.consequence}.`,
     });
   });
-  if (profile.overrun > 0) events.push({ at: ENEMY_REINFORCEMENT_WAVE.arrivalAt, text: `Helioch Relief Column reaches the ${operation.extractionTitle}. ${profile.reinforcementLoss} formation recovery lost.` });
+  if (profile.overrun > 0) events.push({ at: reinforcementWave.arrivalAt, text: `${reinforcementWave.name} reaches the ${operation.extractionTitle}. ${profile.reinforcementLoss} formation recovery lost.` });
   return events.sort((left, right) => left.at - right.at);
 };
 
-const defaultBranches = () => Object.fromEntries(
-  BREAKPOINTS.map((breakpoint) => [breakpoint.id, breakpoint.defaultOption]),
+const defaultBranches = (operation = OPERATIONS[0]) => Object.fromEntries(
+  breakpointsFor(operation).map((breakpoint) => [breakpoint.id, breakpoint.defaultOption]),
 );
 
 const fmtClock = (seconds) => {
@@ -740,16 +1014,17 @@ function FormationPortrait({ formation, compact = false }) {
 }
 
 function AppHeader({ phase, battleTime, operation, operationIndex, profile }) {
-  const reinforcementsEngaged = (phase === "battle" || phase === "complete") && battleTime >= ENEMY_REINFORCEMENT_WAVE.arrivalAt;
+  const reinforcementWave = reinforcementWaveFor(operation);
+  const reinforcementsEngaged = (phase === "battle" || phase === "complete") && battleTime >= reinforcementWave.arrivalAt;
   const clock = phase === "plan" || phase === "drill"
-    ? { label: "ENEMY WAVE IN", value: "06:00", detail: "HELIOCH RELIEF COLUMN" }
+    ? { label: "ENEMY WAVE IN", value: fmtDuration(reinforcementWave.arrivalAt), detail: reinforcementWave.name }
     : phase === "complete"
       ? profile.overrun > 0
         ? { label: "ENEMY WAVE CONTACT", value: fmtDuration(profile.overrun), detail: "BEFORE EXTRACTION CLEAR" }
         : { label: "EXTRACTION CLEAR", value: fmtDuration(profile.timeSaved), detail: "BEFORE ENEMY WAVE" }
       : reinforcementsEngaged
-        ? { label: "ENEMY WAVE ENGAGED", value: `+${fmtDuration(battleTime - ENEMY_REINFORCEMENT_WAVE.arrivalAt)}`, detail: "GANTRY INTERCEPT" }
-        : { label: "ENEMY WAVE IN", value: fmtClock(battleTime), detail: "EAST GANTRY APPROACH" };
+        ? { label: "ENEMY WAVE ENGAGED", value: `+${fmtDuration(battleTime - reinforcementWave.arrivalAt)}`, detail: reinforcementWave.order }
+        : { label: "ENEMY WAVE IN", value: fmtClock(battleTime), detail: reinforcementWave.approach };
   return (
     <header className="app-header">
       <div className="brand-block">
@@ -939,9 +1214,9 @@ function ObjectiveMarker({ className, number, title, description, state = "activ
   );
 }
 
-const resolveFieldPoint = (plan, reference) => {
+const resolveFieldPoint = (plan, landmarks, reference) => {
   if (typeof reference === "number") return plan.positions[reference];
-  if (typeof reference === "string") return FIELD_LANDMARKS[reference];
+  if (typeof reference === "string") return landmarks[reference];
   return reference;
 };
 
@@ -958,10 +1233,12 @@ const fieldSegmentStyle = (start, end, size) => {
   };
 };
 
-function TacticalFieldPlan({ assignments, branches, formations, phase, playbook }) {
+function TacticalFieldPlan({ assignments, branches, formations, operation, phase, playbook }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
-  const plan = FIELD_PLANS[playbook.id];
+  const operationField = operationFieldFor(operation);
+  const plan = operationField.plans[playbook.id];
+  const breakpoints = breakpointsFor(operation);
 
   useEffect(() => {
     if (!layerRef.current || phase === "battle" || phase === "complete") return undefined;
@@ -987,7 +1264,7 @@ function TacticalFieldPlan({ assignments, branches, formations, phase, playbook 
     return { ...route, roleIndex, role, formation, start };
   });
   const baseSegments = routes.flatMap((route) => {
-    const points = [route.start, ...route.points].map((point) => resolveFieldPoint(plan, point));
+    const points = [route.start, ...route.points].map((point) => resolveFieldPoint(plan, operationField.landmarks, point));
     return points.slice(0, -1).map((point, index) => ({
       id: `route-${route.roleIndex}-${index}`,
       start: point,
@@ -995,7 +1272,7 @@ function TacticalFieldPlan({ assignments, branches, formations, phase, playbook 
       className: `base lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""}`,
     }));
   });
-  const branchSegments = BREAKPOINTS.flatMap((breakpoint, breakpointIndex) => {
+  const branchSegments = breakpoints.flatMap((breakpoint, breakpointIndex) => {
     const selectedOptionId = branches[breakpoint.id];
     const roleIndex = plan.breakpointRoles[breakpoint.id];
     const role = playbook.roles[roleIndex];
@@ -1010,13 +1287,13 @@ function TacticalFieldPlan({ assignments, branches, formations, phase, playbook 
       const changed = selectedRoute && option.id !== breakpoint.defaultOption;
       return route.slice(0, -1).map((point, index) => ({
         id: `${breakpoint.id}-${option.id}-${index}`,
-        start: resolveFieldPoint(plan, point),
-        end: resolveFieldPoint(plan, route[index + 1]),
+        start: resolveFieldPoint(plan, operationField.landmarks, point),
+        end: resolveFieldPoint(plan, operationField.landmarks, route[index + 1]),
         className: `branch breakpoint-${breakpointIndex + 1} lane-${roleIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"} ${staffed ? "staffed" : ""} ${changed ? "changed" : ""}`,
       }));
     });
   });
-  const branchTurns = BREAKPOINTS.flatMap((breakpoint, breakpointIndex) => {
+  const branchTurns = breakpoints.flatMap((breakpoint, breakpointIndex) => {
     const selectedOptionId = branches[breakpoint.id];
     return breakpoint.options.flatMap((option) => {
       const selectedRoute = option.id === selectedOptionId;
@@ -1025,7 +1302,7 @@ function TacticalFieldPlan({ assignments, branches, formations, phase, playbook 
         .slice(0, 1)
         .map((point, index) => ({
           id: `${breakpoint.id}-${option.id}-turn-${index}`,
-          point: resolveFieldPoint(plan, point),
+          point: resolveFieldPoint(plan, operationField.landmarks, point),
           label: `${selectedRoute ? "" : "ALT · "}${option.routeLabel}`,
           className: `breakpoint-${breakpointIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"}`,
         }));
@@ -1037,7 +1314,7 @@ function TacticalFieldPlan({ assignments, branches, formations, phase, playbook 
       <div className="field-plan-caption panel-surface" aria-live="polite">
         <div><span>5 FORMATION ROUTES</span><b>{playbook.name}</b></div>
         <div className="field-plan-branch-state">
-          {BREAKPOINTS.map((breakpoint, index) => {
+          {breakpoints.map((breakpoint, index) => {
             const option = breakpoint.options.find((item) => item.id === branches[breakpoint.id]);
             const changed = branches[breakpoint.id] !== breakpoint.defaultOption;
             return <span className={changed ? "changed" : ""} key={breakpoint.id}>BP{index + 1} · {option.routeLabel}</span>;
@@ -1076,9 +1353,11 @@ function TacticalFieldPlan({ assignments, branches, formations, phase, playbook 
   );
 }
 
-function EnemyFieldPlan({ battleTime, phase, clashes, profile, planReady }) {
+function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planReady }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
+  const enemyPlan = enemyPlanFor(operation);
+  const reinforcementWave = reinforcementWaveFor(operation);
 
   useEffect(() => {
     if (!layerRef.current) return undefined;
@@ -1093,20 +1372,20 @@ function EnemyFieldPlan({ battleTime, phase, clashes, profile, planReady }) {
     return () => observer.disconnect();
   }, []);
 
-  const waveApproachAt = ENEMY_REINFORCEMENT_WAVE.arrivalAt - ENEMY_REINFORCEMENT_WAVE.approachDuration;
+  const waveApproachAt = reinforcementWave.arrivalAt - reinforcementWave.approachDuration;
   const waveProgress = phase === "battle" || phase === "complete"
-    ? Math.max(0, Math.min(1, (battleTime - waveApproachAt) / ENEMY_REINFORCEMENT_WAVE.approachDuration))
+    ? Math.max(0, Math.min(1, (battleTime - waveApproachAt) / reinforcementWave.approachDuration))
     : 0;
   const wavePosition = {
-    x: ENEMY_REINFORCEMENT_WAVE.start.x + (ENEMY_REINFORCEMENT_WAVE.intercept.x - ENEMY_REINFORCEMENT_WAVE.start.x) * waveProgress,
-    y: ENEMY_REINFORCEMENT_WAVE.start.y + (ENEMY_REINFORCEMENT_WAVE.intercept.y - ENEMY_REINFORCEMENT_WAVE.start.y) * waveProgress,
+    x: reinforcementWave.start.x + (reinforcementWave.intercept.x - reinforcementWave.start.x) * waveProgress,
+    y: reinforcementWave.start.y + (reinforcementWave.intercept.y - reinforcementWave.start.y) * waveProgress,
   };
-  const waveArrived = (phase === "battle" || phase === "complete") && battleTime >= ENEMY_REINFORCEMENT_WAVE.arrivalAt;
+  const waveArrived = (phase === "battle" || phase === "complete") && battleTime >= reinforcementWave.arrivalAt;
   const clearsBeforeWave = planReady && profile.overrun === 0;
 
   return (
-    <div className="enemy-plan-layer" ref={layerRef} aria-label={`${ENEMY_PLAN.name} enemy battlefield plan`}>
-      {ENEMY_PLAN.formations.map((formation, index) => {
+    <div className="enemy-plan-layer" ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
+      {enemyPlan.formations.map((formation, index) => {
         const clash = clashes[index];
         const inBattle = phase === "battle" || phase === "complete";
         const progress = inBattle ? Math.min(1, battleTime / formation.actionAt) : 0;
@@ -1131,17 +1410,17 @@ function EnemyFieldPlan({ battleTime, phase, clashes, profile, planReady }) {
           </Fragment>
         );
       })}
-      <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"}`} style={fieldSegmentStyle(ENEMY_REINFORCEMENT_WAVE.start, ENEMY_REINFORCEMENT_WAVE.intercept, layerSize)}>
+      <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"}`} style={fieldSegmentStyle(reinforcementWave.start, reinforcementWave.intercept, layerSize)}>
         <ArrowRight weight="bold" />
       </div>
-      <div className={`reinforcement-intercept ${clearsBeforeWave ? "avoided" : "threat"}`} style={{ left: `${ENEMY_REINFORCEMENT_WAVE.intercept.x}%`, top: `${ENEMY_REINFORCEMENT_WAVE.intercept.y}%` }}>
+      <div className={`reinforcement-intercept ${clearsBeforeWave ? "avoided" : "threat"}`} style={{ left: `${reinforcementWave.intercept.x}%`, top: `${reinforcementWave.intercept.y}%` }}>
         <Crosshair weight="duotone" />
-        <span>{!planReady ? "ENEMY WAVE · T+06:00" : clearsBeforeWave ? "WARHOST CLEARS FIRST" : `${fmtDuration(profile.overrun)} INTERCEPT WINDOW`}</span>
+        <span>{!planReady ? `ENEMY WAVE · T+${fmtDuration(reinforcementWave.arrivalAt)}` : clearsBeforeWave ? "WARHOST CLEARS FIRST" : `${fmtDuration(profile.overrun)} INTERCEPT WINDOW`}</span>
       </div>
       <div className={`enemy-plan-formation reinforcement-wave ${waveArrived ? "landed" : waveProgress > 0 ? "advancing" : "queued"} ${clearsBeforeWave ? "avoided" : ""}`} style={{ left: `${wavePosition.x}%`, top: `${wavePosition.y}%` }}>
-        <img src="/assets/helioch-sentinels.png" alt={`${ENEMY_REINFORCEMENT_WAVE.name} approaching the Extraction Gantry`} />
-        <span>{ENEMY_REINFORCEMENT_WAVE.number}</span>
-        <small>{waveArrived ? ENEMY_REINFORCEMENT_WAVE.order : `WAVE · T+${fmtDuration(ENEMY_REINFORCEMENT_WAVE.arrivalAt)}`}</small>
+        <img src="/assets/helioch-sentinels.png" alt={`${reinforcementWave.name} approaching ${operation.extractionTitle}`} />
+        <span>{reinforcementWave.number}</span>
+        <small>{waveArrived ? reinforcementWave.order : `WAVE · T+${fmtDuration(reinforcementWave.arrivalAt)}`}</small>
       </div>
     </div>
   );
@@ -1381,18 +1660,19 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
   }, []);
 
   return (
-    <section className={`battlefield phase-${phase}`} aria-label={`${operation.name} mission map`}>
-      <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt="Isometric industrial foundry battlefield" />
+    <section className={`battlefield phase-${phase} operation-${operation.id}`} aria-label={`${operation.name} mission map`}>
+      <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
       <div className="battlefield-wash" />
-      <EnemyFieldPlan battleTime={battleTime} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} />
-      <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} phase={phase} playbook={playbook} />
+      <div className="battlefield-operation-veil" aria-hidden="true" />
+      <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} />
+      <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} operation={operation} phase={phase} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
-      <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? "FORMATION STAGING" : "ENTRY / BREACH"}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
-      <ObjectiveMarker className="alpha-objective" number="1" title="CONTROL NODE ALPHA" description={alphaState === "secured" ? "SECURED · Railjack anchoring" : "Seize and hold"} state={alphaState} />
-      <ObjectiveMarker className="beta-objective" number="1" title="CONTROL NODE BETA" description={betaState === "secured" ? "SECURED · Transit lane open" : "Seize and hold"} state={betaState} />
+      <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
+      <ObjectiveMarker className="alpha-objective" number="1" title={operation.controlTitles[0]} description={alphaState === "secured" ? "SECURED · western route open" : "Seize and hold"} state={alphaState} />
+      <ObjectiveMarker className="beta-objective" number="1" title={operation.controlTitles[1]} description={betaState === "secured" ? "SECURED · transit lane open" : "Seize and hold"} state={betaState} />
       <ObjectiveMarker className="reactor-objective" number="2" title={operation.primaryTitle} description={reactorState === "secured" ? operation.primaryDone : operation.primaryDescription} state={reactorState} icon={Factory} />
       <ObjectiveMarker className="extraction-objective" number="3" title={operation.extractionTitle} description={`Extract ${operation.requiredExtraction}+ formations`} state={extractionState} icon={Flag} />
-      <ObjectiveMarker className="rescue-objective" title="RESCUE SALVAGE CREW" description="Optional · field repair reward" state="optional" icon={Wrench} />
+      <ObjectiveMarker className="rescue-objective" title={operation.optionalTitle} description={operation.optionalDescription} state="optional" icon={Wrench} />
 
       <div className="mission-path path-one" aria-hidden="true" />
       <div className="mission-path path-two" aria-hidden="true" />
@@ -1457,11 +1737,13 @@ function BattlePulse({ battleTime, events }) {
   );
 }
 
-function EnemyPlanIntel({ battleTime, phase, planReady, clashes, profile }) {
+function EnemyPlanIntel({ battleTime, operation, phase, planReady, clashes, profile }) {
+  const enemyPlan = enemyPlanFor(operation);
+  const reinforcementWave = reinforcementWaveFor(operation);
   return (
     <div className="intel-block enemy-plan-intel">
       <span className="panel-label">ENEMY PLAYBOOK · EXECUTES IN PARALLEL</span>
-      <div className="enemy-doctrine-title"><Target weight="duotone" /><span><b>{ENEMY_PLAN.name}</b><small>{ENEMY_PLAN.intent}</small></span></div>
+      <div className="enemy-doctrine-title"><Target weight="duotone" /><span><b>{enemyPlan.name}</b><small>{enemyPlan.intent}</small></span></div>
       <div className="enemy-chain">
         {clashes.map((clash, index) => {
           const resolved = (phase === "battle" || phase === "complete") && battleTime >= clash.actionAt;
@@ -1489,11 +1771,11 @@ function EnemyPlanIntel({ battleTime, phase, planReady, clashes, profile }) {
         })}
       </div>
       <div className={`reinforcement-order ${planReady && profile.overrun === 0 ? "avoided" : "threat"}`}>
-        <span className="enemy-step-number">{ENEMY_REINFORCEMENT_WAVE.number}</span>
+        <span className="enemy-step-number">{reinforcementWave.number}</span>
         <span className="enemy-step-copy">
-          <em>ARRIVES T+{fmtDuration(ENEMY_REINFORCEMENT_WAVE.arrivalAt)}</em>
-          <b>{ENEMY_REINFORCEMENT_WAVE.name}</b>
-          <small>{ENEMY_REINFORCEMENT_WAVE.approach}</small>
+          <em>ARRIVES T+{fmtDuration(reinforcementWave.arrivalAt)}</em>
+          <b>{reinforcementWave.name}</b>
+          <small>{reinforcementWave.approach}</small>
         </span>
         <span className="enemy-step-result">
           {!planReady ? "CONTINGENCY UNREAD" : profile.overrun > 0 ? `${reinforcementForecast(profile)} · ${profile.reinforcementLoss} RECOVERY LOST` : `${reinforcementForecast(profile)} · CONTACT AVOIDED`}
@@ -1548,7 +1830,7 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
         )}
         {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Place formations on the authored tactical route.</p>}
       </div>
-      <EnemyPlanIntel battleTime={battleTime} phase={phase} planReady={planReady} clashes={profile.enemyClashes} profile={profile} />
+      <EnemyPlanIntel battleTime={battleTime} operation={operation} phase={phase} planReady={planReady} clashes={profile.enemyClashes} profile={profile} />
       <div className="intel-block victory-block">
         <span className="panel-label">VICTORY CONDITION</span>
         <Factory weight="duotone" />
@@ -1557,10 +1839,10 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
       </div>
       <div className="intel-block objective-progress">
         <span className="panel-label">MISSION STATE</span>
-        <ProgressRow label="Alpha" done={battleTime >= profile.alphaAt} />
-        <ProgressRow label="Beta" done={battleTime >= profile.betaAt} />
+        <ProgressRow label={operation.controlProgress[0]} done={battleTime >= profile.alphaAt} />
+        <ProgressRow label={operation.controlProgress[1]} done={battleTime >= profile.betaAt} />
         <ProgressRow label={operation.primaryProgress} done={battleTime >= profile.reactorAt} />
-        <ProgressRow label="Salvage crew" done={rescueComplete} optional />
+        <ProgressRow label={operation.optionalTitle.replace("RECOVER ", "")} done={rescueComplete} optional />
         <ProgressRow label="Extraction" done={phase === "complete"} />
       </div>
     </section>
@@ -1576,15 +1858,17 @@ function ProgressRow({ label, done, optional = false }) {
   );
 }
 
-function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onReset, planReady, branches, onBranch }) {
+function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onReset, operation, planReady, branches, onBranch }) {
+  const breakpoints = breakpointsFor(operation);
+  const breakpointImpacts = breakpointImpactsFor(operation);
   return (
     <footer className="mission-footer">
       <div className="contingency-block">
         <span className="panel-label">AUTHORED BREAKPOINTS · OVERRIDE COSTS 1 COMMAND SEAL</span>
         <div className="contingencies">
-          {BREAKPOINTS.map((breakpoint, index) => {
+          {breakpoints.map((breakpoint, index) => {
             const selectedOption = breakpoint.options.find((option) => option.id === branches[breakpoint.id]);
-            const impact = BREAKPOINT_IMPACTS[breakpoint.id][selectedOption.id];
+            const impact = breakpointImpacts[breakpoint.id][selectedOption.id];
             return (
             <div className="breakpoint" key={breakpoint.id}>
               <span>{String(index + 1).padStart(2, "0")}</span>
@@ -1640,10 +1924,10 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
   );
 }
 
-function DecisionOverlay({ decision, seals, branches, onResolve }) {
+function DecisionOverlay({ decision, seals, branches, operation, onResolve }) {
   if (!decision) return null;
-  const isBeta = decision === "beta";
-  const breakpoint = BREAKPOINTS.find((item) => item.id === decision);
+  const breakpoint = breakpointsFor(operation).find((item) => item.id === decision);
+  const breakpointImpacts = breakpointImpactsFor(operation);
   const authored = breakpoint.options.find((option) => option.id === branches[decision]);
   const alternative = breakpoint.options.find((option) => option.id !== branches[decision]);
   return (
@@ -1651,14 +1935,14 @@ function DecisionOverlay({ decision, seals, branches, onResolve }) {
       <div className="decision-panel">
         <div className="decision-icon"><Radio weight="duotone" /></div>
         <p className="eyebrow">PLAYBOOK BREAKPOINT</p>
-        <h2 id="decision-title">{isBeta ? "Beta lane is collapsing" : "Salvage crew is cut off"}</h2>
-        <p>{isBeta ? "Helioch fire has the planned transit lane ranged. Your authored response is ready for execution." : "The optional rescue now conflicts with the reactor timetable. Your playbook already contains a response."}</p>
+        <h2 id="decision-title">{breakpoint.title}</h2>
+        <p>{breakpoint.description}</p>
         <div className="authored-order"><span>AUTHORED ORDER</span><b>{authored.label}</b><small>{authored.effect}</small></div>
         <div className="decision-route-compare">
           <span className="panel-label">HOW THE PLAN CHANGES</span>
           {breakpoint.options.map((option) => {
             const isAuthored = option.id === branches[decision];
-            const impact = BREAKPOINT_IMPACTS[decision][option.id];
+            const impact = breakpointImpacts[decision][option.id];
             return (
               <div className={isAuthored ? "authored" : "alternate"} key={option.id}>
                 <strong>{isAuthored ? "AUTHORED PATH" : "IF OVERRIDDEN"}</strong>
@@ -1777,8 +2061,9 @@ function SalvageWorkshop({ baselineRefits, choice, formations, nextOperation, on
 function CompletionOverlay({ formations, hasNextOperation, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
   const lostCount = FORMATIONS.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
+  const reinforcementWave = reinforcementWaveFor(operation);
   const timingResult = profile.overrun > 0
-    ? `The Helioch Relief Column reached the gantry ${profile.overrun} seconds before extraction cleared.`
+    ? `The ${reinforcementWave.name} reached ${operation.extractionTitle} ${profile.overrun} seconds before extraction cleared.`
     : profile.timeSaved > 0
     ? `The Warhost cleared extraction ${profile.timeSaved} seconds before the enemy wave arrived.`
     : "The Warhost cleared the gantry as the enemy wave arrived.";
@@ -1797,7 +2082,7 @@ function CompletionOverlay({ formations, hasNextOperation, operation, rescued, u
           <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>PLAN VS PLAN</span><b>{profile.effects.length} combos · {disruptedEnemyOrders} / 3 enemy orders broken</b><Seal weight="duotone" /></div>
+          <div><span>PLAN VS PLAN</span><b>{profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</b><Seal weight="duotone" /></div>
         </div>
         <p className="completion-note">Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{won && hasNextOperation ? "ENTER SALVAGE WORKSHOP" : "RETURN TO BATTLEFIELD"}</b><small>{won && hasNextOperation ? "Carry this detachment into the next operation." : "Inspect the completed operation state."}</small></span><ArrowRight /></button>
@@ -1832,11 +2117,11 @@ export function App() {
   const timerRef = useRef(null);
   const placementRevisionRef = useRef(0);
 
-  const playbook = useMemo(
-    () => PLAYBOOKS.find((item) => item.id === playbookId) ?? PLAYBOOKS[0],
-    [playbookId],
-  );
   const operation = OPERATIONS[operationIndex] ?? OPERATIONS[0];
+  const playbook = useMemo(
+    () => playbookForOperation(PLAYBOOKS.find((item) => item.id === playbookId) ?? PLAYBOOKS[0], operation),
+    [operation, playbookId],
+  );
   const condition = useMemo(
     () => MISSION_CONDITIONS.find((item) => item.id === conditionId) ?? MISSION_CONDITIONS[0],
     [conditionId],
@@ -1876,8 +2161,8 @@ export function App() {
   const activeBranches = phase === "plan" || phase === "drill" ? branches : battleBranches;
 
   const operationProfile = useMemo(
-    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness, condition),
-    [activeBranches, condition, placementReadiness, tacticalHandoffs],
+    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness, condition, operation),
+    [activeBranches, condition, operation, placementReadiness, tacticalHandoffs],
   );
 
   const operationEvents = useMemo(
@@ -1903,10 +2188,10 @@ export function App() {
         : `Enemy ${clash.label} lands: ${clash.consequence}`),
       ...operationProfile.branchEffects.map((branch) => `${branch.option.label}: ${branch.impact.text}`),
       operationProfile.overrun > 0
-        ? `${operationProfile.extractedCount} formations forecast to extract ${operationProfile.overrun} seconds after the enemy wave reaches the gantry`
+        ? `${operationProfile.extractedCount} formations forecast to extract ${operationProfile.overrun} seconds after the enemy wave reaches ${operation.extractionTitle}`
         : `${operationProfile.extractedCount} formations forecast to clear ${operationProfile.timeSaved} seconds before the enemy wave`,
     ],
-    [assignedCount, condition, formations.length, operationProfile, playbook, tacticalHandoffs],
+    [assignedCount, condition, formations.length, operation, operationProfile, playbook, tacticalHandoffs],
   );
 
   useEffect(() => {
@@ -1956,8 +2241,8 @@ export function App() {
     if (!next) return;
     setPlaybookId(next.id);
     setAssignments(emptyAssignments(next));
-    setBranches(defaultBranches());
-    setBattleBranches(defaultBranches());
+    setBranches(defaultBranches(operation));
+    setBattleBranches(defaultBranches(operation));
     setSelected("harpoon");
     setPickerRoleId(null);
     setPlacementFeedback(null);
@@ -1989,8 +2274,8 @@ export function App() {
       const nextSequence = evaluateTacticalSequence(playbook, assignments, nextFormations);
       const previousReadiness = calculatePlacementReadiness(playbook, assignments, previousSequence.handoffs, condition, formations);
       const nextReadiness = calculatePlacementReadiness(playbook, assignments, nextSequence.handoffs, condition, nextFormations);
-      const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition);
-      const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition);
+      const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation);
+      const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation);
       const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
       const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
       const previousWindow = previousProfile.timeSaved - previousProfile.overrun;
@@ -2041,8 +2326,8 @@ export function App() {
     const nextSequence = evaluateTacticalSequence(playbook, nextAssignments, formations);
     const previousReadiness = calculatePlacementReadiness(playbook, assignments, previousSequence.handoffs, condition, formations);
     const nextReadiness = calculatePlacementReadiness(playbook, nextAssignments, nextSequence.handoffs, condition, formations);
-    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition);
-    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition);
+    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation);
+    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation);
     const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const targetIndex = playbook.roles.findIndex((role) => role.id === targetRole.id);
@@ -2096,7 +2381,7 @@ export function App() {
 
   const chooseBranch = (breakpointId, optionId) => {
     if (phase !== "plan") return;
-    const breakpoint = BREAKPOINTS.find((item) => item.id === breakpointId);
+    const breakpoint = breakpointsFor(operation).find((item) => item.id === breakpointId);
     if (!breakpoint?.options.some((option) => option.id === optionId)) return;
     setBranches((current) => ({ ...current, [breakpointId]: optionId }));
     setDrillComplete(false);
@@ -2104,7 +2389,8 @@ export function App() {
 
   const resolveDecision = (choice) => {
     if (choice === "override" && seals <= 0) return;
-    const breakpoint = BREAKPOINTS.find((item) => item.id === decision);
+    const breakpoint = breakpointsFor(operation).find((item) => item.id === decision);
+    const breakpointImpacts = breakpointImpactsFor(operation);
     const plannedOption = branches[decision];
     const chosenOption = choice === "override"
       ? breakpoint.options.find((option) => option.id !== plannedOption)?.id
@@ -2113,7 +2399,7 @@ export function App() {
       setSeals((current) => current - 1);
     }
     setBattleBranches((current) => ({ ...current, [decision]: chosenOption }));
-    if (decision === "rescue") setRescueComplete(Boolean(BREAKPOINT_IMPACTS[decision][chosenOption].rescue));
+    if (decision === "rescue") setRescueComplete(Boolean(breakpointImpacts[decision][chosenOption].rescue));
     setResolvedDecisions((current) => [...current, decision]);
     setDecision(null);
   };
@@ -2165,8 +2451,8 @@ export function App() {
     setOperationIndex(nextIndex);
     setConditionId(nextOperation.conditionId);
     setAssignments(emptyAssignments(playbook));
-    setBranches(defaultBranches());
-    setBattleBranches(defaultBranches());
+    setBranches(defaultBranches(nextOperation));
+    setBattleBranches(defaultBranches(nextOperation));
     setPhase("plan");
     setBattleTime(0);
     setSelected("harpoon");
@@ -2192,8 +2478,8 @@ export function App() {
     setConditionId("clear");
     setRefits(defaultRefits());
     setAssignments(emptyAssignments(PLAYBOOKS[0]));
-    setBranches(defaultBranches());
-    setBattleBranches(defaultBranches());
+    setBranches(defaultBranches(OPERATIONS[0]));
+    setBattleBranches(defaultBranches(OPERATIONS[0]));
     setSelected("harpoon");
     setDrillStep(-1);
     setDrillComplete(false);
@@ -2217,8 +2503,8 @@ export function App() {
         <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
       </div>
-      <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
-      <DecisionOverlay decision={decision} seals={seals} branches={branches} onResolve={resolveDecision} />
+      <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
+      <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
       {showCompletion && <CompletionOverlay formations={formations} hasNextOperation={operationIndex < OPERATIONS.length - 1} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
       {showWorkshop && workshopBaseline && <SalvageWorkshop baselineRefits={workshopBaseline} choice={salvageChoice} formations={formations} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopRefit} onLaunch={launchNextOperation} />}

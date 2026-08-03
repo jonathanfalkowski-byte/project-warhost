@@ -129,6 +129,12 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .battlefield { min-width: 0; min-height: 0; position: relative; overflow: hidden; background: #111; }
 .battlefield-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(.82) saturate(.82) contrast(1.08); }
 .battlefield-wash { position: absolute; inset: 0; background: rgba(5, 8, 8, .22); pointer-events: none; }
+.battlefield-operation-veil { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
+.operation-ashen-passage .battlefield-art { object-position: 73% center; transform: scale(1.08); filter: brightness(.65) saturate(.56) contrast(1.18) hue-rotate(145deg); }
+.operation-ashen-passage .battlefield-wash { z-index: 1; background: linear-gradient(125deg, rgba(5, 13, 17, .58), rgba(20, 22, 18, .18) 42%, rgba(2, 8, 12, .68)); }
+.operation-ashen-passage .battlefield-operation-veil { background: radial-gradient(ellipse at 61% 34%, rgba(126, 178, 183, .12), transparent 24%), repeating-linear-gradient(165deg, transparent 0 48px, rgba(170, 205, 205, .035) 50px 56px, transparent 58px 104px); mix-blend-mode: screen; opacity: .78; }
+.operation-ashen-passage.phase-battle .battlefield-art { filter: brightness(.7) saturate(.66) contrast(1.18) hue-rotate(145deg); }
+.operation-ashen-passage.phase-complete .battlefield-art { filter: brightness(.58) saturate(.45) contrast(1.12) hue-rotate(145deg); }
 .phase-battle .battlefield-art { filter: brightness(.86) saturate(.96) contrast(1.08); }
 .phase-complete .battlefield-art { filter: brightness(.8) saturate(.68) contrast(1.05); }
 .field-plan-layer { position: absolute; z-index: 5; inset: 0; overflow: hidden; pointer-events: none; }
@@ -229,6 +235,22 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .reactor-objective { right: 15%; top: 43%; }
 .extraction-objective { right: 2%; top: 14%; }
 .rescue-objective { right: 10%; bottom: 18%; }
+.operation-ashen-passage .alpha-objective { left: 18%; top: 27%; }
+.operation-ashen-passage .beta-objective { right: 27%; top: 10%; }
+.operation-ashen-passage .reactor-objective { right: 18%; top: 36%; }
+.operation-ashen-passage .extraction-objective { right: 1.5%; top: 5%; }
+.operation-ashen-passage .rescue-objective { right: 6%; bottom: 23%; }
+.operation-ashen-passage .entry-sector { left: 3%; bottom: 8%; border-color: #78aeb7; background: rgba(6, 20, 24, .92); }
+.operation-ashen-passage.phase-plan .entry-sector, .operation-ashen-passage.phase-drill .entry-sector { left: 2%; top: 9%; bottom: auto; }
+.operation-ashen-passage .path-one { left: 19%; top: 52%; width: 32%; transform: rotate(-18deg); }
+.operation-ashen-passage .path-two { left: 48%; top: 41%; width: 29%; transform: rotate(-27deg); }
+.operation-ashen-passage .path-three { left: 75%; top: 24%; width: 19%; transform: rotate(-17deg); }
+.operation-ashen-passage .combo-pull { left: 19%; top: 63%; width: 25%; transform: rotate(-37deg); }
+.operation-ashen-passage .combo-burn { left: 34%; top: 69%; width: 21%; transform: rotate(-53deg); }
+.operation-ashen-passage .combo-break { left: 48%; top: 62%; width: 22%; transform: rotate(-61deg); }
+.operation-ashen-passage .kill-zone { left: 56%; top: 30%; border-color: rgba(131, 183, 190, .45); color: rgba(169, 218, 221, .62); background: rgba(38, 79, 85, .18); transform: rotate(-8deg); }
+.operation-ashen-passage .kill-zone span { transform: rotate(8deg); }
+.operation-ashen-passage .kill-zone.active { border-color: #85c4ca; color: #b8ecee; background: rgba(44, 102, 108, .34); box-shadow: 0 0 20px rgba(103, 184, 190, .25); }
 .map-sector { position: absolute; z-index: 5; padding: 6px 8px; display: grid; background: rgba(8, 16, 19, .9); border-left: 2px solid var(--blue); }
 .map-sector span { font-family: "Barlow Condensed"; color: #6bc8f2; font-size: 13px; letter-spacing: .06em; }
 .map-sector small { font-size: 10px; color: #9fa9a5; }
