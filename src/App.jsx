@@ -350,6 +350,7 @@ const BASE_OPERATION = {
 };
 
 const COMBO_CONFIRMATION_MS = 2600;
+const IMPROVISED_TASK_DELAY = 15;
 
 const ENEMY_REINFORCEMENT_WAVE = {
   number: "E4",
@@ -467,11 +468,26 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs) => Object.
       score,
       label,
       taskAligned,
+      taskDelay: taskAligned ? 0 : IMPROVISED_TASK_DELAY,
       inboundReaction,
       outboundLink,
     }];
   }),
 );
+
+const summarizePlacementReadiness = (readiness) => {
+  const staffed = Object.values(readiness).filter(Boolean);
+  const alignedCount = staffed.filter((item) => item.taskAligned).length;
+  const improvisedCount = staffed.length - alignedCount;
+  const totalScore = staffed.reduce((sum, item) => sum + item.score, 0);
+  return {
+    staffedCount: staffed.length,
+    alignedCount,
+    improvisedCount,
+    average: staffed.length > 0 ? Math.round(totalScore / staffed.length) : 0,
+    delay: improvisedCount * IMPROVISED_TASK_DELAY,
+  };
+};
 
 const calculateEnemyClashes = (maneuvers) => ENEMY_PLAN.stages.map((stage) => {
   const counterManeuver = maneuvers.find((maneuver) => stage.counteredBy.includes(maneuver.name));
@@ -484,8 +500,9 @@ const calculateEnemyClashes = (maneuvers) => ENEMY_PLAN.stages.map((stage) => {
   };
 });
 
-const calculateOperationProfile = (handoffs, branchChoices) => {
+const calculateOperationProfile = (handoffs, branchChoices, readiness) => {
   const maneuvers = handoffs.filter((handoff) => handoff.maneuver).map((handoff) => handoff.maneuver);
+  const readinessSummary = summarizePlacementReadiness(readiness);
   const total = (key) => maneuvers.reduce((sum, maneuver) => sum + (maneuver.impact[key] ?? 0), 0);
   const enemyClashes = calculateEnemyClashes(maneuvers);
   const enemyTotal = (key) => enemyClashes.reduce((sum, clash) => sum + (clash.disrupted ? 0 : clash.impact[key] ?? 0), 0);
@@ -504,7 +521,7 @@ const calculateOperationProfile = (handoffs, branchChoices) => {
   const reactorAt = Math.max(betaAt + 60, BASE_OPERATION.reactorAt - total("reactor") + branchTotal("reactorDelay") + enemyTotal("reactorDelay"));
   const reactorExposeAt = Math.max(betaAt + 30, reactorAt - 45);
   const rescueDecisionAt = Math.max(betaAt + 30, Math.min(210, reactorExposeAt - 15));
-  const extractionAt = Math.max(reactorAt + 30, BASE_OPERATION.extractionAt - total("extraction")) + branchTotal("missionDelay") + enemyTotal("missionDelay");
+  const extractionAt = Math.max(reactorAt + 30, BASE_OPERATION.extractionAt - total("extraction")) + branchTotal("missionDelay") + enemyTotal("missionDelay") + readinessSummary.delay;
   const completeAt = extractionAt + 15;
   const overrun = Math.max(0, completeAt - BASE_OPERATION.completeAt);
   const reinforcementLoss = Math.ceil(overrun / 15);
@@ -528,6 +545,7 @@ const calculateOperationProfile = (handoffs, branchChoices) => {
     enemyRecoveryLoss,
     enemyClashes,
     branchEffects,
+    readiness: readinessSummary,
     effects: maneuvers,
   };
 };
@@ -655,7 +673,7 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness })
   if (!formation) return null;
   const Icon = formation.icon;
   const observations = readiness ? [
-    readiness.taskAligned ? "TASK ALIGNED" : "IMPROVISED TASK",
+    readiness.taskAligned ? "TASK ALIGNED" : `IMPROVISED / +${fmtDuration(readiness.taskDelay)}`,
     readiness.inboundReaction ? "INBOUND REACTION" : "NO INBOUND REACTION",
     readiness.outboundLink ? "FEEDS NEXT STOP" : "NO OUTBOUND REACTION",
   ] : [];
@@ -1356,6 +1374,13 @@ function IntelRail({ phase, battleTime, planReady, rescueComplete, playbook, ass
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planReady ? forecast : `${assignedCount} / 5 ASSIGNED`}</strong>
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
+        {profile.readiness.staffedCount > 0 && (
+          <div className={`readiness-impact ${profile.readiness.delay > 0 ? "penalty" : "aligned"}`}>
+            <span>FORMATION READINESS</span>
+            <b>{profile.readiness.average}% · {profile.readiness.delay > 0 ? `+${fmtDuration(profile.readiness.delay)} EXECUTION DELAY` : "NO TASK-FIT DELAY"}</b>
+            <small>{profile.readiness.alignedCount} / {profile.readiness.staffedCount} STAFFED FORMATIONS TASK-ALIGNED · COMBO EFFECTS RESOLVE SEPARATELY</small>
+          </div>
+        )}
         {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Place formations on the authored tactical route.</p>}
       </div>
       <EnemyPlanIntel battleTime={battleTime} phase={phase} planReady={planReady} clashes={profile.enemyClashes} profile={profile} />
@@ -1530,6 +1555,9 @@ function CompletionOverlay({ rescued, usedSeals, playbook, profile, onClose }) {
     : profile.timeSaved > 0
     ? `The Warhost cleared extraction ${profile.timeSaved} seconds before the enemy wave arrived.`
     : "The Warhost cleared the gantry as the enemy wave arrived.";
+  const readinessResult = profile.readiness.delay > 0
+    ? `${profile.readiness.improvisedCount} improvised ${profile.readiness.improvisedCount === 1 ? "assignment added" : "assignments added"} ${profile.readiness.delay} seconds of execution delay.`
+    : `All ${profile.readiness.staffedCount} formations were task-aligned with no readiness delay.`;
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className="decision-panel completion-panel">
@@ -1544,7 +1572,7 @@ function CompletionOverlay({ rescued, usedSeals, playbook, profile, onClose }) {
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAN VS PLAN</span><b>{profile.effects.length} combos · {disruptedEnemyOrders} / 3 enemy orders broken</b><Seal weight="duotone" /></div>
         </div>
-        <p className="completion-note">{timingResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+        <p className="completion-note">{timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onClose}><span><b>RETURN TO BATTLEFIELD</b><small>Inspect the completed mission state.</small></span><ArrowRight /></button>
       </div>
     </div>
@@ -1606,8 +1634,8 @@ export function App() {
   const activeBranches = phase === "plan" || phase === "drill" ? branches : battleBranches;
 
   const operationProfile = useMemo(
-    () => calculateOperationProfile(tacticalHandoffs, activeBranches),
-    [activeBranches, tacticalHandoffs],
+    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness),
+    [activeBranches, placementReadiness, tacticalHandoffs],
   );
 
   const operationEvents = useMemo(
@@ -1619,6 +1647,9 @@ export function App() {
     () => [
       `Loading ${playbook.name} geometry`,
       ...playbook.stages.map((stage) => `${stage.label} timing and support arcs confirmed`),
+      operationProfile.readiness.delay > 0
+        ? `${operationProfile.readiness.improvisedCount} improvised assignments add ${operationProfile.readiness.delay} seconds to extraction timing`
+        : `All ${operationProfile.readiness.staffedCount} formations are task-aligned; no readiness delay`,
       ...(tacticalHandoffs.some((handoff) => handoff.maneuver)
         ? tacticalHandoffs.filter((handoff) => handoff.maneuver).map((handoff) => `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}. ${handoff.maneuver.impact.text}`)
         : [`All ${assignedCount} formations act independently; no automatic combo windows discovered`]),
@@ -1705,8 +1736,10 @@ export function App() {
     };
     const previousSequence = evaluateTacticalSequence(playbook, assignments);
     const nextSequence = evaluateTacticalSequence(playbook, nextAssignments);
-    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches);
-    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches);
+    const previousReadiness = calculatePlacementReadiness(playbook, assignments, previousSequence.handoffs);
+    const nextReadiness = calculatePlacementReadiness(playbook, nextAssignments, nextSequence.handoffs);
+    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness);
+    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness);
     const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const targetIndex = playbook.roles.findIndex((role) => role.id === targetRole.id);
