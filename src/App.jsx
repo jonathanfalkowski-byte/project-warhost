@@ -242,6 +242,45 @@ const MISSION_CONDITIONS = [
   },
 ];
 
+const OPERATIONS = [
+  {
+    id: "dead-circuit",
+    name: "OPERATION DEAD CIRCUIT",
+    shortName: "Dead Circuit",
+    type: "SABOTAGE & EXTRACT",
+    conditionId: "clear",
+    conditionLocked: false,
+    requiredExtraction: 3,
+    orders: ["SEIZE BOTH NODES", "SABOTAGE REACTOR", "EXTRACT 3+ FORMATIONS"],
+    victory: "Sabotage Reactor Spine and extract at least 3 formations.",
+    primaryTitle: "REACTOR SPINE",
+    primaryDescription: "Primary sabotage target",
+    primaryDone: "SABOTAGED",
+    primaryProgress: "Reactor",
+    primaryResult: "Reactor sabotaged",
+    extractionTitle: "EXTRACTION GANTRY",
+    primaryEvent: "Reactor Spine sabotaged. Extraction route open.",
+  },
+  {
+    id: "ashen-passage",
+    name: "OPERATION ASHEN PASSAGE",
+    shortName: "Ashen Passage",
+    type: "HOLD & EVACUATE",
+    conditionId: "blackout",
+    conditionLocked: true,
+    requiredExtraction: 4,
+    orders: ["SECURE BOTH NODES", "HOLD SIGNAL FURNACE", "EXTRACT 4+ FORMATIONS"],
+    victory: "Hold the Signal Furnace relay and extract at least 4 formations.",
+    primaryTitle: "SIGNAL FURNACE",
+    primaryDescription: "Maintain the evacuation uplink",
+    primaryDone: "RELAY HELD",
+    primaryProgress: "Signal Furnace",
+    primaryResult: "Signal Furnace held",
+    extractionTitle: "VOID LIFT GANTRY",
+    primaryEvent: "Signal Furnace relay held. Void Lift corridor open.",
+  },
+];
+
 const roleDemandsFor = (role, index, condition) => condition.roleOverrides[index] ?? role.demands;
 
 const BREAKPOINTS = [
@@ -634,7 +673,7 @@ const comboWindowTimes = (profile) => [
   profile.extractionAt,
 ];
 
-const buildOperationEvents = (profile) => {
+const buildOperationEvents = (profile, operation) => {
   const maneuverFor = (phase) => profile.effects.find((maneuver) => maneuver.impact.phase === phase)?.name;
   const alphaManeuver = maneuverFor("alpha");
   const betaManeuver = maneuverFor("beta");
@@ -648,8 +687,8 @@ const buildOperationEvents = (profile) => {
     { at: profile.betaAt, text: betaManeuver ? `${betaManeuver} seals Control Node Beta.` : "Control Node Beta seized under pressure." },
     { at: profile.rescueDecisionAt, text: "Salvage crew located below the reactor deck." },
     { at: profile.reactorExposeAt, text: reactorManeuver ? `${reactorManeuver} exposes the Reactor Spine.` : "Reactor Spine exposed. Breach force advancing." },
-    { at: profile.reactorAt, text: "Reactor Spine sabotaged. Extraction route open." },
-    { at: profile.extractionAt, text: extractionManeuver ? `${extractionManeuver}: ${profile.extractedCount} formations crossing the gantry.` : `${profile.extractedCount} formations crossing the Extraction Gantry.` },
+    { at: profile.reactorAt, text: operation.primaryEvent },
+    { at: profile.extractionAt, text: extractionManeuver ? `${extractionManeuver}: ${profile.extractedCount} formations crossing the gantry.` : `${profile.extractedCount} formations crossing the ${operation.extractionTitle}.` },
   ];
   profile.enemyClashes.forEach((clash) => {
     events.push({
@@ -659,7 +698,7 @@ const buildOperationEvents = (profile) => {
         : `${clash.label} lands. ${clash.consequence}.`,
     });
   });
-  if (profile.overrun > 0) events.push({ at: ENEMY_REINFORCEMENT_WAVE.arrivalAt, text: `Helioch Relief Column reaches the Extraction Gantry. ${profile.reinforcementLoss} formation recovery lost.` });
+  if (profile.overrun > 0) events.push({ at: ENEMY_REINFORCEMENT_WAVE.arrivalAt, text: `Helioch Relief Column reaches the ${operation.extractionTitle}. ${profile.reinforcementLoss} formation recovery lost.` });
   return events.sort((left, right) => left.at - right.at);
 };
 
@@ -700,7 +739,7 @@ function FormationPortrait({ formation, compact = false }) {
   );
 }
 
-function AppHeader({ phase, battleTime, profile }) {
+function AppHeader({ phase, battleTime, operation, operationIndex, profile }) {
   const reinforcementsEngaged = (phase === "battle" || phase === "complete") && battleTime >= ENEMY_REINFORCEMENT_WAVE.arrivalAt;
   const clock = phase === "plan" || phase === "drill"
     ? { label: "ENEMY WAVE IN", value: "06:00", detail: "HELIOCH RELIEF COLUMN" }
@@ -733,8 +772,8 @@ function AppHeader({ phase, battleTime, profile }) {
       </div>
       <div className="operation-block">
         <div>
-          <p className="operation-title">OPERATION DEAD CIRCUIT</p>
-          <p className="operation-type">SABOTAGE &amp; EXTRACT</p>
+          <p className="operation-title">{operation.name}</p>
+          <p className="operation-type">{operation.type} · RUN {operationIndex + 1} / {OPERATIONS.length}</p>
         </div>
         <div className="reinforcement-clock" aria-live="polite">
           <span>{clock.label}</span>
@@ -746,7 +785,7 @@ function AppHeader({ phase, battleTime, profile }) {
   );
 }
 
-function FormationDossier({ formation, assignedRole, assignedIndex, readiness, phase, onRefit }) {
+function FormationDossier({ formation, assignedRole, assignedIndex, readiness, phase, refitsLocked, onRefit }) {
   if (!formation) return null;
   const Icon = formation.icon;
   const observations = readiness ? [
@@ -764,14 +803,14 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness, p
       </div>
       <p>{formation.purpose}</p>
       <div className="dossier-refits">
-        <span>REFIT BAY · ONE PACKAGE INSTALLED</span>
+        <span>REFIT BAY · {refitsLocked ? "LOCKED FOR OPERATION" : "ONE PACKAGE INSTALLED"}</span>
         <div>
           {formation.refits.map((refit) => (
             <button
               key={refit.id}
               className={formation.activeRefit.id === refit.id ? "selected" : ""}
               onClick={() => onRefit(formation.id, refit.id)}
-              disabled={phase !== "plan"}
+              disabled={refitsLocked || phase !== "plan"}
               aria-pressed={formation.activeRefit.id === refit.id}
             >
               <b>{refit.name}</b>
@@ -805,7 +844,7 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness, p
   );
 }
 
-function FormationRoster({ formations, selected, onSelect, assignments, playbook, onPlaybook, phase, onFormationDragStart, readiness, onRefit }) {
+function FormationRoster({ formations, selected, onSelect, assignments, playbook, onPlaybook, phase, onFormationDragStart, readiness, refitsLocked, onRefit }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -865,21 +904,21 @@ function FormationRoster({ formations, selected, onSelect, assignments, playbook
           );
         })}
       </div>
-      <FormationDossier formation={selectedFormation} assignedRole={selectedRole} assignedIndex={selectedRoleIndex} readiness={selectedRole ? readiness[selectedRole.id] : null} phase={phase} onRefit={onRefit} />
+      <FormationDossier formation={selectedFormation} assignedRole={selectedRole} assignedIndex={selectedRoleIndex} readiness={selectedRole ? readiness[selectedRole.id] : null} phase={phase} refitsLocked={refitsLocked} onRefit={onRefit} />
     </section>
   );
 }
 
-function MissionRoute({ phase, battleTime, profile }) {
+function MissionRoute({ phase, battleTime, operation, profile }) {
   const steps = [
-    { n: 1, label: "SEIZE BOTH NODES", done: battleTime >= profile.betaAt },
-    { n: 2, label: "SABOTAGE REACTOR", done: battleTime >= profile.reactorAt },
-    { n: 3, label: "EXTRACT 3+ FORMATIONS", done: phase === "complete" },
+    { n: 1, label: operation.orders[0], done: battleTime >= profile.betaAt },
+    { n: 2, label: operation.orders[1], done: battleTime >= profile.reactorAt },
+    { n: 3, label: operation.orders[2], done: phase === "complete" },
   ];
   return (
     <div className="mission-route panel-surface">
       <span className="panel-label">VICTORY ORDERS</span>
-      <div className="victory-rule"><b>WIN THE MISSION</b><small>Sabotage Reactor Spine + extract 3 formations.</small></div>
+      <div className="victory-rule"><b>WIN THE MISSION</b><small>{operation.victory}</small></div>
       {steps.map((step) => (
         <div className={`route-step route-${step.n} ${step.done ? "done" : ""}`} key={step.n}>
           <span>{step.done ? <CheckCircle weight="fill" /> : step.n}</span>
@@ -1299,7 +1338,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   );
 }
 
-function Battlefield({ formations, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart, readiness }) {
+function Battlefield({ formations, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart, readiness }) {
   const [confirmedCombo, setConfirmedCombo] = useState(null);
   const confirmedComboIdRef = useRef(null);
   const confirmedComboTimerRef = useRef(null);
@@ -1342,17 +1381,17 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
   }, []);
 
   return (
-    <section className={`battlefield phase-${phase}`} aria-label="Operation Dead Circuit mission map">
+    <section className={`battlefield phase-${phase}`} aria-label={`${operation.name} mission map`}>
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt="Isometric industrial foundry battlefield" />
       <div className="battlefield-wash" />
       <EnemyFieldPlan battleTime={battleTime} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} />
       <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} phase={phase} playbook={playbook} />
-      <MissionRoute phase={phase} battleTime={battleTime} profile={profile} />
+      <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? "FORMATION STAGING" : "ENTRY / BREACH"}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
       <ObjectiveMarker className="alpha-objective" number="1" title="CONTROL NODE ALPHA" description={alphaState === "secured" ? "SECURED · Railjack anchoring" : "Seize and hold"} state={alphaState} />
       <ObjectiveMarker className="beta-objective" number="1" title="CONTROL NODE BETA" description={betaState === "secured" ? "SECURED · Transit lane open" : "Seize and hold"} state={betaState} />
-      <ObjectiveMarker className="reactor-objective" number="2" title="REACTOR SPINE" description={reactorState === "secured" ? "SABOTAGED" : "Primary target"} state={reactorState} icon={Factory} />
-      <ObjectiveMarker className="extraction-objective" number="3" title="EXTRACTION GANTRY" description="Extract 3+ formations" state={extractionState} icon={Flag} />
+      <ObjectiveMarker className="reactor-objective" number="2" title={operation.primaryTitle} description={reactorState === "secured" ? operation.primaryDone : operation.primaryDescription} state={reactorState} icon={Factory} />
+      <ObjectiveMarker className="extraction-objective" number="3" title={operation.extractionTitle} description={`Extract ${operation.requiredExtraction}+ formations`} state={extractionState} icon={Flag} />
       <ObjectiveMarker className="rescue-objective" title="RESCUE SALVAGE CREW" description="Optional · field repair reward" state="optional" icon={Wrench} />
 
       <div className="mission-path path-one" aria-hidden="true" />
@@ -1464,17 +1503,18 @@ function EnemyPlanIntel({ battleTime, phase, planReady, clashes, profile }) {
   );
 }
 
-function MissionConditionSelector({ condition, phase, onCondition }) {
+function MissionConditionSelector({ condition, locked, phase, onCondition }) {
+  const visibleConditions = locked ? [condition] : MISSION_CONDITIONS;
   return (
     <div className="intel-block condition-intel">
-      <span className="panel-label">MISSION CONDITION · DISCLOSED BEFORE DEPLOYMENT</span>
+      <span className="panel-label">MISSION CONDITION · {locked ? "ASSIGNED BY OPERATION" : "DISCLOSED BEFORE DEPLOYMENT"}</span>
       <div className="condition-options" role="group" aria-label="Prototype mission condition">
-        {MISSION_CONDITIONS.map((item) => (
+        {visibleConditions.map((item) => (
           <button
             key={item.id}
             className={condition.id === item.id ? "selected" : ""}
             onClick={() => onCondition(item.id)}
-            disabled={phase !== "plan"}
+            disabled={locked || phase !== "plan"}
             aria-pressed={condition.id === item.id}
           >
             <b>{item.name}</b>
@@ -1483,18 +1523,18 @@ function MissionConditionSelector({ condition, phase, onCondition }) {
         ))}
       </div>
       <p className="condition-effect"><Warning weight="duotone" /><span><b>{condition.name}</b>{condition.effect}</span></p>
-      <small className="prototype-note">PROTOTYPE SWITCH · FINAL MISSIONS ASSIGN THIS CONDITION BEFORE DEPLOYMENT.</small>
+      <small className="prototype-note">{locked ? "FIXED FOR THIS OPERATION · ADAPT PLACEMENT AND REFITS TO THE FIELD." : "PROTOTYPE SWITCH · LATER OPERATIONS ASSIGN THEIR CONDITION BEFORE DEPLOYMENT."}</small>
     </div>
   );
 }
 
-function IntelRail({ phase, battleTime, condition, onCondition, planReady, rescueComplete, playbook, assignedCount, profile }) {
+function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, rescueComplete, playbook, assignedCount, profile }) {
   const forecast = profile.overrun > 0
     ? `${profile.extractedCount} / 5 EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
     : `${profile.extractedCount} / 5 EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
-      <MissionConditionSelector condition={condition} phase={phase} onCondition={onCondition} />
+      <MissionConditionSelector condition={condition} locked={operation.conditionLocked} phase={phase} onCondition={onCondition} />
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planReady ? forecast : `${assignedCount} / 5 ASSIGNED`}</strong>
@@ -1512,14 +1552,14 @@ function IntelRail({ phase, battleTime, condition, onCondition, planReady, rescu
       <div className="intel-block victory-block">
         <span className="panel-label">VICTORY CONDITION</span>
         <Factory weight="duotone" />
-        <p>Sabotage Reactor Spine and extract at least 3 formations.</p>
+        <p>{operation.victory}</p>
         <small>Annihilating the enemy is not required.</small>
       </div>
       <div className="intel-block objective-progress">
         <span className="panel-label">MISSION STATE</span>
         <ProgressRow label="Alpha" done={battleTime >= profile.alphaAt} />
         <ProgressRow label="Beta" done={battleTime >= profile.betaAt} />
-        <ProgressRow label="Reactor" done={battleTime >= profile.reactorAt} />
+        <ProgressRow label={operation.primaryProgress} done={battleTime >= profile.reactorAt} />
         <ProgressRow label="Salvage crew" done={rescueComplete} optional />
         <ProgressRow label="Extraction" done={phase === "complete"} />
       </div>
@@ -1676,7 +1716,65 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
   );
 }
 
-function CompletionOverlay({ formations, rescued, usedSeals, playbook, profile, onClose }) {
+function SalvageWorkshop({ baselineRefits, choice, formations, nextOperation, onChoose, onLaunch }) {
+  const incomingCondition = MISSION_CONDITIONS.find((condition) => condition.id === nextOperation.conditionId);
+  return (
+    <div className="decision-backdrop workshop-backdrop" role="dialog" aria-modal="true" aria-labelledby="workshop-title">
+      <div className="decision-panel workshop-panel">
+        <div className="workshop-heading">
+          <div>
+            <p className="eyebrow">INTERMISSION · SCRAPBORN SALVAGE BAY</p>
+            <h2 id="workshop-title">Carry the detachment forward.</h2>
+            <p>Every installed refit survived Dead Circuit. Replace at most one package before the next operation, or keep the Warhost unchanged.</p>
+          </div>
+          <div className={`salvage-token ${choice ? "spent" : "available"}`}>
+            <Wrench weight="duotone" />
+            <span><b>{choice ? "0 / 1" : "1 / 1"}</b><small>REFIT REPLACEMENT REMAINING</small></span>
+          </div>
+        </div>
+        <div className="incoming-operation">
+          <span>INCOMING OPERATION</span>
+          <b>{nextOperation.name}</b>
+          <small>{nextOperation.victory}</small>
+          <em>{incomingCondition.name} · {incomingCondition.effect}</em>
+        </div>
+        <div className="workshop-formations">
+          {formations.map((formation) => {
+            const baseFormation = FORMATIONS.find((item) => item.id === formation.id);
+            const carriedRefit = baseFormation.refits.find((refit) => refit.id === baselineRefits[formation.id]);
+            const lockedByOtherChoice = Boolean(choice && choice.formationId !== formation.id);
+            return (
+              <div className={`workshop-formation ${choice?.formationId === formation.id ? "changed" : ""}`} key={formation.id}>
+                <FormationPortrait formation={formation} compact />
+                <div className="workshop-formation-copy"><b>{formation.name}</b><small>CARRIES {carriedRefit.name}</small></div>
+                <div className="workshop-refit-options">
+                  {baseFormation.refits.map((refit) => (
+                    <button
+                      key={refit.id}
+                      className={formation.activeRefit.id === refit.id ? "selected" : ""}
+                      onClick={() => onChoose(formation.id, refit.id)}
+                      disabled={lockedByOtherChoice}
+                      aria-pressed={formation.activeRefit.id === refit.id}
+                    >
+                      <b>{refit.name}</b>
+                      <small>{refit.capabilities.join(" / ")} · CREATES {refit.creates}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="workshop-footer">
+          <span>{choice ? `${FORMATIONS.find((formation) => formation.id === choice.formationId).name} will enter Ashen Passage with a replacement package.` : "No replacement selected. Skipping the refit is allowed."}</span>
+          <button className="commit-button" onClick={onLaunch}><span><b>LAUNCH ASHEN PASSAGE</b><small>Lock refits and return to tactical planning.</small></span><ArrowRight weight="bold" /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompletionOverlay({ formations, hasNextOperation, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
   const lostCount = FORMATIONS.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const timingResult = profile.overrun > 0
@@ -1689,20 +1787,20 @@ function CompletionOverlay({ formations, rescued, usedSeals, playbook, profile, 
     : `All ${profile.readiness.staffedCount} formations were task-aligned with no readiness delay.`;
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
-      <div className="decision-panel completion-panel">
-        <CheckCircle className="completion-icon" weight="duotone" />
-        <p className="eyebrow">OPERATION SUCCESS</p>
-        <div className="victory-banner">VICTORY</div>
-        <h2 id="complete-title">You won Operation Dead Circuit.</h2>
-        <p>The Reactor Spine was sabotaged and {profile.extractedCount} formations escaped. Victory required the primary objective plus at least 3 extracted formations.</p>
+      <div className={`decision-panel completion-panel ${won ? "victory" : "defeat"}`}>
+        {won ? <CheckCircle className="completion-icon" weight="duotone" /> : <Warning className="completion-icon" weight="duotone" />}
+        <p className="eyebrow">{won ? "OPERATION SUCCESS" : "OPERATION FAILED"}</p>
+        <div className="victory-banner">{won ? "VICTORY" : "DEFEAT"}</div>
+        <h2 id="complete-title">{won ? `${operation.shortName} is secured.` : `${operation.shortName} was lost.`}</h2>
+        <p>{operation.primaryResult} and {profile.extractedCount} formations escaped. Victory required the primary objective plus at least {operation.requiredExtraction} extracted formations.</p>
         <div className="after-action-grid">
-          <div><span>PRIMARY · COMPLETE</span><b>Reactor sabotaged</b><CheckCircle weight="fill" /></div>
-          <div><span>EXTRACTION · PASSED</span><b>{profile.extractedCount} extracted · 3 required</b><CheckCircle weight="fill" /></div>
+          <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
+          <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAN VS PLAN</span><b>{profile.effects.length} combos · {disruptedEnemyOrders} / 3 enemy orders broken</b><Seal weight="duotone" /></div>
         </div>
         <p className="completion-note">Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
-        <button className="commit-button debrief-button" onClick={onClose}><span><b>RETURN TO BATTLEFIELD</b><small>Inspect the completed mission state.</small></span><ArrowRight /></button>
+        <button className="commit-button debrief-button" onClick={onAction}><span><b>{won && hasNextOperation ? "ENTER SALVAGE WORKSHOP" : "RETURN TO BATTLEFIELD"}</b><small>{won && hasNextOperation ? "Carry this detachment into the next operation." : "Inspect the completed operation state."}</small></span><ArrowRight /></button>
       </div>
     </div>
   );
@@ -1710,6 +1808,7 @@ function CompletionOverlay({ formations, rescued, usedSeals, playbook, profile, 
 
 export function App() {
   const [phase, setPhase] = useState("plan");
+  const [operationIndex, setOperationIndex] = useState(0);
   const [selected, setSelected] = useState("harpoon");
   const [playbookId, setPlaybookId] = useState("trapline");
   const [conditionId, setConditionId] = useState("clear");
@@ -1725,6 +1824,9 @@ export function App() {
   const [resolvedDecisions, setResolvedDecisions] = useState([]);
   const [rescueComplete, setRescueComplete] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
+  const [showWorkshop, setShowWorkshop] = useState(false);
+  const [workshopBaseline, setWorkshopBaseline] = useState(null);
+  const [salvageChoice, setSalvageChoice] = useState(null);
   const [pickerRoleId, setPickerRoleId] = useState(null);
   const [placementFeedback, setPlacementFeedback] = useState(null);
   const timerRef = useRef(null);
@@ -1734,6 +1836,7 @@ export function App() {
     () => PLAYBOOKS.find((item) => item.id === playbookId) ?? PLAYBOOKS[0],
     [playbookId],
   );
+  const operation = OPERATIONS[operationIndex] ?? OPERATIONS[0];
   const condition = useMemo(
     () => MISSION_CONDITIONS.find((item) => item.id === conditionId) ?? MISSION_CONDITIONS[0],
     [conditionId],
@@ -1778,9 +1881,10 @@ export function App() {
   );
 
   const operationEvents = useMemo(
-    () => buildOperationEvents(operationProfile),
-    [operationProfile],
+    () => buildOperationEvents(operationProfile, operation),
+    [operation, operationProfile],
   );
+  const operationWon = operationProfile.extractedCount >= operation.requiredExtraction;
 
   const drillSteps = useMemo(
     () => [
@@ -1862,7 +1966,7 @@ export function App() {
   };
 
   const changeCondition = (nextId) => {
-    if (phase !== "plan" || !MISSION_CONDITIONS.some((item) => item.id === nextId)) return;
+    if (phase !== "plan" || operation.conditionLocked || !MISSION_CONDITIONS.some((item) => item.id === nextId)) return;
     setConditionId(nextId);
     setPickerRoleId(null);
     setPlacementFeedback(null);
@@ -1871,7 +1975,7 @@ export function App() {
   };
 
   const changeRefit = (formationId, refitId) => {
-    if (phase !== "plan") return;
+    if (phase !== "plan" || operationIndex > 0) return;
     const baseFormation = FORMATIONS.find((formation) => formation.id === formationId);
     const nextRefit = baseFormation?.refits.find((refit) => refit.id === refitId);
     if (!baseFormation || !nextRefit || refits[formationId] === refitId) return;
@@ -2025,9 +2129,65 @@ export function App() {
     setShowCompletion(false);
   };
 
+  const handleCompletionAction = () => {
+    const hasNextOperation = operationIndex < OPERATIONS.length - 1;
+    if (operationWon && hasNextOperation) {
+      setWorkshopBaseline({ ...refits });
+      setSalvageChoice(null);
+      setShowCompletion(false);
+      setShowWorkshop(true);
+      return;
+    }
+    setShowCompletion(false);
+  };
+
+  const chooseWorkshopRefit = (formationId, refitId) => {
+    if (!showWorkshop || !workshopBaseline) return;
+    const formation = FORMATIONS.find((item) => item.id === formationId);
+    if (!formation?.refits.some((refit) => refit.id === refitId)) return;
+    if (salvageChoice && salvageChoice.formationId !== formationId) return;
+
+    const carriedRefitId = workshopBaseline[formationId];
+    if (refitId === carriedRefitId) {
+      setRefits({ ...workshopBaseline });
+      setSalvageChoice(null);
+      return;
+    }
+
+    setRefits({ ...workshopBaseline, [formationId]: refitId });
+    setSalvageChoice({ formationId, refitId });
+  };
+
+  const launchNextOperation = () => {
+    const nextIndex = operationIndex + 1;
+    const nextOperation = OPERATIONS[nextIndex];
+    if (!showWorkshop || !nextOperation) return;
+    setOperationIndex(nextIndex);
+    setConditionId(nextOperation.conditionId);
+    setAssignments(emptyAssignments(playbook));
+    setBranches(defaultBranches());
+    setBattleBranches(defaultBranches());
+    setPhase("plan");
+    setBattleTime(0);
+    setSelected("harpoon");
+    setDrillStep(-1);
+    setDrillComplete(false);
+    setSeals(2);
+    setDecision(null);
+    setResolvedDecisions([]);
+    setRescueComplete(false);
+    setShowCompletion(false);
+    setShowWorkshop(false);
+    setWorkshopBaseline(null);
+    setSalvageChoice(null);
+    setPickerRoleId(null);
+    setPlacementFeedback(null);
+  };
+
   const resetMission = () => {
     setPhase("plan");
     setBattleTime(0);
+    setOperationIndex(0);
     setPlaybookId("trapline");
     setConditionId("clear");
     setRefits(defaultRefits());
@@ -2042,22 +2202,26 @@ export function App() {
     setResolvedDecisions([]);
     setRescueComplete(false);
     setShowCompletion(false);
+    setShowWorkshop(false);
+    setWorkshopBaseline(null);
+    setSalvageChoice(null);
     setPickerRoleId(null);
     setPlacementFeedback(null);
   };
 
   return (
     <main className={`warhost-app ${phase}`}>
-      <AppHeader phase={phase} battleTime={battleTime} profile={operationProfile} />
+      <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} onRefit={changeRefit} />
-        <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
-        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
+        <FormationRoster formations={formations} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
+        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
-      {showCompletion && <CompletionOverlay formations={formations} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} onClose={() => setShowCompletion(false)} />}
+      {showCompletion && <CompletionOverlay formations={formations} hasNextOperation={operationIndex < OPERATIONS.length - 1} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
+      {showWorkshop && workshopBaseline && <SalvageWorkshop baselineRefits={workshopBaseline} choice={salvageChoice} formations={formations} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopRefit} onLaunch={launchNextOperation} />}
     </main>
   );
 }

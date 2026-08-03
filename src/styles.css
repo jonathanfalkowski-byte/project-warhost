@@ -569,6 +569,42 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .after-action-grid svg { width: 23px; color: #8dcf67; }
 .debrief-button { min-height: 68px; width: 100%; }
 .completion-note { margin: -10px 0 18px !important; font-size: 11px !important; }
+.completion-panel.defeat { border-color: #9b4b35; }
+.completion-panel.defeat .completion-icon, .completion-panel.defeat .eyebrow { color: #ef7a56; }
+.completion-panel.defeat .victory-banner { border-color: #9b4b35; background: #36170f; color: #ff8c66; }
+.completion-panel.defeat .after-action-grid > div:nth-child(2) { border-color: #85412f; background: #24130e; }
+.completion-panel.defeat .after-action-grid > div:nth-child(2) svg { color: #ef7655; }
+
+.workshop-panel { width: min(900px, 94vw); max-height: calc(100vh - 28px); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; border-color: #8b7447; background: #111512; }
+.workshop-heading { display: grid; grid-template-columns: minmax(0, 1fr) 170px; align-items: center; gap: 20px; }
+.workshop-heading h2 { margin: 4px 0 6px; }
+.workshop-heading > div:first-child > p:last-child { margin: 0; color: #9ea59f; font-size: 12px; line-height: 1.4; }
+.salvage-token { display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 8px; padding: 10px; border: 1px solid #8f7240; background: #241e12; }
+.salvage-token > svg { width: 36px; height: 36px; color: #d2a759; }
+.salvage-token > span { display: grid; }
+.salvage-token b { color: #e1bd76; font-family: "Barlow Condensed"; font-size: 22px; }
+.salvage-token small { color: #a38d64; font-family: "Barlow Condensed"; font-size: 8px; line-height: 1.15; letter-spacing: .08em; }
+.salvage-token.spent { border-color: #5c5a4b; background: #181916; opacity: .75; }
+.incoming-operation { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 2px 12px; padding: 9px 11px; border-left: 4px solid #d16a39; background: #21150f; }
+.incoming-operation > span { grid-row: 1 / 4; align-self: center; color: #d28a61; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .1em; }
+.incoming-operation b { color: #ef9b70; font-family: "Barlow Condensed"; font-size: 15px; letter-spacing: .07em; }
+.incoming-operation small { color: #aaa09a; font-size: 10px; }
+.incoming-operation em { color: #d7a06e; font-family: "Barlow Condensed"; font-size: 9px; font-style: normal; letter-spacing: .04em; }
+.workshop-formations { min-height: 0; display: grid; gap: 5px; padding-right: 5px; overflow: auto; scrollbar-width: thin; scrollbar-color: #66583d #111; }
+.workshop-formation { min-width: 0; display: grid; grid-template-columns: 52px 145px minmax(0, 1fr); align-items: center; gap: 9px; padding: 7px; border: 1px solid #3d443e; background: #121715; }
+.workshop-formation.changed { border-color: #a78648; background: #211d12; box-shadow: inset 3px 0 #d0a153; }
+.workshop-formation-copy { min-width: 0; display: grid; gap: 2px; }
+.workshop-formation-copy b { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .05em; }
+.workshop-formation-copy small { color: #a48e62; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .05em; }
+.workshop-refit-options { min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.workshop-refit-options button { min-width: 0; display: grid; gap: 2px; padding: 7px; border: 1px solid #434b45; background: #151a17; color: #aeb4af; text-align: left; cursor: pointer; }
+.workshop-refit-options button.selected { border-color: #ae8a4d; background: #292216; box-shadow: inset 2px 0 #d2a557; }
+.workshop-refit-options button:disabled { cursor: default; opacity: .4; }
+.workshop-refit-options b { color: #d3bd8e; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .06em; }
+.workshop-refit-options small { color: #7fb8ca; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .04em; }
+.workshop-footer { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: center; gap: 14px; padding-top: 10px; border-top: 1px solid #4a493d; }
+.workshop-footer > span { color: #9b9f98; font-size: 10px; line-height: 1.35; }
+.workshop-footer .commit-button { min-height: 62px; }
 
 @keyframes placementImpactReveal { 0% { opacity: .25; transform: scale(.985); } 45% { opacity: 1; transform: scale(1.012); } 100% { transform: scale(1); } }
 @keyframes comboSlotMoved { 0% { border-color: #7fd7ff; background: #153849; box-shadow: 0 0 0 rgba(73, 194, 242, 0); transform: translateY(0); } 45% { box-shadow: 0 0 24px rgba(73, 194, 242, .65); transform: translateY(-5px); } 100% { transform: translateY(0); } }
