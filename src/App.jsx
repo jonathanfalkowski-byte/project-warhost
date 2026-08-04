@@ -316,6 +316,39 @@ const ASHEN_PASSAGE_PLAYBOOK_COPY = {
   },
 };
 
+const ASHEN_REFIT_PROTOCOLS = {
+  magnet: {
+    name: "MAGNETIC RELAY KEY",
+    stopIndex: 2,
+    text: "The Breach Magnet locks onto the buried relay spine, opening the objective route and shielding the withdrawal.",
+    impact: { reactor: 30, extraction: 15, protects: 1 },
+  },
+  crucible: {
+    name: "VEIL CIPHER",
+    stopIndex: 1,
+    text: "The Ash Crucible reads the veil current, preserving the Void Lift approach through the smoke.",
+    impact: { extraction: 15, protects: 1 },
+  },
+  charge: {
+    name: "VEIL FRACTURE",
+    stopIndex: 0,
+    text: "The Fracture Charge breaks the first ash front, accelerating the eastern gate and protecting the column.",
+    impact: { beta: 30, extraction: 15, protects: 1 },
+  },
+  sled: {
+    name: "FURNACE FEED",
+    stopIndex: 1,
+    text: "The Supply Sled couples to a furnace conduit, feeding the gate assault, relay hold, and evacuation clock.",
+    impact: { beta: 30, reactor: 15, extraction: 15, protects: 1 },
+  },
+  shield: {
+    name: "VOID LIFT BUBBLE",
+    stopIndex: 0,
+    text: "The Evac Shield catches the full column at deployment, absorbing improvised-task delay and protecting the lift run.",
+    impact: { extraction: 30, protects: 1, delayReduction: 45 },
+  },
+};
+
 const playbookForOperation = (playbook, operation) => {
   if (operation?.id !== "ashen-passage") return playbook;
   const copy = ASHEN_PASSAGE_PLAYBOOK_COPY[playbook.id];
@@ -474,7 +507,7 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       label: "ASH VEIL",
       creates: "BLINDED CORRIDOR",
       intelligence: "KNOWN",
-      counteredBy: ["COVERED DRAG", "POWER WINCH", "FURNACE DRAGNET", "ASHEN CORDON"],
+      counteredBy: ["COVERED DRAG", "POWER WINCH", "FURNACE DRAGNET", "ASHEN CORDON", "MAGNETIC RELAY KEY", "VEIL FRACTURE", "FURNACE FEED"],
       impact: { reactorDelay: 15 },
       consequence: "Signal relay delayed +00:15",
     },
@@ -485,7 +518,7 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       uses: "BLINDED CORRIDOR",
       creates: "RELAY LOCK",
       intelligence: "UNCERTAIN",
-      counteredBy: ["THERMAL BREACH", "COVERED ADVANCE", "LOCKED BREACH", "WEDGE & WALL", "LOCKSTEP HOLD"],
+      counteredBy: ["THERMAL BREACH", "COVERED ADVANCE", "LOCKED BREACH", "WEDGE & WALL", "LOCKSTEP HOLD", "FURNACE FEED"],
       impact: { missionDelay: 15 },
       consequence: "Void Lift opening delayed +00:15",
     },
@@ -496,7 +529,7 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       uses: "RELAY LOCK",
       creates: "LIFT SEALED",
       intelligence: "UNKNOWN",
-      counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "MOBILE RESUPPLY"],
+      counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "MOBILE RESUPPLY", "VOID LIFT BUBBLE"],
       impact: { recoveryLoss: 1 },
       consequence: "One formation sealed below the Void Lift",
     },
@@ -872,6 +905,22 @@ const summarizePlacementReadiness = (readiness) => {
   };
 };
 
+const calculateRefitProtocols = (playbook, assignments, formations, operation) => Object.fromEntries(
+  playbook.roles.map((role, index) => {
+    const formation = formations.find((item) => item.id === assignments[role.id]);
+    const protocol = operation?.id === "ashen-passage" && formation
+      ? ASHEN_REFIT_PROTOCOLS[formation.activeRefit.id]
+      : null;
+    return [role.id, protocol ? {
+      ...protocol,
+      formationId: formation.id,
+      formationName: formation.name,
+      refitName: formation.activeRefit.name,
+      active: protocol.stopIndex === index,
+    } : null];
+  }),
+);
+
 const calculateEnemyClashes = (maneuvers, operation) => {
   const enemyPlan = enemyPlanFor(operation);
   return enemyPlan.stages.map((stage) => {
@@ -886,11 +935,20 @@ const calculateEnemyClashes = (maneuvers, operation) => {
   });
 };
 
-const calculateOperationProfile = (handoffs, branchChoices, readiness, condition, operation) => {
+const calculateOperationProfile = (handoffs, branchChoices, readiness, condition, operation, refitProtocols = {}) => {
   const maneuvers = handoffs.filter((handoff) => handoff.maneuver).map((handoff) => handoff.maneuver);
-  const readinessSummary = summarizePlacementReadiness(readiness);
+  const activeProtocols = Object.values(refitProtocols).filter((protocol) => protocol?.active);
+  const baseReadinessSummary = summarizePlacementReadiness(readiness);
   const total = (key) => maneuvers.reduce((sum, maneuver) => sum + (maneuver.impact[key] ?? 0), 0);
-  const enemyClashes = calculateEnemyClashes(maneuvers, operation);
+  const protocolTotal = (key) => activeProtocols.reduce((sum, protocol) => sum + (protocol.impact[key] ?? 0), 0);
+  const protocolDelayReduction = Math.min(baseReadinessSummary.delay, protocolTotal("delayReduction"));
+  const readinessSummary = {
+    ...baseReadinessSummary,
+    rawDelay: baseReadinessSummary.delay,
+    protocolDelayReduction,
+    delay: Math.max(0, baseReadinessSummary.delay - protocolDelayReduction),
+  };
+  const enemyClashes = calculateEnemyClashes([...maneuvers, ...activeProtocols], operation);
   const enemyTotal = (key) => enemyClashes.reduce((sum, clash) => sum + (clash.disrupted ? 0 : clash.impact[key] ?? 0), 0);
   const breakpoints = breakpointsFor(operation);
   const breakpointImpacts = breakpointImpactsFor(operation);
@@ -903,17 +961,17 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     };
   });
   const branchTotal = (key) => branchEffects.reduce((sum, branch) => sum + (branch.impact[key] ?? 0), 0);
-  const alphaAt = Math.max(30, BASE_OPERATION.alphaAt - total("alpha"));
-  const betaAt = Math.max(alphaAt + 45, BASE_OPERATION.betaAt - total("beta"));
+  const alphaAt = Math.max(30, BASE_OPERATION.alphaAt - total("alpha") - protocolTotal("alpha"));
+  const betaAt = Math.max(alphaAt + 45, BASE_OPERATION.betaAt - total("beta") - protocolTotal("beta"));
   const betaDecisionAt = Math.max(alphaAt + 15, betaAt - 45);
-  const reactorAt = Math.max(betaAt + 60, BASE_OPERATION.reactorAt - total("reactor") + branchTotal("reactorDelay") + enemyTotal("reactorDelay"));
+  const reactorAt = Math.max(betaAt + 60, BASE_OPERATION.reactorAt - total("reactor") - protocolTotal("reactor") + branchTotal("reactorDelay") + enemyTotal("reactorDelay"));
   const reactorExposeAt = Math.max(betaAt + 30, reactorAt - 45);
   const rescueDecisionAt = Math.max(betaAt + 30, Math.min(210, reactorExposeAt - 15));
-  const extractionAt = Math.max(reactorAt + 30, BASE_OPERATION.extractionAt - total("extraction")) + branchTotal("missionDelay") + enemyTotal("missionDelay") + readinessSummary.delay;
+  const extractionAt = Math.max(reactorAt + 30, BASE_OPERATION.extractionAt - total("extraction") - protocolTotal("extraction")) + branchTotal("missionDelay") + enemyTotal("missionDelay") + readinessSummary.delay;
   const completeAt = extractionAt + 15;
   const overrun = Math.max(0, completeAt - BASE_OPERATION.completeAt);
   const reinforcementLoss = Math.ceil(overrun / 15);
-  const protectedCount = total("protects") + branchTotal("protects");
+  const protectedCount = total("protects") + protocolTotal("protects") + branchTotal("protects");
   const enemyRecoveryLoss = enemyTotal("recoveryLoss");
   const extractedCount = Math.max(3, Math.min(FORMATIONS.length, 3 + protectedCount) - reinforcementLoss - enemyRecoveryLoss);
 
@@ -936,6 +994,7 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     readiness: readinessSummary,
     condition,
     effects: maneuvers,
+    protocols: activeProtocols,
   };
 };
 
@@ -990,6 +1049,15 @@ const fmtClock = (seconds) => {
 const fmtDuration = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(
   seconds % 60,
 ).padStart(2, "0")}`;
+
+const protocolImpactText = (impact) => [
+  impact.alpha ? `FIRST GATE -${fmtDuration(impact.alpha)}` : null,
+  impact.beta ? `SECOND GATE -${fmtDuration(impact.beta)}` : null,
+  impact.reactor ? `RELAY -${fmtDuration(impact.reactor)}` : null,
+  impact.extraction ? `VOID LIFT -${fmtDuration(impact.extraction)}` : null,
+  impact.protects ? `+${impact.protects} FORMATION PRESERVED` : null,
+  impact.delayReduction ? `ABSORBS ${fmtDuration(impact.delayReduction)} IMPROVISED DELAY` : null,
+].filter(Boolean).join(" · ");
 
 const reinforcementForecast = (profile) => profile.overrun > 0
   ? `WAVE ARRIVES ${fmtDuration(profile.overrun)} BEFORE CLEAR`
@@ -1498,7 +1566,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile }) {
   );
 }
 
-function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook, profile, readiness }) {
+function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook, profile, readiness, refitProtocols }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
@@ -1564,6 +1632,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
         {playbook.roles.map((role, index) => {
           const roleDemands = roleDemandsFor(role, index, condition);
           const formation = formations.find((item) => item.id === assignments[role.id]);
+          const refitProtocol = refitProtocols[role.id];
           const output = outputs[role.id];
           const nextRole = playbook.roles[index + 1];
           const nextFormation = nextRole ? formations.find((item) => item.id === assignments[nextRole.id]) : null;
@@ -1598,6 +1667,12 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                 {formation ? (
                   <>
                     <span className="slot-formation"><img src={formation.asset} alt="" /><span><b>{formation.name}</b><small>{formation.activeRefit.name}</small></span></span>
+                    {refitProtocol && (
+                      <span className={`slot-protocol ${refitProtocol.active ? "active" : "dormant"}`} title={refitProtocol.active ? refitProtocol.text : "No field interface found at this stop."}>
+                        <b>{refitProtocol.active ? `REFIT PROTOCOL · ${refitProtocol.name}` : "REFIT PROTOCOL DORMANT"}</b>
+                        <small>{refitProtocol.active ? protocolImpactText(refitProtocol.impact) : "NO FIELD INTERFACE AT THIS STOP"}</small>
+                      </span>
+                    )}
                     <span className={`slot-result ${output.incoming ? "transformed" : ""}`}>
                       <span className="slot-output"><b>{output.result}</b><small>{output.incoming ? "COMBO RESULT" : "CREATES"}</small></span>
                       <span className={`slot-readiness readiness-${readiness[role.id].label.toLowerCase()}`} title="Observed after placement; task fit and neighboring combo links affect readiness."><b>{readiness[role.id].score}%</b><small>{readiness[role.id].label}</small></span>
@@ -1617,7 +1692,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   );
 }
 
-function Battlefield({ formations, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart, readiness }) {
+function Battlefield({ formations, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart, readiness, refitProtocols }) {
   const [confirmedCombo, setConfirmedCombo] = useState(null);
   const confirmedComboIdRef = useRef(null);
   const confirmedComboTimerRef = useRef(null);
@@ -1715,7 +1790,7 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
         );
       })}
 
-      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} />
+      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -1825,7 +1900,15 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
           <div className={`readiness-impact ${profile.readiness.delay > 0 ? "penalty" : "aligned"}`}>
             <span>FORMATION READINESS</span>
             <b>{profile.readiness.average}% · {profile.readiness.delay > 0 ? `+${fmtDuration(profile.readiness.delay)} EXECUTION DELAY` : "NO TASK-FIT DELAY"}</b>
-            <small>{profile.readiness.alignedCount} / {profile.readiness.staffedCount} STAFFED FORMATIONS TASK-ALIGNED · COMBO EFFECTS RESOLVE SEPARATELY</small>
+            <small>{profile.readiness.alignedCount} / {profile.readiness.staffedCount} STAFFED FORMATIONS TASK-ALIGNED{profile.readiness.protocolDelayReduction > 0 ? ` · REFIT ABSORBED ${fmtDuration(profile.readiness.protocolDelayReduction)} OF ${fmtDuration(profile.readiness.rawDelay)} IMPROVISED DELAY` : ""} · COMBO EFFECTS RESOLVE SEPARATELY</small>
+          </div>
+        )}
+        {profile.protocols.length > 0 && (
+          <div className="refit-protocol-impact">
+            <span>ASHEN FIELD PROTOCOL{profile.protocols.length > 1 ? "S" : ""} ONLINE</span>
+            {profile.protocols.map((protocol) => <b key={protocol.formationId}>{protocol.name} · {protocol.formationName}</b>)}
+            {profile.protocols.map((protocol) => <em key={`${protocol.formationId}-impact`}>{protocolImpactText(protocol.impact)}</em>)}
+            <small>THE INSTALLED PACKAGE FOUND A BATTLEFIELD INTERFACE AND ALTERED THE MISSION FORECAST.</small>
           </div>
         )}
         {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Place formations on the authored tactical route.</p>}
@@ -2081,9 +2164,12 @@ function CompletionOverlay({ formations, hasNextOperation, operation, rescued, u
     : profile.timeSaved > 0
     ? `The Warhost cleared extraction ${profile.timeSaved} seconds before the enemy wave arrived.`
     : "The Warhost cleared the gantry as the enemy wave arrived.";
-  const readinessResult = profile.readiness.delay > 0
-    ? `${profile.readiness.improvisedCount} improvised ${profile.readiness.improvisedCount === 1 ? "assignment added" : "assignments added"} ${profile.readiness.delay} seconds of execution delay.`
+  const readinessResult = profile.readiness.rawDelay > 0
+    ? `${profile.readiness.improvisedCount} improvised ${profile.readiness.improvisedCount === 1 ? "assignment created" : "assignments created"} ${profile.readiness.rawDelay} seconds of execution delay.${profile.readiness.protocolDelayReduction > 0 ? ` The active refit absorbed ${profile.readiness.protocolDelayReduction} seconds, leaving ${profile.readiness.delay}.` : ""}`
     : `All ${profile.readiness.staffedCount} formations were task-aligned with no readiness delay.`;
+  const protocolResult = profile.protocols.length > 0
+    ? `Active Ashen field protocols: ${profile.protocols.map((protocol) => protocol.name).join(", ")}.`
+    : "No installed refit found an Ashen field interface.";
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className={`decision-panel completion-panel ${won ? "victory" : "defeat"}`}>
@@ -2098,7 +2184,7 @@ function CompletionOverlay({ formations, hasNextOperation, operation, rescued, u
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAN VS PLAN</span><b>{profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</b><Seal weight="duotone" /></div>
         </div>
-        <p className="completion-note">Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+        <p className="completion-note">Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{won && hasNextOperation ? "ENTER SALVAGE WORKSHOP" : "RETURN TO BATTLEFIELD"}</b><small>{won && hasNextOperation ? "Carry this detachment into the next operation." : "Inspect the completed operation state."}</small></span><ArrowRight /></button>
       </div>
     </div>
@@ -2171,12 +2257,16 @@ export function App() {
     () => calculatePlacementReadiness(playbook, assignments, tacticalHandoffs, condition, formations),
     [assignments, condition, formations, playbook, tacticalHandoffs],
   );
+  const refitProtocols = useMemo(
+    () => calculateRefitProtocols(playbook, assignments, formations, operation),
+    [assignments, formations, operation, playbook],
+  );
 
   const activeBranches = phase === "plan" || phase === "drill" ? branches : battleBranches;
 
   const operationProfile = useMemo(
-    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness, condition, operation),
-    [activeBranches, condition, operation, placementReadiness, tacticalHandoffs],
+    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness, condition, operation, refitProtocols),
+    [activeBranches, condition, operation, placementReadiness, refitProtocols, tacticalHandoffs],
   );
 
   const operationEvents = useMemo(
@@ -2189,6 +2279,7 @@ export function App() {
     () => [
       `Condition ${condition.name}: ${condition.effect}`,
       `${formations.length} installed refits locked; no loadout changes after commitment`,
+      ...operationProfile.protocols.map((protocol) => `${protocol.name} online: ${protocol.text}`),
       `Loading ${playbook.name} geometry`,
       ...playbook.stages.map((stage) => `${stage.label} timing and support arcs confirmed`),
       operationProfile.readiness.delay > 0
@@ -2288,8 +2379,10 @@ export function App() {
       const nextSequence = evaluateTacticalSequence(playbook, assignments, nextFormations);
       const previousReadiness = calculatePlacementReadiness(playbook, assignments, previousSequence.handoffs, condition, formations);
       const nextReadiness = calculatePlacementReadiness(playbook, assignments, nextSequence.handoffs, condition, nextFormations);
-      const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation);
-      const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation);
+      const previousProtocols = calculateRefitProtocols(playbook, assignments, formations, operation);
+      const nextProtocols = calculateRefitProtocols(playbook, assignments, nextFormations, operation);
+      const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation, previousProtocols);
+      const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation, nextProtocols);
       const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
       const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
       const previousWindow = previousProfile.timeSaved - previousProfile.overrun;
@@ -2340,8 +2433,10 @@ export function App() {
     const nextSequence = evaluateTacticalSequence(playbook, nextAssignments, formations);
     const previousReadiness = calculatePlacementReadiness(playbook, assignments, previousSequence.handoffs, condition, formations);
     const nextReadiness = calculatePlacementReadiness(playbook, nextAssignments, nextSequence.handoffs, condition, formations);
-    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation);
-    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation);
+    const previousProtocols = calculateRefitProtocols(playbook, assignments, formations, operation);
+    const nextProtocols = calculateRefitProtocols(playbook, nextAssignments, formations, operation);
+    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation, previousProtocols);
+    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation, nextProtocols);
     const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const targetIndex = playbook.roles.findIndex((role) => role.id === targetRole.id);
@@ -2352,8 +2447,10 @@ export function App() {
     const nextWindow = nextProfile.timeSaved - nextProfile.overrun;
     const improved = nextLinks > previousLinks || nextProfile.extractedCount > previousProfile.extractedCount || nextWindow > previousWindow;
     const weakened = nextLinks < previousLinks || nextProfile.extractedCount < previousProfile.extractedCount || nextWindow < previousWindow;
-    const tone = nextReady && !previousReady ? "strengthened" : weakened ? "weakened" : improved ? "strengthened" : "rewired";
-    const title = nextReady && !previousReady ? "PLAN ONLINE" : tone === "weakened" ? "CHAIN BROKEN" : tone === "strengthened" ? "CHAIN STRENGTHENED" : "CHAIN REWIRED";
+    const previousProtocolCount = previousProfile.protocols.length;
+    const nextProtocolCount = nextProfile.protocols.length;
+    const tone = nextProtocolCount > previousProtocolCount ? "strengthened" : nextProtocolCount < previousProtocolCount ? "weakened" : nextReady && !previousReady ? "strengthened" : weakened ? "weakened" : improved ? "strengthened" : "rewired";
+    const title = nextProtocolCount > previousProtocolCount ? "REFIT PROTOCOL ONLINE" : nextProtocolCount < previousProtocolCount ? "REFIT PROTOCOL DORMANT" : nextReady && !previousReady ? "PLAN ONLINE" : tone === "weakened" ? "CHAIN BROKEN" : tone === "strengthened" ? "CHAIN STRENGTHENED" : "CHAIN REWIRED";
     const forecast = nextReady
       ? `${nextProfile.extractedCount} / 5 EXTRACT · ${reinforcementForecast(nextProfile)}`
       : `${Object.values(nextAssignments).filter(Boolean).length} / 5 FORMATIONS PLACED`;
@@ -2514,7 +2611,7 @@ export function App() {
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
         <FormationRoster formations={formations} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
-        <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} />
+        <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
