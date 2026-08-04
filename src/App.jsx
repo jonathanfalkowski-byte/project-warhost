@@ -1967,6 +1967,20 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
   const assignedFormationId = assignments[role.id];
   const roleIndex = playbook.roles.findIndex((item) => item.id === role.id);
   const roleDemands = roleDemandsFor(role, roleIndex, condition);
+  const formationStartOrder = new Map(formations.map((formation, index) => [formation.id, index]));
+  const formationSlotOrder = new Map(
+    playbook.roles
+      .map((assignedRole, index) => [assignments[assignedRole.id], index])
+      .filter(([formationId]) => Boolean(formationId)),
+  );
+  const orderedFormations = [...formations].sort((left, right) => {
+    const leftSlot = formationSlotOrder.get(left.id);
+    const rightSlot = formationSlotOrder.get(right.id);
+    if (leftSlot !== undefined && rightSlot !== undefined) return leftSlot - rightSlot;
+    if (leftSlot !== undefined) return -1;
+    if (rightSlot !== undefined) return 1;
+    return formationStartOrder.get(left.id) - formationStartOrder.get(right.id);
+  });
   return (
     <div className="decision-backdrop formation-picker-backdrop" role="dialog" aria-modal="true" aria-labelledby="formation-picker-title">
       <div className="decision-panel formation-picker-panel">
@@ -1974,7 +1988,7 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
         <h2 id="formation-picker-title">Who executes {role.label}?</h2>
         <p>{role.brief} This condition demands <b>{roleDemands.join(" / ")}</b>. Choose the formation; readiness and any adjacent tactical handoff are revealed after placement.</p>
         <div className="formation-picker-list">
-          {formations.map((formation) => {
+          {orderedFormations.map((formation) => {
             const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
             const currentRoleIndex = currentRole ? playbook.roles.findIndex((item) => item.id === currentRole.id) : -1;
             const current = assignedFormationId === formation.id;
