@@ -30,6 +30,7 @@ import {
   Warning,
   Wrench,
 } from "@phosphor-icons/react";
+import { resolveAshenCollision } from "./enemyCollision.js";
 
 const FORMATIONS = [
   {
@@ -921,18 +922,167 @@ const calculateRefitProtocols = (playbook, assignments, formations, operation) =
   }),
 );
 
-const calculateEnemyClashes = (maneuvers, operation) => {
+const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtocols = []) => {
   const enemyPlan = enemyPlanFor(operation);
-  return enemyPlan.stages.map((stage) => {
-  const counterManeuver = maneuvers.find((maneuver) => stage.counteredBy.includes(maneuver.name));
-  const formation = enemyPlan.formations.find((item) => item.id === stage.formationId);
-  return {
-    ...stage,
-    actionAt: formation.actionAt,
-    disrupted: Boolean(counterManeuver),
-    counterManeuver,
+  const counterActors = [...maneuvers, ...activeProtocols];
+  const baseClash = (stage, overrides = {}) => {
+    const counterManeuver = counterActors.find((maneuver) => stage.counteredBy.includes(maneuver.name));
+    const formation = enemyPlan.formations.find((item) => item.id === stage.formationId);
+    const disrupted = Boolean(counterManeuver);
+    return {
+      ...stage,
+      actionAt: formation.actionAt,
+      disrupted,
+      counterManeuver,
+      appliesImpact: !disrupted,
+      routeState: disrupted ? "countered" : "passed",
+      resultText: disrupted ? `${counterManeuver.name} BREAKS IT` : `LANDS · ${stage.consequence}`,
+      eventText: disrupted
+        ? `${counterManeuver.name} breaks the Helioch ${stage.label}.`
+        : `${stage.label} lands. ${stage.consequence}.`,
+      ...overrides,
+    };
   };
+
+  if (operation?.id !== "ashen-passage") return enemyPlan.stages.map((stage) => baseClash(stage));
+
+  const [veilStage, wardStage, liftStage] = enemyPlan.stages;
+  const firstWindowStaffed = Boolean(firstHandoff?.sourceId && firstHandoff?.receiverId);
+  const firstWindowActors = [
+    firstHandoff?.maneuver,
+    ...activeProtocols.filter((protocol) => protocol.stopIndex <= 1),
+  ].filter(Boolean);
+  const resolvedCollision = resolveAshenCollision({
+    firstWindowStaffed,
+    firstManeuverName: firstHandoff?.maneuver?.name ?? null,
+    activeProtocolNames: firstWindowActors.filter((actor) => actor !== firstHandoff?.maneuver).map((actor) => actor.name),
+    veilCounterNames: veilStage.counteredBy,
   });
+  const collisionOutcome = resolvedCollision.outcome;
+  const trapActor = firstWindowActors.find((actor) => actor.name === resolvedCollision.actorName);
+  const collision = {
+    revealed: firstWindowStaffed,
+    outcome: collisionOutcome,
+    actorName: resolvedCollision.actorName,
+    sourceId: firstHandoff?.sourceId ?? null,
+    receiverId: firstHandoff?.receiverId ?? null,
+    title: collisionOutcome === "trapped"
+      ? "VEIL TRAPPED AT THE GATE"
+      : collisionOutcome === "diverted"
+        ? "VEIL DIVERTED TO THE RELAY"
+        : collisionOutcome === "passed"
+          ? "VEIL PASSES THE CONTACT WINDOW"
+          : "COLLISION WINDOW UNRESOLVED",
+    summary: collisionOutcome === "trapped"
+      ? "The first player combo catches the Veil Engines. Their created condition never reaches the Oath Ward."
+      : collisionOutcome === "diverted"
+        ? "The first player combo cannot stop the Veil Engines, but forces them and the Oath Ward toward the Signal Furnace."
+        : collisionOutcome === "passed"
+          ? "No reaction fires between Stop 01 and Stop 02. BLINDED CORRIDOR feeds the Oath Ward's next order."
+          : "Staff Stop 01 and Stop 02 to reveal how the two plans collide.",
+  };
+
+  let veilClash;
+  let wardClash;
+  let liftClash;
+
+  if (collisionOutcome === "trapped") {
+    veilClash = baseClash(veilStage, {
+      disrupted: true,
+      counterManeuver: trapActor,
+      appliesImpact: false,
+      routeState: "trapped",
+      creates: "VEIL TRAPPED",
+      resultText: `${trapActor.name} TRAPS IT AT CONTACT`,
+      eventText: `${trapActor.name} traps the Veil Engines at the first gate. The enemy chain is starved.`,
+      collision,
+    });
+    wardClash = baseClash(wardStage, {
+      disrupted: true,
+      counterManeuver: { name: "VEIL TRAPPED" },
+      appliesImpact: false,
+      routeState: "starved",
+      uses: "NO INCOMING CONDITION",
+      creates: "WARD STALLED",
+      resultText: "STARVED · NO BLINDED CORRIDOR",
+      eventText: "The Oath Ward stalls without a blinded corridor to exploit.",
+    });
+    liftClash = baseClash(liftStage, {
+      disrupted: true,
+      counterManeuver: { name: "ENEMY CHAIN STARVED" },
+      appliesImpact: false,
+      routeState: "starved",
+      uses: "NO RELAY LOCK",
+      creates: "LIFT OPEN",
+      resultText: "STARVED · NO RELAY LOCK",
+      eventText: "Lift Occupation never forms; the upstream enemy chain was broken.",
+    });
+  } else if (collisionOutcome === "diverted") {
+    veilClash = baseClash(veilStage, {
+      disrupted: false,
+      counterManeuver: null,
+      appliesImpact: true,
+      routeState: "diverted",
+      label: "VEIL DIVERSION",
+      creates: "DIVERTED VEIL",
+      consequence: "Signal Furnace pressured +00:15",
+      resultText: `${firstHandoff.maneuver.name} DIVERTS IT TO RELAY`,
+      eventText: `${firstHandoff.maneuver.name} diverts the Veil Engines toward the Signal Furnace.`,
+      collision,
+    });
+    const redirectedWard = {
+      ...wardStage,
+      label: "RELAY PURSUIT",
+      uses: "DIVERTED VEIL",
+      creates: "ASH PRESSURE",
+      impact: { reactorDelay: 15 },
+      consequence: "Signal Furnace hold delayed +00:15",
+    };
+    wardClash = baseClash(redirectedWard);
+    wardClash = {
+      ...wardClash,
+      routeState: wardClash.disrupted ? "countered" : "redirected",
+      resultText: wardClash.disrupted ? `${wardClash.counterManeuver.name} BREAKS THE PURSUIT` : "REROUTES · PRESSURES SIGNAL FURNACE",
+      eventText: wardClash.disrupted
+        ? `${wardClash.counterManeuver.name} breaks the Oath Ward's relay pursuit.`
+        : "The Oath Ward abandons its furnace-silence route and pursues the diverted Veil toward the relay.",
+    };
+    liftClash = baseClash(liftStage, {
+      disrupted: true,
+      counterManeuver: { name: "RELAY LOCK NEVER CREATED" },
+      appliesImpact: false,
+      routeState: "starved",
+      uses: "NO RELAY LOCK",
+      creates: "LIFT OPEN",
+      resultText: "STARVED · ENEMY ROUTE LEFT THE LIFT",
+      eventText: "Lift Occupation is abandoned while the enemy play converges on the Signal Furnace.",
+    });
+  } else {
+    veilClash = baseClash(veilStage, {
+      disrupted: false,
+      counterManeuver: null,
+      appliesImpact: true,
+      routeState: "passed",
+      resultText: collisionOutcome === "unread" ? "OUTCOME UNREAD" : "PASSES · CREATES BLINDED CORRIDOR",
+      eventText: "The Veil Engines pass the first contact window and blind the eastern corridor.",
+      collision,
+    });
+    wardClash = baseClash(wardStage);
+    liftClash = wardClash.disrupted
+      ? baseClash(liftStage, {
+        disrupted: true,
+        counterManeuver: { name: "RELAY LOCK BROKEN UPSTREAM" },
+        appliesImpact: false,
+        routeState: "starved",
+        uses: "NO RELAY LOCK",
+        creates: "LIFT OPEN",
+        resultText: "STARVED · RELAY LOCK BROKEN",
+        eventText: "Lift Occupation cannot form after the Oath Ward's relay lock is broken.",
+      })
+      : baseClash(liftStage);
+  }
+
+  return [veilClash, wardClash, liftClash];
 };
 
 const calculateOperationProfile = (handoffs, branchChoices, readiness, condition, operation, refitProtocols = {}) => {
@@ -948,8 +1098,8 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     protocolDelayReduction,
     delay: Math.max(0, baseReadinessSummary.delay - protocolDelayReduction),
   };
-  const enemyClashes = calculateEnemyClashes([...maneuvers, ...activeProtocols], operation);
-  const enemyTotal = (key) => enemyClashes.reduce((sum, clash) => sum + (clash.disrupted ? 0 : clash.impact[key] ?? 0), 0);
+  const enemyClashes = calculateEnemyClashes(maneuvers, operation, handoffs[0], activeProtocols);
+  const enemyTotal = (key) => enemyClashes.reduce((sum, clash) => sum + (clash.appliesImpact ? clash.impact[key] ?? 0 : 0), 0);
   const breakpoints = breakpointsFor(operation);
   const breakpointImpacts = breakpointImpactsFor(operation);
   const branchEffects = breakpoints.map((breakpoint) => {
@@ -990,6 +1140,7 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     reinforcementLoss,
     enemyRecoveryLoss,
     enemyClashes,
+    enemyCollision: enemyClashes[0]?.collision ?? null,
     branchEffects,
     readiness: readinessSummary,
     condition,
@@ -1026,9 +1177,7 @@ const buildOperationEvents = (profile, operation) => {
   profile.enemyClashes.forEach((clash) => {
     events.push({
       at: clash.actionAt,
-      text: clash.disrupted
-        ? `${clash.counterManeuver.name} breaks the Helioch ${clash.label}.`
-        : `${clash.label} lands. ${clash.consequence}.`,
+      text: clash.eventText,
     });
   });
   if (profile.overrun > 0) events.push({ at: reinforcementWave.arrivalAt, text: `${reinforcementWave.name} reaches the ${operation.extractionTitle}. ${profile.reinforcementLoss} formation recovery lost.` });
@@ -1301,6 +1450,27 @@ const fieldSegmentStyle = (start, end, size) => {
   };
 };
 
+const pointAlongFieldRoute = (points, progress) => {
+  if (points.length < 2) return points[0];
+  const segments = points.slice(0, -1).map((start, index) => {
+    const end = points[index + 1];
+    return { start, end, length: Math.hypot(end.x - start.x, end.y - start.y) };
+  });
+  const totalLength = segments.reduce((sum, segment) => sum + segment.length, 0);
+  let remaining = Math.max(0, Math.min(1, progress)) * totalLength;
+  for (const segment of segments) {
+    if (remaining <= segment.length) {
+      const ratio = segment.length > 0 ? remaining / segment.length : 0;
+      return {
+        x: segment.start.x + (segment.end.x - segment.start.x) * ratio,
+        y: segment.start.y + (segment.end.y - segment.start.y) * ratio,
+      };
+    }
+    remaining -= segment.length;
+  }
+  return points.at(-1);
+};
+
 function TacticalFieldPlan({ assignments, branches, formations, operation, phase, playbook }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
@@ -1421,11 +1591,19 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
   );
 }
 
-function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planReady }) {
+function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planReady, playbook }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const enemyPlan = enemyPlanFor(operation);
   const reinforcementWave = reinforcementWaveFor(operation);
+  const operationField = operationFieldFor(operation);
+  const fieldPlan = operationField.plans[playbook.id];
+  const firstPosition = fieldPlan.positions[0];
+  const secondPosition = fieldPlan.positions[1];
+  const collisionPoint = {
+    x: (firstPosition.x + secondPosition.x) / 2,
+    y: (firstPosition.y + secondPosition.y) / 2,
+  };
 
   useEffect(() => {
     if (!layerRef.current) return undefined;
@@ -1450,6 +1628,18 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
   };
   const waveArrived = (phase === "battle" || phase === "complete") && battleTime >= reinforcementWave.arrivalAt;
   const clearsBeforeWave = planReady && profile.overrun === 0;
+  const routeForClash = (formation, clash, index) => {
+    if (operation.id !== "ashen-passage") return [formation.start, formation.end];
+    if (index === 0 && clash.routeState === "trapped") return [formation.start, collisionPoint];
+    if (index === 0 && clash.routeState === "diverted") return [formation.start, collisionPoint, operationField.landmarks.reactor];
+    if (index === 0) return [formation.start, collisionPoint, formation.end];
+    if (clash.routeState === "redirected") return [formation.start, operationField.landmarks.reactor];
+    if (clash.routeState === "starved") return [formation.start, {
+      x: formation.start.x + (formation.end.x - formation.start.x) * .12,
+      y: formation.start.y + (formation.end.y - formation.start.y) * .12,
+    }];
+    return [formation.start, formation.end];
+  };
 
   return (
     <div className="enemy-plan-layer" ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
@@ -1457,27 +1647,34 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
         const clash = clashes[index];
         const inBattle = phase === "battle" || phase === "complete";
         const progress = inBattle ? Math.min(1, battleTime / formation.actionAt) : 0;
-        const position = {
-          x: formation.start.x + (formation.end.x - formation.start.x) * progress,
-          y: formation.start.y + (formation.end.y - formation.start.y) * progress,
-        };
+        const route = routeForClash(formation, clash, index);
+        const position = pointAlongFieldRoute(route, progress);
+        const endpoint = route.at(-1);
         const resolved = inBattle && battleTime >= formation.actionAt;
         return (
           <Fragment key={formation.id}>
-            <div className={`enemy-plan-segment enemy-lane-${index + 1} ${clash.disrupted ? "countered" : "threat"}`} style={fieldSegmentStyle(formation.start, formation.end, layerSize)}>
-              <ArrowRight weight="bold" />
-            </div>
-            <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.disrupted ? "countered" : "threat"}`} style={{ left: `${formation.end.x}%`, top: `${formation.end.y}%` }}>
+            {route.slice(0, -1).map((start, segmentIndex) => (
+              <div className={`enemy-plan-segment enemy-lane-${index + 1} ${clash.routeState}`} style={fieldSegmentStyle(start, route[segmentIndex + 1], layerSize)} key={`${formation.id}-segment-${segmentIndex}`}>
+                <ArrowRight weight="bold" />
+              </div>
+            ))}
+            <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
               <b>{formation.number}</b><span>{clash.label}</span>
             </div>
-            <div className={`enemy-plan-formation ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"}`} style={{ left: `${position.x}%`, top: `${position.y}%` }}>
+            <div className={`enemy-plan-formation ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"}`} style={{ left: `${position.x}%`, top: `${position.y}%` }}>
               <img src="/assets/helioch-sentinels.png" alt={`${formation.name} executing ${clash.label}`} />
               <span>{formation.number}</span>
-              <small>{resolved ? clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
+              <small>{resolved ? clash.routeState === "starved" ? "CHAIN STARVED" : clash.routeState === "diverted" || clash.routeState === "redirected" ? "REROUTED" : clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
             </div>
           </Fragment>
         );
       })}
+      {operation.id === "ashen-passage" && (
+        <div className={`enemy-collision-marker ${profile.enemyCollision?.outcome ?? "unread"}`} style={{ left: `${collisionPoint.x}%`, top: `${collisionPoint.y}%` }}>
+          <Crosshair weight="duotone" />
+          <span>{profile.enemyCollision?.revealed ? profile.enemyCollision.title : "STOP 01/02 CONTACT WINDOW"}</span>
+        </div>
+      )}
       <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"}`} style={fieldSegmentStyle(reinforcementWave.start, reinforcementWave.intercept, layerSize)}>
         <ArrowRight weight="bold" />
       </div>
@@ -1739,7 +1936,7 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
-      <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} />
+      <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} />
       <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} operation={operation} phase={phase} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
@@ -1815,14 +2012,26 @@ function BattlePulse({ battleTime, events }) {
 function EnemyPlanIntel({ battleTime, operation, phase, planReady, clashes, profile }) {
   const enemyPlan = enemyPlanFor(operation);
   const reinforcementWave = reinforcementWaveFor(operation);
+  const collision = profile.enemyCollision;
+  const collisionSource = FORMATIONS.find((formation) => formation.id === collision?.sourceId);
+  const collisionReceiver = FORMATIONS.find((formation) => formation.id === collision?.receiverId);
   return (
     <div className="intel-block enemy-plan-intel">
       <span className="panel-label">ENEMY PLAYBOOK · EXECUTES IN PARALLEL</span>
       <div className="enemy-doctrine-title"><Target weight="duotone" /><span><b>{enemyPlan.name}</b><small>{enemyPlan.intent}</small></span></div>
+      {operation.id === "ashen-passage" && (
+        <div className={`enemy-collision-readout ${collision?.outcome ?? "unread"}`} aria-live="polite">
+          <span><Crosshair weight="duotone" /> PLAN COLLISION · STOP 01/02</span>
+          <b>{collision?.title ?? "COLLISION WINDOW UNRESOLVED"}</b>
+          <small>{collision?.summary ?? "Staff Stop 01 and Stop 02 to reveal how the two plans collide."}</small>
+          {collision?.revealed && <em>{collisionSource?.name} → {collisionReceiver?.name}{collision.actorName ? ` · ${collision.actorName}` : " · NO AUTOMATIC REACTION"}</em>}
+        </div>
+      )}
       <div className="enemy-chain">
         {clashes.map((clash, index) => {
           const resolved = (phase === "battle" || phase === "complete") && battleTime >= clash.actionAt;
-          const state = !planReady ? "unread" : clash.disrupted ? "countered" : "threat";
+          const revealed = operation.id === "ashen-passage" ? Boolean(collision?.revealed) : planReady;
+          const state = !revealed ? "unread" : clash.routeState === "passed" ? "threat" : clash.routeState;
           return (
             <Fragment key={clash.id}>
               <div className={`enemy-chain-step ${state} ${resolved ? "resolved" : ""}`}>
@@ -1833,11 +2042,9 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, clashes, prof
                   <small>{clash.uses ? `${clash.uses} → ` : "CREATES "}{clash.creates}</small>
                 </span>
                 <span className="enemy-step-result">
-                  {!planReady
+                  {!revealed
                     ? "OUTCOME UNREAD"
-                    : clash.disrupted
-                      ? `${clash.counterManeuver.name} BREAKS IT`
-                      : `LANDS · ${clash.consequence}`}
+                    : clash.resultText}
                 </span>
               </div>
               {index < clashes.length - 1 && <ArrowRight className="enemy-chain-arrow" weight="bold" />}
@@ -2288,9 +2495,7 @@ export function App() {
       ...(tacticalHandoffs.some((handoff) => handoff.maneuver)
         ? tacticalHandoffs.filter((handoff) => handoff.maneuver).map((handoff) => `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}. ${handoff.maneuver.impact.text}`)
         : [`All ${assignedCount} formations act independently; no automatic combo windows discovered`]),
-      ...operationProfile.enemyClashes.map((clash) => clash.disrupted
-        ? `${clash.counterManeuver.name} disrupts enemy ${clash.label}`
-        : `Enemy ${clash.label} lands: ${clash.consequence}`),
+      ...operationProfile.enemyClashes.map((clash) => `Enemy ${clash.label}: ${clash.resultText}`),
       ...operationProfile.branchEffects.map((branch) => `${branch.option.label}: ${branch.impact.text}`),
       operationProfile.overrun > 0
         ? `${operationProfile.extractedCount} formations forecast to extract ${operationProfile.overrun} seconds after the enemy wave reaches ${operation.extractionTitle}`

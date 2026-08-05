@@ -178,11 +178,18 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .enemy-plan-segment::before { content: ""; position: absolute; inset: -5px 0 auto; border-top: 1px dotted rgba(245, 130, 79, .38); }
 .enemy-plan-segment > svg { position: absolute; right: -8px; top: -7px; width: 15px; height: 15px; padding: 2px; border: 1px solid #e37a4b; border-radius: 50%; background: #28130c; color: #ffae78; }
 .enemy-plan-segment.countered { --enemy-route: #7ca65b; opacity: .68; border-color: #add985; box-shadow: 0 0 10px rgba(125, 179, 87, .38); }
+.enemy-plan-segment.trapped, .enemy-plan-segment.starved { --enemy-route: #729d55; opacity: .54; border-color: #a5d782; box-shadow: 0 0 10px rgba(125, 179, 87, .3); }
+.enemy-plan-segment.starved { height: 1px; border-top-style: dotted; opacity: .28; }
+.enemy-plan-segment.diverted, .enemy-plan-segment.redirected { --enemy-route: #c69046; border-color: #ffd082; box-shadow: 0 0 12px rgba(213, 150, 61, .52); }
 .enemy-plan-stop { position: absolute; z-index: 3; display: grid; justify-items: center; transform: translate(-50%, -50%); }
 .enemy-plan-stop > b { width: 28px; height: 28px; display: grid; place-items: center; border: 2px solid #d8693f; border-radius: 50%; background: rgba(38, 15, 9, .96); color: #ffb080; font-family: "Barlow Condensed"; font-size: 11px; box-shadow: 0 0 12px rgba(221, 93, 47, .4); }
 .enemy-plan-stop > span { margin-top: 2px; padding: 2px 4px; border: 1px solid #7c3e27; background: rgba(31, 13, 8, .94); color: #f49a70; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .06em; white-space: nowrap; }
 .enemy-plan-stop.countered > b { border-color: #729e54; background: rgba(20, 37, 15, .96); color: #a5d77e; }
 .enemy-plan-stop.countered > span { border-color: #587c42; color: #9bcf76; }
+.enemy-plan-stop.trapped > b, .enemy-plan-stop.starved > b { border-color: #729e54; background: rgba(20, 37, 15, .96); color: #a5d77e; }
+.enemy-plan-stop.trapped > span, .enemy-plan-stop.starved > span { border-color: #587c42; color: #9bcf76; }
+.enemy-plan-stop.diverted > b, .enemy-plan-stop.redirected > b { border-color: #c18a42; background: rgba(45, 30, 10, .96); color: #ffd082; }
+.enemy-plan-stop.diverted > span, .enemy-plan-stop.redirected > span { border-color: #8d652e; color: #eab765; }
 .enemy-plan-formation { position: absolute; z-index: 4; width: 58px; height: 58px; transform: translate(-50%, -50%); transition: left .8s ease, top .8s ease, opacity .5s, filter .5s; }
 .enemy-plan-formation img { width: 100%; height: 100%; object-fit: cover; border: 2px solid #d66b40; border-radius: 50%; filter: brightness(1.12) contrast(1.18); box-shadow: 0 0 13px rgba(219, 89, 44, .5), 0 6px 12px rgba(0,0,0,.72); }
 .enemy-plan-formation > span { position: absolute; left: -6px; top: -6px; min-width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid #ed9166; background: #5b2514; color: #ffd1b6; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; }
@@ -190,7 +197,15 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .enemy-plan-formation.disrupted { opacity: .32; filter: grayscale(.8); }
 .enemy-plan-formation.disrupted img { border-color: #7da25e; }
 .enemy-plan-formation.disrupted > small { color: #a4d17f; }
+.enemy-plan-formation.diverted img, .enemy-plan-formation.redirected img { border-color: #d5a14f; box-shadow: 0 0 15px rgba(210, 148, 58, .58), 0 6px 12px rgba(0,0,0,.72); }
+.enemy-plan-formation.diverted > small, .enemy-plan-formation.redirected > small { color: #f0c16d; }
 .enemy-plan-formation.landed img { animation: enemyThreatPulse 1s ease-in-out infinite alternate; }
+.enemy-collision-marker { position: absolute; z-index: 7; display: grid; justify-items: center; transform: translate(-50%, -50%); color: #e07a4b; }
+.enemy-collision-marker svg { width: 29px; height: 29px; padding: 5px; border: 2px solid currentColor; border-radius: 50%; background: rgba(34, 14, 9, .96); box-shadow: 0 0 15px rgba(226, 94, 44, .5); }
+.enemy-collision-marker span { margin-top: 3px; max-width: 150px; padding: 2px 5px; border: 1px solid currentColor; background: rgba(25, 10, 7, .94); font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .06em; text-align: center; }
+.enemy-collision-marker.trapped { color: #94ce6e; }
+.enemy-collision-marker.diverted { color: #efb65d; }
+.enemy-collision-marker.passed { color: #f0764b; }
 .reinforcement-route { position: absolute; z-index: 2; height: 2px; transform-origin: 0 50%; border-top: 2px dashed #ff8a55; filter: drop-shadow(0 0 5px rgba(236, 102, 54, .6)); }
 .reinforcement-route > svg { position: absolute; right: -8px; top: -8px; width: 16px; height: 16px; padding: 2px; border: 1px solid #ef764d; border-radius: 50%; background: #2a110b; color: #ff9d6f; }
 .reinforcement-route.avoided { border-color: #779b5d; opacity: .54; filter: none; }
@@ -469,6 +484,18 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .enemy-doctrine-title b { color: #f49a6c; font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; }
 .enemy-doctrine-title small { color: #9b8b84; font-size: 9px; line-height: 1.2; }
 .enemy-chain { display: grid; gap: 2px; }
+.enemy-collision-readout { display: grid; gap: 3px; padding: 7px; border: 1px dashed #5a4135; background: #15110f; font-family: "Barlow Condensed"; }
+.enemy-collision-readout > span { display: flex; align-items: center; gap: 5px; color: #ad8d7e; font-size: 8px; letter-spacing: .1em; }
+.enemy-collision-readout > span svg { width: 13px; height: 13px; }
+.enemy-collision-readout > b { color: #d0b8aa; font-size: 11px; letter-spacing: .05em; }
+.enemy-collision-readout > small { color: #8f8179; font-size: 8px; line-height: 1.25; }
+.enemy-collision-readout > em { color: #cbd8cf; font-size: 8px; font-style: normal; letter-spacing: .04em; }
+.enemy-collision-readout.trapped { border-style: solid; border-color: #668d4e; background: #121f11; }
+.enemy-collision-readout.trapped > span, .enemy-collision-readout.trapped > b { color: #9dd579; }
+.enemy-collision-readout.diverted { border-style: solid; border-color: #9a6d32; background: #21180d; }
+.enemy-collision-readout.diverted > span, .enemy-collision-readout.diverted > b { color: #efbd6d; }
+.enemy-collision-readout.passed { border-style: solid; border-color: #91432b; background: #25120c; }
+.enemy-collision-readout.passed > span, .enemy-collision-readout.passed > b { color: #ef8057; }
 .enemy-chain-step { min-width: 0; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 3px 6px; padding: 6px; border: 1px solid #4c352b; background: #17110e; }
 .enemy-step-number { grid-row: 1 / 3; align-self: center; color: #e1784d; font-family: "Barlow Condensed"; font-size: 14px; font-weight: 700; }
 .enemy-step-copy { min-width: 0; display: grid; }
@@ -478,6 +505,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .enemy-step-result { grid-column: 1 / -1; padding-top: 3px; border-top: 1px solid #3e302a; color: #8e817a; font-family: "Barlow Condensed"; font-size: 8px; line-height: 1.2; }
 .enemy-chain-step.countered { border-color: #587b44; background: #131e11; }
 .enemy-chain-step.countered .enemy-step-number, .enemy-chain-step.countered .enemy-step-result { color: #91cb6b; }
+.enemy-chain-step.trapped, .enemy-chain-step.starved { border-color: #587b44; background: #131e11; }
+.enemy-chain-step.trapped .enemy-step-number, .enemy-chain-step.trapped .enemy-step-result, .enemy-chain-step.starved .enemy-step-number, .enemy-chain-step.starved .enemy-step-result { color: #91cb6b; }
+.enemy-chain-step.diverted, .enemy-chain-step.redirected { border-color: #8f662f; background: #21180d; }
+.enemy-chain-step.diverted .enemy-step-number, .enemy-chain-step.diverted .enemy-step-result, .enemy-chain-step.redirected .enemy-step-number, .enemy-chain-step.redirected .enemy-step-result { color: #efbd6d; }
 .enemy-chain-step.threat { border-color: #85412a; background: #21110c; }
 .enemy-chain-step.threat .enemy-step-result { color: #ef8057; }
 .enemy-chain-step.resolved { box-shadow: inset 3px 0 currentColor; }

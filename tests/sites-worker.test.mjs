@@ -41,6 +41,30 @@ test("falls back to index.html for an unknown app route", async () => {
   assert.deepEqual(calls, ["/flow/step-two?source=share", "/index.html"]);
 });
 
+test("injects the deployed request origin into social preview metadata", async () => {
+  const response = await worker.fetch(
+    new Request("https://warhost.example/operation/ashen", {
+      headers: { accept: "text/html" },
+    }),
+    {
+      ASSETS: {
+        fetch: async (request) => {
+          const path = new URL(request.url).pathname;
+          return path === "/index.html"
+            ? new Response('<meta property="og:image" content="__WARHOST_ORIGIN__/og.png">', {
+              status: 200,
+              headers: { "content-type": "text/html; charset=utf-8" },
+            })
+            : new Response("missing", { status: 404 });
+        },
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /https:\/\/warhost\.example\/og\.png/);
+});
+
 test("does not turn missing API or write requests into the app shell", async () => {
   for (const request of [
     new Request("https://example.test/api/missing", { headers: { accept: "application/json" } }),
