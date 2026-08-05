@@ -305,6 +305,57 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .battlefield-combo-beat > b { min-width: 0; color: #d4e5d0; font-size: 12px; letter-spacing: .04em; }
 .battlefield-combo-beat > svg { width: 18px; color: #a4e17e; }
 .battlefield-combo-beat > small { grid-column: 1 / -1; color: #9ab097; font-size: 9px; }
+
+.warhost-app.battle .left-rail, .warhost-app.battle .right-rail { opacity: .34; filter: saturate(.45); transition: opacity .35s ease, filter .35s ease; }
+.battlefield.playback-active .battlefield-art { filter: brightness(.48) saturate(.52) contrast(1.14); }
+.battlefield.playback-active.operation-ashen-passage .battlefield-art { filter: brightness(.43) saturate(.42) contrast(1.22) hue-rotate(145deg); }
+.battlefield.playback-active .field-plan-layer { opacity: .2; transition: opacity .35s ease; }
+.battlefield.playback-active .mission-route,
+.battlefield.playback-active .objective-marker,
+.battlefield.playback-active .combo-panel,
+.battlefield.playback-active .map-sector,
+.battlefield.playback-active .kill-zone,
+.battlefield.playback-active .combo-path { opacity: .2; transition: opacity .35s ease; }
+
+.enemy-plan-segment.playback-muted, .enemy-plan-stop.playback-muted, .enemy-plan-formation.playback-muted { opacity: .08 !important; filter: grayscale(.75); }
+.enemy-plan-segment.playback-focused { z-index: 8; height: 5px; opacity: 1 !important; border-top-style: solid; box-shadow: 0 0 22px rgba(240, 113, 58, .95); }
+.enemy-plan-stop.playback-focused { z-index: 11; opacity: 1 !important; filter: none; transform: translate(-50%, -50%) scale(1.16); }
+.enemy-plan-formation.playback-focused { z-index: 12; width: 74px; height: 74px; opacity: 1 !important; filter: none; }
+.enemy-plan-formation.playback-focused img { border-width: 3px; box-shadow: 0 0 30px rgba(245, 101, 43, .88), 0 10px 18px rgba(0,0,0,.8); }
+.enemy-collision-marker.playback-focused { z-index: 15; transform: translate(-50%, -50%) scale(1.25); animation: playbackCollisionPulse .85s ease-in-out infinite alternate; }
+.map-formation.playback-muted { opacity: .1; filter: grayscale(.8); animation: none; }
+.map-formation.playback-focused { z-index: 14; opacity: 1; filter: none; transform: translate(-50%, -50%) scale(1.16); animation: playbackPlayerPulse .85s ease-in-out infinite alternate; }
+.map-formation.playback-focused .formation-image { border: 3px solid #69d2ff; box-shadow: 0 0 28px rgba(49, 184, 239, .9), 0 10px 18px rgba(0,0,0,.8); }
+
+.battle-playback-director { --playback-accent: #65c9f3; position: absolute; z-index: 30; inset: 0; pointer-events: none; font-family: "Barlow Condensed", sans-serif; }
+.battle-playback-director.enemy-intent { --playback-accent: #f08a52; }
+.battle-playback-director.contact { --playback-accent: #f2bf5f; }
+.battle-playback-director.result.route-trapped,
+.battle-playback-director.result.route-countered,
+.battle-playback-director.result.route-starved { --playback-accent: #9edb77; }
+.battle-playback-director.result.route-diverted,
+.battle-playback-director.result.route-redirected { --playback-accent: #f1bd65; }
+.battle-playback-director.result.route-passed { --playback-accent: #f1714c; }
+.battle-playback-director.complete { --playback-accent: #91d26d; }
+.playback-narration { position: absolute; left: 50%; top: 3%; width: min(620px, 78%); transform: translateX(-50%); display: grid; gap: 5px; padding: 13px 16px 14px; border: 1px solid var(--playback-accent); border-left-width: 5px; background: linear-gradient(100deg, rgba(7, 12, 12, .985), rgba(11, 18, 18, .94)); box-shadow: 0 0 38px rgba(0,0,0,.78), 0 0 22px color-mix(in srgb, var(--playback-accent) 28%, transparent); pointer-events: auto; animation: playbackBeatReveal .34s ease-out; }
+.playback-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--playback-accent); font-size: 11px; font-weight: 700; letter-spacing: .13em; }
+.playback-heading em { color: #89928e; font-size: 9px; font-style: normal; }
+.playback-narration > b { color: #edf1ef; font-size: 22px; letter-spacing: .035em; line-height: 1.05; }
+.playback-narration > p { margin: 0; color: #aeb8b3; font-family: "Barlow", sans-serif; font-size: 11px; line-height: 1.4; }
+.playback-transport { position: absolute; left: 50%; bottom: 5.2%; transform: translateX(-50%); display: flex; align-items: stretch; border: 1px solid #4e5a55; background: rgba(7, 12, 11, .97); box-shadow: 0 10px 30px rgba(0,0,0,.72); pointer-events: auto; }
+.playback-transport button { min-width: 42px; min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 10px; border: 0; border-right: 1px solid #3c4642; background: transparent; color: #9ccce0; cursor: pointer; }
+.playback-transport button:hover:not(:disabled) { background: #14252a; color: #d3f2ff; }
+.playback-transport button:disabled { color: #49514e; cursor: default; }
+.playback-transport button svg { width: 16px; height: 16px; }
+.playback-transport .playback-previous svg { transform: rotate(180deg); }
+.playback-transport .playback-toggle { min-width: 92px; color: var(--playback-accent); font-weight: 700; letter-spacing: .09em; }
+.playback-transport .playback-replay { border-right: 0; color: #a8aaa4; font-size: 10px; letter-spacing: .08em; }
+.playback-timeline { position: absolute; left: 50%; bottom: 2%; width: min(650px, 82%); transform: translateX(-50%); display: flex; align-items: center; gap: 3px; pointer-events: auto; }
+.playback-timeline button { min-width: 5px; height: 4px; flex: 1; padding: 0; border: 0; background: #33403b; cursor: pointer; transition: height .18s ease, background .18s ease, box-shadow .18s ease; }
+.playback-timeline button.resolved { background: #567b86; }
+.playback-timeline button.enemy-intent { background-color: #76442f; }
+.playback-timeline button.result { background-color: #7f5237; }
+.playback-timeline button.current { height: 9px; background: var(--playback-accent); box-shadow: 0 0 12px var(--playback-accent); }
 .combo-panel { position: absolute; z-index: 10; left: 3%; top: 39%; width: 265px; padding: 10px; }
 .playbook-board { position: absolute; z-index: 15; left: 3%; top: 24%; width: min(860px, 90%); padding: 11px 13px; background: rgba(8, 14, 14, .96); border-color: #3b6879; box-shadow: 0 14px 32px rgba(0, 0, 0, .48); }
 .playbook-board.incomplete { box-shadow: inset 0 0 0 1px rgba(41, 169, 232, .1), 0 14px 32px rgba(0, 0, 0, .48); }
@@ -683,6 +734,9 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 @keyframes comboBeatReveal { from { opacity: 0; transform: translate(-50%, -10px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes formationPulse { from { filter: brightness(.9); } to { filter: brightness(1.18); } }
 @keyframes enemyThreatPulse { from { box-shadow: 0 0 8px rgba(219, 89, 44, .42); } to { box-shadow: 0 0 20px rgba(245, 99, 46, .82); } }
+@keyframes playbackBeatReveal { from { opacity: 0; transform: translate(-50%, -9px) scale(.985); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+@keyframes playbackCollisionPulse { from { filter: drop-shadow(0 0 5px currentColor); } to { filter: drop-shadow(0 0 18px currentColor); } }
+@keyframes playbackPlayerPulse { from { filter: brightness(.9); } to { filter: brightness(1.22); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; } }
 @media (max-width: 1260px) {
   .warhost-app { min-width: 980px; }

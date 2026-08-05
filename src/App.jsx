@@ -31,6 +31,11 @@ import {
   Wrench,
 } from "@phosphor-icons/react";
 import { resolveAshenCollision } from "./enemyCollision.js";
+import {
+  buildBattlePlayback,
+  playbackIndexAfterStep,
+  playbackTimeForIndex,
+} from "./battlePlayback.js";
 
 const FORMATIONS = [
   {
@@ -743,7 +748,7 @@ const BASE_OPERATION = {
   completeAt: 360,
 };
 
-const COMBO_CONFIRMATION_MS = 2600;
+const PLAYBACK_BEAT_MS = 2600;
 const IMPROVISED_TASK_DELAY = 15;
 
 const DEAD_CIRCUIT_REINFORCEMENT_WAVE = {
@@ -1591,7 +1596,7 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
   );
 }
 
-function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planReady, playbook }) {
+function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planReady, playbook, playbackBeat }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const enemyPlan = enemyPlanFor(operation);
@@ -1646,6 +1651,9 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
       {enemyPlan.formations.map((formation, index) => {
         const clash = clashes[index];
         const inBattle = phase === "battle" || phase === "complete";
+        const playbackHasEnemyFocus = Number.isInteger(playbackBeat?.enemyFormationIndex);
+        const playbackFocused = playbackBeat?.enemyFormationIndex === index;
+        const playbackClass = playbackHasEnemyFocus ? playbackFocused ? "playback-focused" : "playback-muted" : "";
         const progress = inBattle ? Math.min(1, battleTime / formation.actionAt) : 0;
         const route = routeForClash(formation, clash, index);
         const position = pointAlongFieldRoute(route, progress);
@@ -1654,14 +1662,14 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
         return (
           <Fragment key={formation.id}>
             {route.slice(0, -1).map((start, segmentIndex) => (
-              <div className={`enemy-plan-segment enemy-lane-${index + 1} ${clash.routeState}`} style={fieldSegmentStyle(start, route[segmentIndex + 1], layerSize)} key={`${formation.id}-segment-${segmentIndex}`}>
+              <div className={`enemy-plan-segment enemy-lane-${index + 1} ${clash.routeState} ${playbackClass}`} style={fieldSegmentStyle(start, route[segmentIndex + 1], layerSize)} key={`${formation.id}-segment-${segmentIndex}`}>
                 <ArrowRight weight="bold" />
               </div>
             ))}
-            <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
+            <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${playbackClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
               <b>{formation.number}</b><span>{clash.label}</span>
             </div>
-            <div className={`enemy-plan-formation ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"}`} style={{ left: `${position.x}%`, top: `${position.y}%` }}>
+            <div className={`enemy-plan-formation ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass}`} style={{ left: `${position.x}%`, top: `${position.y}%` }}>
               <img src="/assets/helioch-sentinels.png" alt={`${formation.name} executing ${clash.label}`} />
               <span>{formation.number}</span>
               <small>{resolved ? clash.routeState === "starved" ? "CHAIN STARVED" : clash.routeState === "diverted" || clash.routeState === "redirected" ? "REROUTED" : clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
@@ -1670,7 +1678,7 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
         );
       })}
       {operation.id === "ashen-passage" && (
-        <div className={`enemy-collision-marker ${profile.enemyCollision?.outcome ?? "unread"}`} style={{ left: `${collisionPoint.x}%`, top: `${collisionPoint.y}%` }}>
+        <div className={`enemy-collision-marker ${profile.enemyCollision?.outcome ?? "unread"} ${playbackBeat?.kind === "contact" ? "playback-focused" : ""}`} style={{ left: `${collisionPoint.x}%`, top: `${collisionPoint.y}%` }}>
           <Crosshair weight="duotone" />
           <span>{profile.enemyCollision?.revealed ? profile.enemyCollision.title : "STOP 01/02 CONTACT WINDOW"}</span>
         </div>
@@ -1889,54 +1897,22 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   );
 }
 
-function Battlefield({ formations, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, events, onChooseRole, onAssignFormation, onFormationDragStart, readiness, refitProtocols }) {
-  const [confirmedCombo, setConfirmedCombo] = useState(null);
-  const confirmedComboIdRef = useRef(null);
-  const confirmedComboTimerRef = useRef(null);
+function Battlefield({ formations, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onFormationDragStart, readiness, refitProtocols, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
   const activeFormations = phase === "complete" ? formations.slice(0, profile.extractedCount).map((formation) => formation.id) : formations.map((formation) => formation.id);
   const alphaState = battleTime >= profile.alphaAt ? "secured" : "active";
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
   const reactorState = battleTime >= profile.reactorAt ? "secured" : "threat";
   const extractionState = phase === "complete" ? "secured" : "future";
-  const timing = comboWindowTimes(profile);
-  const confirmedComboSource = formations.find((formation) => formation.id === confirmedCombo?.sourceId);
-  const confirmedComboReceiver = formations.find((formation) => formation.id === confirmedCombo?.receiverId);
-
-  useEffect(() => {
-    if (phase !== "battle") {
-      if (confirmedComboTimerRef.current) window.clearTimeout(confirmedComboTimerRef.current);
-      confirmedComboTimerRef.current = null;
-      confirmedComboIdRef.current = null;
-      setConfirmedCombo(null);
-      return;
-    }
-
-    const triggeredCombo = handoffs.find((handoff) => (
-      handoff.maneuver
-      && battleTime >= timing[handoff.from]
-      && battleTime < timing[handoff.from] + 15
-    ));
-    if (!triggeredCombo || confirmedComboIdRef.current === triggeredCombo.id) return;
-
-    confirmedComboIdRef.current = triggeredCombo.id;
-    setConfirmedCombo(triggeredCombo);
-    if (confirmedComboTimerRef.current) window.clearTimeout(confirmedComboTimerRef.current);
-    confirmedComboTimerRef.current = window.setTimeout(() => {
-      setConfirmedCombo(null);
-      confirmedComboTimerRef.current = null;
-    }, COMBO_CONFIRMATION_MS);
-  }, [battleTime, handoffs, phase, timing]);
-
-  useEffect(() => () => {
-    if (confirmedComboTimerRef.current) window.clearTimeout(confirmedComboTimerRef.current);
-  }, []);
+  const playbackActive = phase === "battle" || phase === "complete";
+  const focusedPlayerIds = playbackBeat?.playerFormationIds ?? [];
+  const hasPlayerFocus = focusedPlayerIds.length > 0;
 
   return (
-    <section className={`battlefield phase-${phase} operation-${operation.id}`} aria-label={`${operation.name} mission map`}>
+    <section className={`battlefield phase-${phase} operation-${operation.id} ${playbackActive ? "playback-active" : ""}`} aria-label={`${operation.name} mission map`}>
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
-      <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} />
+      <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} />
       <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} operation={operation} phase={phase} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
@@ -1953,16 +1929,6 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
       <div className={`combo-path combo-burn ${planReady ? "active warm" : ""}`} aria-hidden="true" />
       <div className={`combo-path combo-break ${planReady ? "active" : ""}`} aria-hidden="true" />
       <div className={`kill-zone ${planReady ? "active" : ""}`}><span>DECISION AREA</span></div>
-      {confirmedCombo && (
-        <div className="battlefield-combo-beat" role="status">
-          <span><Lightning weight="fill" /> AUTOMATIC COMBO · RESOLVED</span>
-          <b>{confirmedComboSource.name} creates {confirmedCombo.maneuver.passes}</b>
-          <ArrowRight weight="bold" />
-          <b>{confirmedComboReceiver.name} reacts: {confirmedCombo.maneuver.name}</b>
-          <small>RESULT: {confirmedCombo.maneuver.result} · {confirmedCombo.maneuver.impact.text}</small>
-        </div>
-      )}
-
       {formations.filter((formation) => activeFormations.includes(formation.id)).map((formation) => {
         const assignedNode = deployments[formation.id] ? NODES[deployments[formation.id]] : null;
         const node = assignedNode ?? STAGING_NODES[formation.id];
@@ -1973,7 +1939,7 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${confirmedCombo?.sourceId === formation.id ? "combo-source" : ""} ${confirmedCombo?.receiverId === formation.id ? "combo-receiver" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${node.left + progressShift}%`, top: `${node.top - progressShift * 0.45}%` }}
             onClick={() => onSelect(formation.id)}
             draggable={phase === "plan"}
@@ -1994,17 +1960,57 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
           <div><span>GHOST DRILL {Math.min(drillStep + 1, drillSteps.length)} / {drillSteps.length}</span><b>{drillSteps[Math.min(drillStep, drillSteps.length - 1)]}</b></div>
         </div>
       )}
-      {(phase === "battle" || phase === "complete") && <BattlePulse battleTime={battleTime} events={events} />}
+      {playbackActive && (
+        <BattlePlaybackDirector
+          beat={playbackBeat}
+          beats={playbackBeats}
+          index={playbackIndex}
+          playing={playbackPlaying}
+          onToggle={onPlaybackToggle}
+          onStep={onPlaybackStep}
+          onReplay={onPlaybackReplay}
+          phase={phase}
+        />
+      )}
     </section>
   );
 }
 
-function BattlePulse({ battleTime, events }) {
-  const current = [...events].reverse().find((event) => battleTime >= event.at) ?? { text: "Warhost advancing from the breach line." };
+function BattlePlaybackDirector({ beat, beats, index, playing, onToggle, onStep, onReplay, phase }) {
+  if (!beat) return null;
+  const atStart = index === 0;
+  const atEnd = index === beats.length - 1;
   return (
-    <div className="battle-pulse" role="status" aria-live="polite">
-      <Radio weight="duotone" />
-      <div><span>LIVE OPERATIONS</span><b>{current.text}</b></div>
+    <div className={`battle-playback-director ${beat.kind} route-${beat.routeState ?? "none"}`}>
+      <div className="playback-narration" role="status" aria-live="polite" key={beat.id}>
+        <div className="playback-heading">
+          <span>{beat.eyebrow}</span>
+          <em>BEAT {String(index + 1).padStart(2, "0")} / {String(beats.length).padStart(2, "0")}</em>
+        </div>
+        <b>{beat.title}</b>
+        <p>{beat.detail}</p>
+      </div>
+      <div className="playback-transport" aria-label="Battle playback controls">
+        <button className="playback-previous" onClick={() => onStep(-1)} disabled={atStart} aria-label="Previous battle beat"><ArrowRight weight="bold" /></button>
+        <button className="playback-toggle" onClick={onToggle} disabled={phase === "complete" && atEnd} aria-label={playing ? "Pause battle playback" : "Play battle playback"}>
+          {playing ? <Pause weight="fill" /> : <Play weight="fill" />}
+          <span>{playing ? "PAUSE" : "PLAY"}</span>
+        </button>
+        <button onClick={() => onStep(1)} disabled={atEnd} aria-label="Next battle beat"><ArrowRight weight="bold" /></button>
+        <button className="playback-replay" onClick={onReplay} aria-label="Replay battle from the beginning"><ArrowCounterClockwise weight="bold" /><span>REPLAY</span></button>
+      </div>
+      <div className="playback-timeline" aria-label="Battle beat timeline">
+        {beats.map((item, beatIndex) => (
+          <button
+            key={item.id}
+            className={`${beatIndex === index ? "current" : ""} ${beatIndex < index ? "resolved" : ""} ${item.kind}`}
+            onClick={() => onStep(beatIndex - index)}
+            aria-label={`Go to beat ${beatIndex + 1}: ${item.title}`}
+            aria-current={beatIndex === index ? "step" : undefined}
+            title={item.title}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -2411,6 +2417,8 @@ export function App() {
   const [drillStep, setDrillStep] = useState(-1);
   const [drillComplete, setDrillComplete] = useState(false);
   const [battleTime, setBattleTime] = useState(0);
+  const [playbackIndex, setPlaybackIndex] = useState(0);
+  const [playbackPlaying, setPlaybackPlaying] = useState(false);
   const [seals, setSeals] = useState(2);
   const [decision, setDecision] = useState(null);
   const [resolvedDecisions, setResolvedDecisions] = useState([]);
@@ -2421,7 +2429,6 @@ export function App() {
   const [salvageChoice, setSalvageChoice] = useState(null);
   const [pickerRoleId, setPickerRoleId] = useState(null);
   const [placementFeedback, setPlacementFeedback] = useState(null);
-  const timerRef = useRef(null);
   const placementRevisionRef = useRef(0);
 
   const operation = OPERATIONS[operationIndex] ?? OPERATIONS[0];
@@ -2480,6 +2487,18 @@ export function App() {
     () => buildOperationEvents(operationProfile, operation),
     [operation, operationProfile],
   );
+  const playbackBeats = useMemo(
+    () => buildBattlePlayback({
+      operation,
+      profile: operationProfile,
+      handoffs: tacticalHandoffs,
+      formations,
+      events: operationEvents,
+      comboTimes: comboWindowTimes(operationProfile),
+    }),
+    [formations, operation, operationEvents, operationProfile, tacticalHandoffs],
+  );
+  const currentPlaybackBeat = playbackBeats[Math.min(playbackIndex, playbackBeats.length - 1)] ?? null;
   const operationWon = operationProfile.extractedCount >= operation.requiredExtraction;
 
   const drillSteps = useMemo(
@@ -2522,12 +2541,17 @@ export function App() {
   }, [phase, drillSteps.length]);
 
   useEffect(() => {
-    if (phase !== "battle" || decision) return undefined;
-    timerRef.current = window.setInterval(() => {
-      setBattleTime((current) => Math.min(operationProfile.completeAt, current + 15));
-    }, 620);
-    return () => window.clearInterval(timerRef.current);
-  }, [phase, decision, operationProfile.completeAt]);
+    if (phase !== "battle" && phase !== "complete") return;
+    setBattleTime(playbackTimeForIndex(playbackBeats, playbackIndex));
+  }, [phase, playbackBeats, playbackIndex]);
+
+  useEffect(() => {
+    if (phase !== "battle" || decision || !playbackPlaying || playbackIndex >= playbackBeats.length - 1) return undefined;
+    const timeout = window.setTimeout(() => {
+      setPlaybackIndex((current) => playbackIndexAfterStep(current, 1, playbackBeats.length));
+    }, PLAYBACK_BEAT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [decision, phase, playbackBeats.length, playbackIndex, playbackPlaying]);
 
   useEffect(() => {
     if (phase !== "battle") return;
@@ -2539,11 +2563,17 @@ export function App() {
       setDecision("rescue");
       return;
     }
-    if (battleTime >= operationProfile.completeAt) {
-      setPhase("complete");
-      setShowCompletion(true);
-    }
   }, [battleTime, phase, decision, resolvedDecisions, operationProfile]);
+
+  useEffect(() => {
+    if (phase !== "battle" || decision || currentPlaybackBeat?.kind !== "complete") return undefined;
+    const timeout = window.setTimeout(() => {
+      setPhase("complete");
+      setPlaybackPlaying(false);
+      setShowCompletion(true);
+    }, PLAYBACK_BEAT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [currentPlaybackBeat, decision, phase]);
 
   const changePlaybook = (nextId) => {
     if (phase !== "plan") return;
@@ -2720,11 +2750,44 @@ export function App() {
     setDecision(null);
   };
 
+  const stepPlayback = (delta) => {
+    if (phase !== "battle" && phase !== "complete") return;
+    const nextIndex = playbackIndexAfterStep(playbackIndex, delta, playbackBeats.length);
+    setPlaybackPlaying(false);
+    setPlaybackIndex(nextIndex);
+    setBattleTime(playbackTimeForIndex(playbackBeats, nextIndex));
+    if (phase === "complete" && nextIndex < playbackBeats.length - 1) {
+      setShowCompletion(false);
+      setPhase("battle");
+    }
+  };
+
+  const togglePlayback = () => {
+    if (phase !== "battle" && phase !== "complete") return;
+    if (phase === "complete" && playbackIndex < playbackBeats.length - 1) {
+      setShowCompletion(false);
+      setPhase("battle");
+    }
+    setPlaybackPlaying((current) => !current);
+  };
+
+  const replayPlayback = () => {
+    if (phase !== "battle" && phase !== "complete") return;
+    setShowCompletion(false);
+    setDecision(null);
+    setBattleTime(0);
+    setPlaybackIndex(0);
+    setPlaybackPlaying(true);
+    setPhase("battle");
+  };
+
   const commitMission = () => {
     if (!planReady) return;
     setPhase("battle");
     setBattleBranches({ ...branches });
     setBattleTime(0);
+    setPlaybackIndex(0);
+    setPlaybackPlaying(true);
     setResolvedDecisions([]);
     setRescueComplete(false);
     setSeals(2);
@@ -2771,6 +2834,8 @@ export function App() {
     setBattleBranches(defaultBranches(nextOperation));
     setPhase("plan");
     setBattleTime(0);
+    setPlaybackIndex(0);
+    setPlaybackPlaying(false);
     setSelected("harpoon");
     setDrillStep(-1);
     setDrillComplete(false);
@@ -2789,6 +2854,8 @@ export function App() {
   const resetMission = () => {
     setPhase("plan");
     setBattleTime(0);
+    setPlaybackIndex(0);
+    setPlaybackPlaying(false);
     setOperationIndex(0);
     setPlaybookId("trapline");
     setConditionId("clear");
@@ -2816,7 +2883,7 @@ export function App() {
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
         <FormationRoster formations={formations} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
-        <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} events={operationEvents} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} />
+        <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
