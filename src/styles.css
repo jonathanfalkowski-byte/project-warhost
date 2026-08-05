@@ -309,7 +309,19 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .warhost-app.battle .left-rail, .warhost-app.battle .right-rail { opacity: .34; filter: saturate(.45); transition: opacity .35s ease, filter .35s ease; }
 .battlefield.playback-active .battlefield-art { filter: brightness(.48) saturate(.52) contrast(1.14); }
 .battlefield.playback-active.operation-ashen-passage .battlefield-art { filter: brightness(.43) saturate(.42) contrast(1.22) hue-rotate(145deg); }
-.battlefield.playback-active .field-plan-layer { opacity: .2; transition: opacity .35s ease; }
+.field-plan-layer.executing .field-plan-caption,
+.field-plan-layer.executing .field-plan-entry,
+.field-plan-layer.executing .field-plan-turn,
+.field-plan-layer.executing .field-plan-position { opacity: .18; transition: opacity .3s ease; }
+.field-plan-layer.executing .field-plan-segment { opacity: .42; transition: opacity .3s ease, height .3s ease, box-shadow .3s ease; }
+.field-plan-layer.executing .field-plan-segment.alternative-route { display: none; }
+.field-plan-layer.executing .field-plan-segment.playback-muted,
+.field-plan-layer.executing .field-plan-entry.playback-muted,
+.field-plan-layer.executing .field-plan-position.playback-muted { opacity: .04 !important; }
+.field-plan-layer.executing .field-plan-segment.playback-focused { z-index: 9; height: 5px; opacity: 1 !important; border-top-style: solid; box-shadow: 0 0 22px rgba(var(--route-rgb, 102, 206, 244), .95); }
+.field-plan-layer.executing .field-plan-entry.playback-focused,
+.field-plan-layer.executing .field-plan-position.playback-focused { z-index: 10; opacity: 1 !important; transform: translate(-50%, -50%) scale(1.12); }
+.field-plan-layer.executing .field-plan-segment.staffed > svg { animation: playerRouteArrow 1s ease-in-out infinite alternate; }
 .battlefield.playback-active .mission-route,
 .battlefield.playback-active .objective-marker,
 .battlefield.playback-active .combo-panel,
@@ -737,6 +749,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 @keyframes playbackBeatReveal { from { opacity: 0; transform: translate(-50%, -9px) scale(.985); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes playbackCollisionPulse { from { filter: drop-shadow(0 0 5px currentColor); } to { filter: drop-shadow(0 0 18px currentColor); } }
 @keyframes playbackPlayerPulse { from { filter: brightness(.9); } to { filter: brightness(1.22); } }
+@keyframes playerRouteArrow { from { filter: drop-shadow(0 0 2px currentColor); transform: scale(.88); } to { filter: drop-shadow(0 0 9px currentColor); transform: scale(1.18); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; } }
 @media (max-width: 1260px) {
   .warhost-app { min-width: 980px; }

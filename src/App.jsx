@@ -36,6 +36,11 @@ import {
   playbackIndexAfterStep,
   playbackTimeForIndex,
 } from "./battlePlayback.js";
+import {
+  buildAuthoredFormationRoutes,
+  pointAlongRoute as pointAlongFieldRoute,
+  positionAlongAuthoredRoute,
+} from "./fieldRoutes.js";
 
 const FORMATIONS = [
   {
@@ -1455,36 +1460,18 @@ const fieldSegmentStyle = (start, end, size) => {
   };
 };
 
-const pointAlongFieldRoute = (points, progress) => {
-  if (points.length < 2) return points[0];
-  const segments = points.slice(0, -1).map((start, index) => {
-    const end = points[index + 1];
-    return { start, end, length: Math.hypot(end.x - start.x, end.y - start.y) };
-  });
-  const totalLength = segments.reduce((sum, segment) => sum + segment.length, 0);
-  let remaining = Math.max(0, Math.min(1, progress)) * totalLength;
-  for (const segment of segments) {
-    if (remaining <= segment.length) {
-      const ratio = segment.length > 0 ? remaining / segment.length : 0;
-      return {
-        x: segment.start.x + (segment.end.x - segment.start.x) * ratio,
-        y: segment.start.y + (segment.end.y - segment.start.y) * ratio,
-      };
-    }
-    remaining -= segment.length;
-  }
-  return points.at(-1);
-};
-
-function TacticalFieldPlan({ assignments, branches, formations, operation, phase, playbook }) {
+function TacticalFieldPlan({ assignments, branches, formations, operation, phase, playbook, playbackBeat }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const operationField = operationFieldFor(operation);
   const plan = operationField.plans[playbook.id];
   const breakpoints = breakpointsFor(operation);
+  const execution = phase === "battle" || phase === "complete";
+  const focusedPlayerIds = playbackBeat?.playerFormationIds ?? [];
+  const hasPlayerFocus = focusedPlayerIds.length > 0;
 
   useEffect(() => {
-    if (!layerRef.current || phase === "battle" || phase === "complete") return undefined;
+    if (!layerRef.current) return undefined;
     const element = layerRef.current;
     const measure = () => {
       const bounds = element.getBoundingClientRect();
@@ -1496,7 +1483,7 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
     return () => observer.disconnect();
   }, [phase, playbook.id]);
 
-  if (!plan || phase === "battle" || phase === "complete") return null;
+  if (!plan) return null;
 
   const routes = plan.routes.map((route) => {
     const roleIndex = route.role;
@@ -1504,26 +1491,42 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
     const formation = formations.find((item) => item.id === assignments[role.id]);
     const staging = formation ? STAGING_NODES[formation.id] : null;
     const start = staging ? { x: staging.left, y: staging.top - 3 } : route.start;
-    return { ...route, roleIndex, role, formation, start };
+    const playbackClass = execution && hasPlayerFocus
+      ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted"
+      : "";
+    return { ...route, roleIndex, role, formation, start, playbackClass };
   });
-  const baseSegments = routes.flatMap((route) => {
-    const points = [route.start, ...route.points].map((point) => resolveFieldPoint(plan, operationField.landmarks, point));
+  const executionRoutes = buildAuthoredFormationRoutes({
+    plan,
+    landmarks: operationField.landmarks,
+    roles: playbook.roles,
+    assignments,
+    formationStarts: Object.fromEntries(routes.filter((route) => route.formation).map((route) => [route.formation.id, route.start])),
+    branches,
+  });
+  const baseSegments = (execution ? executionRoutes : routes).flatMap((route) => {
+    const points = execution
+      ? route.points
+      : [route.start, ...route.points].map((point) => resolveFieldPoint(plan, operationField.landmarks, point));
+    const routePresentation = routes.find((item) => item.roleIndex === route.roleIndex);
     return points.slice(0, -1).map((point, index) => ({
       id: `route-${route.roleIndex}-${index}`,
       start: point,
       end: points[index + 1],
-      className: `base lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""}`,
+      className: `base lane-${route.roleIndex + 1} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""}`,
     }));
   });
-  const branchSegments = breakpoints.flatMap((breakpoint, breakpointIndex) => {
+  const branchSegments = execution ? [] : breakpoints.flatMap((breakpoint, breakpointIndex) => {
     const selectedOptionId = branches[breakpoint.id];
     const roleIndex = plan.breakpointRoles[breakpoint.id];
     const role = playbook.roles[roleIndex];
     const staffed = Boolean(assignments[role.id]);
-    const orderedOptions = [
-      ...breakpoint.options.filter((option) => option.id !== selectedOptionId),
-      ...breakpoint.options.filter((option) => option.id === selectedOptionId),
-    ];
+    const orderedOptions = execution
+      ? breakpoint.options.filter((option) => option.id === selectedOptionId)
+      : [
+          ...breakpoint.options.filter((option) => option.id !== selectedOptionId),
+          ...breakpoint.options.filter((option) => option.id === selectedOptionId),
+        ];
     return orderedOptions.flatMap((option) => {
       const route = plan.branchRoutes[breakpoint.id][option.id];
       const selectedRoute = option.id === selectedOptionId;
@@ -1532,13 +1535,16 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
         id: `${breakpoint.id}-${option.id}-${index}`,
         start: resolveFieldPoint(plan, operationField.landmarks, point),
         end: resolveFieldPoint(plan, operationField.landmarks, route[index + 1]),
-        className: `branch breakpoint-${breakpointIndex + 1} lane-${roleIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"} ${staffed ? "staffed" : ""} ${changed ? "changed" : ""}`,
+        className: `branch breakpoint-${breakpointIndex + 1} lane-${roleIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"} ${staffed ? "staffed" : ""} ${changed ? "changed" : ""} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(assignments[role.id]) ? "playback-focused" : "playback-muted" : ""}`,
       }));
     });
   });
   const branchTurns = breakpoints.flatMap((breakpoint, breakpointIndex) => {
     const selectedOptionId = branches[breakpoint.id];
-    return breakpoint.options.flatMap((option) => {
+    const visibleOptions = execution
+      ? breakpoint.options.filter((option) => option.id === selectedOptionId)
+      : breakpoint.options;
+    return visibleOptions.flatMap((option) => {
       const selectedRoute = option.id === selectedOptionId;
       return plan.branchRoutes[breakpoint.id][option.id]
         .filter((point) => typeof point === "object" || point === "rescue")
@@ -1553,7 +1559,7 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
   });
 
   return (
-    <div className="field-plan-layer" ref={layerRef} aria-label={`${playbook.name} authored battlefield plan`}>
+    <div className={`field-plan-layer ${execution ? "executing" : "planning"}`} ref={layerRef} aria-label={`${playbook.name} authored battlefield plan`}>
       <div className="field-plan-caption panel-surface" aria-live="polite">
         <div><span>5 FORMATION ROUTES</span><b>{playbook.name}</b></div>
         <div className="field-plan-branch-state">
@@ -1575,7 +1581,7 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
         </div>
       ))}
       {routes.map((route) => (
-        <div className={`field-plan-entry lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""}`} style={{ left: `${route.start.x}%`, top: `${route.start.y}%` }} key={`origin-${route.roleIndex}`}>
+        <div className={`field-plan-entry lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""} ${route.playbackClass}`} style={{ left: `${route.start.x}%`, top: `${route.start.y}%` }} key={`origin-${route.roleIndex}`}>
           <Flag weight="fill" />
           <span>{route.formation ? route.formation.number : String(route.roleIndex + 1).padStart(2, "0")}</span>
           <small>{route.formation ? route.formation.name : `ROUTE ${String(route.roleIndex + 1).padStart(2, "0")}`}</small>
@@ -1585,7 +1591,7 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
         const role = playbook.roles[index];
         const formation = formations.find((item) => item.id === assignments[role.id]);
         return (
-          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
+          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
             <b>{String(index + 1).padStart(2, "0")}</b>
             <span>{role.label.split(" / ")[0]}</span>
             {formation && <em>{formation.name}</em>}
@@ -1906,6 +1912,19 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
   const playbackActive = phase === "battle" || phase === "complete";
   const focusedPlayerIds = playbackBeat?.playerFormationIds ?? [];
   const hasPlayerFocus = focusedPlayerIds.length > 0;
+  const operationField = operationFieldFor(operation);
+  const authoredRoutes = buildAuthoredFormationRoutes({
+    plan: operationField.plans[playbook.id],
+    landmarks: operationField.landmarks,
+    roles: playbook.roles,
+    assignments,
+    formationStarts: Object.fromEntries(formations.map((formation) => {
+      const staging = STAGING_NODES[formation.id];
+      return [formation.id, { x: staging.left, y: staging.top - 3 }];
+    })),
+    branches,
+  });
+  const roleActionTimes = [profile.alphaAt, profile.betaAt, profile.reactorExposeAt, profile.reactorAt, profile.extractionAt];
 
   return (
     <section className={`battlefield phase-${phase} operation-${operation.id} ${playbackActive ? "playback-active" : ""}`} aria-label={`${operation.name} mission map`}>
@@ -1913,7 +1932,7 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} />
-      <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} operation={operation} phase={phase} playbook={playbook} />
+      <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
       <ObjectiveMarker className="alpha-objective" number="1" title={operation.controlTitles[0]} description={alphaState === "secured" ? "SECURED · western route open" : "Seize and hold"} state={alphaState} />
@@ -1933,14 +1952,20 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
         const assignedNode = deployments[formation.id] ? NODES[deployments[formation.id]] : null;
         const node = assignedNode ?? STAGING_NODES[formation.id];
         const active = selected === formation.id;
-        const progressShift = phase === "battle" || phase === "complete"
-          ? Math.min(22, Math.floor(battleTime / 30) * 2.2)
-          : 0;
+        const authoredRoute = authoredRoutes.find((route) => route.formationId === formation.id);
+        const routePosition = playbackActive && authoredRoute
+          ? positionAlongAuthoredRoute({
+              points: authoredRoute.points,
+              battleTime,
+              actionAt: roleActionTimes[authoredRoute.roleIndex] ?? profile.extractionAt,
+              completeAt: profile.completeAt,
+            })
+          : { x: node.left, y: node.top };
         return (
           <button
             key={formation.id}
             className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
-            style={{ left: `${node.left + progressShift}%`, top: `${node.top - progressShift * 0.45}%` }}
+            style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
             draggable={phase === "plan"}
             onDragStart={(event) => onFormationDragStart(event, formation.id)}
