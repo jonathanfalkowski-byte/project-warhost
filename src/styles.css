@@ -62,6 +62,11 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .formation-row[draggable="true"]:active { cursor: grabbing; }
 .formation-row.available .formation-copy em { color: #69c9ef; }
 .formation-row.assigned .formation-copy em { color: #8bcf68; }
+.formation-row .formation-copy .formation-campaign-state { color: #ef8b68; font-weight: 700; }
+.formation-row.formation-unavailable { cursor: default; opacity: .62; border-color: #683f33; background: #1c100d; }
+.formation-row.formation-unavailable:hover { border-color: #683f33; background: #1c100d; }
+.formation-row.formation-unavailable .formation-image { filter: grayscale(.75) brightness(.6); }
+.formation-row.formation-unavailable .formation-copy small, .formation-row.formation-unavailable .formation-copy em { color: #cf765c; }
 .formation-row:disabled { cursor: default; opacity: .82; }
 .formation-number { align-self: start; height: 24px; display: grid; place-items: center; background: #173d52; color: #78cafa; font-family: "Barlow Condensed"; font-weight: 600; }
 .formation-image.compact { width: 48px; height: 48px; object-fit: cover; border: 1px solid #39413f; filter: saturate(.8) contrast(1.08); }
@@ -81,6 +86,12 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .dossier-identity small { display: flex; align-items: center; gap: 4px; color: #84c8e4; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .06em; }
 .dossier-identity small svg { width: 13px; }
 .formation-dossier > p { margin: 8px 0; color: #a7b0ac; font-size: 10px; line-height: 1.35; }
+.dossier-campaign-state { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 5px; margin: 7px 0; padding: 6px; border-left: 3px solid #db6943; background: #27140e; color: #ef8b68; }
+.dossier-campaign-state > svg { width: 15px; }
+.dossier-campaign-state > span { display: grid; }
+.dossier-campaign-state b, .dossier-campaign-state small { font-family: "Barlow Condensed"; letter-spacing: .06em; }
+.dossier-campaign-state b { font-size: 10px; }
+.dossier-campaign-state small { color: #c9785d; font-size: 8px; }
 .dossier-condition, .dossier-reactions { display: grid; gap: 3px; padding-top: 6px; border-top: 1px solid #2c4249; }
 .dossier-refits { margin: 7px 0; display: grid; gap: 4px; padding: 7px 0; border-top: 1px solid #3c4c45; border-bottom: 1px solid #3c4c45; }
 .dossier-refits > span { color: #b69861; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .1em; }
@@ -819,12 +830,18 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .workshop-formation-copy { min-width: 0; display: grid; gap: 2px; }
 .workshop-formation-copy b { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .05em; }
 .workshop-formation-copy small { color: #a48e62; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .05em; }
-.workshop-refit-options { min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-.workshop-refit-options button { min-width: 0; display: grid; gap: 2px; padding: 7px; border: 1px solid #434b45; background: #151a17; color: #aeb4af; text-align: left; cursor: pointer; }
-.workshop-refit-options button.selected { border-color: #ae8a4d; background: #292216; box-shadow: inset 2px 0 #d2a557; }
-.workshop-refit-options button:disabled { cursor: default; opacity: .4; }
-.workshop-refit-options b { color: #d3bd8e; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .06em; }
-.workshop-refit-options small { color: #7fb8ca; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .04em; }
+.workshop-condition { width: fit-content; margin-top: 3px; padding: 2px 5px; border: 1px solid #925239; color: #f29a70; font-family: "Barlow Condensed"; font-size: 8px; font-style: normal; font-weight: 700; letter-spacing: .06em; }
+.workshop-condition.missing { border-color: #ad593c; background: #2d130d; color: #ff8b66; }
+.workshop-actions { min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.workshop-actions button { min-width: 0; display: grid; gap: 2px; padding: 7px; border: 1px solid #434b45; background: #151a17; color: #aeb4af; text-align: left; cursor: pointer; }
+.workshop-actions button.selected { border-color: #ae8a4d; background: #292216; box-shadow: inset 2px 0 #d2a557; }
+.workshop-actions button.carried { border-color: #3b5047; background: #111713; }
+.workshop-actions button:disabled { cursor: default; opacity: .46; }
+.workshop-actions b { color: #d3bd8e; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .06em; }
+.workshop-actions small { color: #7fb8ca; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .04em; }
+.workshop-recovery-action { grid-column: span 1; border-color: #a25738 !important; background: #23140e !important; }
+.workshop-recovery-action b { color: #f09a6f !important; }
+.campaign-shortfall { display: flex; align-items: center; gap: 6px; padding: 6px; border-left: 3px solid #dc6a43; background: #26140e; color: #ef8b68 !important; font-family: "Barlow Condensed"; font-size: 9px !important; font-weight: 700; letter-spacing: .05em; }
 .workshop-footer { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: center; gap: 14px; padding-top: 10px; border-top: 1px solid #4a493d; }
 .workshop-footer > span { color: #9b9f98; font-size: 10px; line-height: 1.35; }
 .workshop-footer .commit-button { min-height: 62px; }

@@ -1,0 +1,90 @@
+import { battlefieldConsequencesAt } from "./battleConsequences.js";
+
+const CAMPAIGN_STATES = Object.freeze({
+  damaged: Object.freeze({ label: "DAMAGED", severity: 1 }),
+  missing: Object.freeze({ label: "MISSING", severity: 2 }),
+});
+
+const copyConditions = (conditions = {}) => Object.fromEntries(
+  Object.entries(conditions)
+    .filter(([formationId, condition]) => typeof formationId === "string" && CAMPAIGN_STATES[condition?.state])
+    .map(([formationId, condition]) => [formationId, { ...condition, ...CAMPAIGN_STATES[condition.state] }]),
+);
+
+export const seriousConditionsFromConsequences = ({ clashes = [], battleTime = 0 } = {}) => {
+  const consequences = battlefieldConsequencesAt({ clashes, battleTime });
+  const conditions = {};
+  let missingAssigned = false;
+
+  [...consequences.active]
+    .sort((left, right) => right.severity - left.severity || left.formationId.localeCompare(right.formationId))
+    .forEach((consequence) => {
+      if (consequence.state !== "damaged" && consequence.state !== "cut-off") return;
+      const becomesMissing = consequence.state === "cut-off" && !missingAssigned;
+      const state = becomesMissing ? "missing" : "damaged";
+      if (becomesMissing) missingAssigned = true;
+      conditions[consequence.formationId] = {
+        state,
+        ...CAMPAIGN_STATES[state],
+        cause: consequence.cause,
+      };
+    });
+
+  return conditions;
+};
+
+export const mergeCampaignConditions = (existing = {}, incoming = {}) => {
+  const merged = copyConditions(existing);
+  Object.entries(copyConditions(incoming)).forEach(([formationId, condition]) => {
+    const current = merged[formationId];
+    if (!current || condition.severity >= current.severity) merged[formationId] = condition;
+  });
+  return merged;
+};
+
+export const applyCampaignConditions = (formations = [], conditions = {}) => formations.map((formation) => {
+  const condition = CAMPAIGN_STATES[conditions[formation.id]?.state]
+    ? { ...conditions[formation.id], ...CAMPAIGN_STATES[conditions[formation.id].state] }
+    : null;
+  if (!condition) return { ...formation, available: true, campaignCondition: null, disabledCapability: null };
+  if (condition.state === "missing") {
+    return { ...formation, available: false, campaignCondition: condition, disabledCapability: null, capabilities: [] };
+  }
+  const disabledCapability = formation.capabilities.at(-1) ?? null;
+  return {
+    ...formation,
+    available: true,
+    campaignCondition: condition,
+    disabledCapability,
+    capabilities: disabledCapability ? formation.capabilities.slice(0, -1) : formation.capabilities,
+  };
+});
+
+export const applyWorkshopAction = ({ refits = {}, conditions = {}, action = null, catalog = [] } = {}) => {
+  const nextRefits = { ...refits };
+  const nextConditions = copyConditions(conditions);
+  if (!action || !["repair", "recover", "refit"].includes(action.type)) {
+    return { refits: nextRefits, conditions: nextConditions, applied: false };
+  }
+
+  const formation = catalog.find((item) => item.id === action.formationId);
+  if (!formation) return { refits: nextRefits, conditions: nextConditions, applied: false };
+
+  if (action.type === "repair" && nextConditions[formation.id]?.state === "damaged") {
+    delete nextConditions[formation.id];
+    return { refits: nextRefits, conditions: nextConditions, applied: true };
+  }
+  if (action.type === "recover" && nextConditions[formation.id]?.state === "missing") {
+    delete nextConditions[formation.id];
+    return { refits: nextRefits, conditions: nextConditions, applied: true };
+  }
+  if (action.type === "refit" && nextConditions[formation.id]?.state !== "missing") {
+    const refit = formation.refits?.find((item) => item.id === action.refitId);
+    if (refit && nextRefits[formation.id] !== refit.id) {
+      nextRefits[formation.id] = refit.id;
+      return { refits: nextRefits, conditions: nextConditions, applied: true };
+    }
+  }
+
+  return { refits: nextRefits, conditions: nextConditions, applied: false };
+};

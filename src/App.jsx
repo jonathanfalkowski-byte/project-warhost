@@ -33,6 +33,12 @@ import {
 import { resolveAshenCollision } from "./enemyCollision.js";
 import { battlefieldConsequencesAt } from "./battleConsequences.js";
 import {
+  applyCampaignConditions,
+  applyWorkshopAction,
+  mergeCampaignConditions,
+  seriousConditionsFromConsequences,
+} from "./campaignPersistence.js";
+import {
   buildBattlePlayback,
   playbackIndexAfterStep,
   playbackTimeForIndex,
@@ -1197,7 +1203,8 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
   const reinforcementLoss = Math.ceil(overrun / 15);
   const protectedCount = total("protects") + protocolTotal("protects") + branchTotal("protects") + doctrine.impact.protects;
   const enemyRecoveryLoss = Math.ceil(enemyTotal("recoveryLoss"));
-  const extractedCount = Math.max(3, Math.min(FORMATIONS.length, 3 + protectedCount) - reinforcementLoss - enemyRecoveryLoss);
+  const deployedCount = readinessSummary.staffedCount;
+  const extractedCount = Math.max(0, Math.min(deployedCount, 3 + protectedCount) - reinforcementLoss - enemyRecoveryLoss);
 
   return {
     alphaAt,
@@ -1369,6 +1376,12 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness, p
         <div><span>FORMATION {formation.number}</span><b>{formation.name}</b><small><Icon weight="duotone" /> {formation.role}</small></div>
       </div>
       <p>{formation.purpose}</p>
+      {formation.campaignCondition && (
+        <div className={`dossier-campaign-state ${formation.campaignCondition.state}`}>
+          <Warning weight="fill" />
+          <span><b>{formation.campaignCondition.label}</b><small>{formation.disabledCapability ? `${formation.disabledCapability} OFFLINE THIS OPERATION` : "FORMATION UNAVAILABLE THIS OPERATION"}</small></span>
+        </div>
+      )}
       <div className="dossier-refits">
         <span>REFIT BAY · {refitsLocked ? "LOCKED FOR OPERATION" : "ONE PACKAGE INSTALLED"}</span>
         <div>
@@ -1411,7 +1424,7 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness, p
   );
 }
 
-function FormationRoster({ formations, selected, onSelect, assignments, playbook, onPlaybook, phase, onFormationDragStart, readiness, refitsLocked, onRefit }) {
+function FormationRoster({ formations, unavailableFormations = [], selected, onSelect, assignments, playbook, onPlaybook, phase, onFormationDragStart, readiness, refitsLocked, onRefit }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -1467,10 +1480,18 @@ function FormationRoster({ formations, selected, onSelect, assignments, playbook
                 <b>{formation.name}</b>
                 <small><Icon weight="duotone" /> {formation.role}</small>
                 <em>{assignedRole ? `STOP ${String(assignedIndex + 1).padStart(2, "0")} · ${assignedRole.label}` : "AVAILABLE · DRAG TO STOP"}</em>
+                {formation.campaignCondition && <em className="formation-campaign-state">{formation.campaignCondition.label} · {formation.disabledCapability} OFFLINE</em>}
               </span>
             </button>
           );
         })}
+        {unavailableFormations.map((formation) => (
+          <div className="formation-row formation-unavailable" key={formation.id} aria-label={`${formation.name}. Missing and unavailable for this operation.`}>
+            <span className="formation-number">{formation.number}</span>
+            <FormationPortrait formation={formation} compact />
+            <span className="formation-copy"><b>{formation.name}</b><small>MISSING</small><em>UNAVAILABLE · LEAVES ONE STOP EMPTY</em></span>
+          </div>
+        ))}
       </div>
       <FormationDossier formation={selectedFormation} assignedRole={selectedRole} assignedIndex={selectedRoleIndex} readiness={selectedRole ? readiness[selectedRole.id] : null} phase={phase} refitsLocked={refitsLocked} onRefit={onRefit} />
     </section>
@@ -1940,7 +1961,10 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           <span className="panel-label">{playbook.name} · AUTHORED TACTICAL ROUTE</span>
           <b>PLACE THE FORMATIONS</b>
         </div>
-        <strong>{assignedCount} / {playbook.roles.length} PLACED</strong>
+        <strong>
+          {assignedCount} / {formations.length} FORMATIONS PLACED
+          {formations.length < playbook.roles.length ? ` · ${playbook.roles.length - formations.length} STOP EMPTY` : ""}
+        </strong>
       </div>
       <p>Drag a visible formation from staging into a stop. Neighboring stops are checked in order for an automatic trigger → response combo.</p>
       <div className={`playbook-doctrine ${doctrine.triggered ? "triggered" : "exposed"}`}>
@@ -2275,16 +2299,17 @@ function MissionConditionSelector({ condition, locked, phase, onCondition }) {
   );
 }
 
-function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, rescueComplete, playbook, assignedCount, profile }) {
+function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, rescueComplete, playbook, assignedCount, formationCount, profile }) {
   const forecast = profile.overrun > 0
-    ? `${profile.extractedCount} / 5 EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
-    : `${profile.extractedCount} / 5 EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
+    ? `${profile.extractedCount} / ${formationCount} EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
+    : `${profile.extractedCount} / ${formationCount} EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
       <MissionConditionSelector condition={condition} locked={operation.conditionLocked} phase={phase} onCondition={onCondition} />
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
-        <strong className={planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planReady ? forecast : `${assignedCount} / 5 ASSIGNED`}</strong>
+        <strong className={planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planReady ? forecast : `${assignedCount} / ${formationCount} AVAILABLE ASSIGNED`}</strong>
+        {formationCount < FORMATIONS.length && <p className="campaign-shortfall"><Warning weight="fill" /> {FORMATIONS.length - formationCount} FORMATION MISSING · LEAVE AN AUTHORED STOP EMPTY</p>}
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
         <div className={`doctrine-outlook ${profile.doctrine.triggered ? "triggered" : "exposed"}`}>
           <span>TACTICAL DOCTRINE · {profile.doctrine.name}</span>
@@ -2387,7 +2412,7 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
               <span><b>{phase === "drill" ? "RUNNING GHOST DRILL" : drillComplete ? "DRILL VERIFIED" : "RUN GHOST DRILL"}</b><small>Preview routes, triggers, and timing.</small></span>
             </button>
             <button className="commit-button" onClick={onCommit} disabled={!planReady}>
-              <span><b>COMMIT PLAYBOOK</b><small>{planReady ? "Execute roles and authored branches." : "Resolve every required role first."}</small></span>
+              <span><b>COMMIT PLAYBOOK</b><small>{planReady ? "Execute staffed roles and authored branches." : "Staff every available formation first."}</small></span>
               <ArrowRight weight="bold" />
             </button>
           </>
@@ -2492,8 +2517,18 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
   );
 }
 
-function SalvageWorkshop({ baselineRefits, choice, formations, nextOperation, onChoose, onLaunch }) {
+function SalvageWorkshop({ baseline, choice, formations, nextOperation, onChoose, onLaunch }) {
   const incomingCondition = MISSION_CONDITIONS.find((condition) => condition.id === nextOperation.conditionId);
+  const selectedAction = choice
+    ? choice.type === "repair"
+      ? `Repair ${FORMATIONS.find((formation) => formation.id === choice.formationId)?.name}.`
+      : choice.type === "recover"
+        ? `Recover ${FORMATIONS.find((formation) => formation.id === choice.formationId)?.name}.`
+        : `Refit ${FORMATIONS.find((formation) => formation.id === choice.formationId)?.name}.`
+    : "No salvage action selected. Launching unchanged is allowed.";
+  const isSelected = (action) => choice?.type === action.type
+    && choice?.formationId === action.formationId
+    && (action.type !== "refit" || choice?.refitId === action.refitId);
   return (
     <div className="decision-backdrop workshop-backdrop" role="dialog" aria-modal="true" aria-labelledby="workshop-title">
       <div className="decision-panel workshop-panel">
@@ -2501,11 +2536,11 @@ function SalvageWorkshop({ baselineRefits, choice, formations, nextOperation, on
           <div>
             <p className="eyebrow">INTERMISSION · SCRAPBORN SALVAGE BAY</p>
             <h2 id="workshop-title">Carry the detachment forward.</h2>
-            <p>Every installed refit survived Dead Circuit. Replace at most one package before the next operation, or keep the Warhost unchanged.</p>
+            <p>Serious battlefield consequences persist. Spend one salvage action to repair damage, recover a missing formation, or install one refit. The other consequences carry forward.</p>
           </div>
           <div className={`salvage-token ${choice ? "spent" : "available"}`}>
             <Wrench weight="duotone" />
-            <span><b>{choice ? "0 / 1" : "1 / 1"}</b><small>REFIT REPLACEMENT REMAINING</small></span>
+            <span><b>{choice ? "0 / 1" : "1 / 1"}</b><small>SALVAGE ACTION REMAINING</small></span>
           </div>
         </div>
         <div className="incoming-operation">
@@ -2517,33 +2552,58 @@ function SalvageWorkshop({ baselineRefits, choice, formations, nextOperation, on
         <div className="workshop-formations">
           {formations.map((formation) => {
             const baseFormation = FORMATIONS.find((item) => item.id === formation.id);
-            const carriedRefit = baseFormation.refits.find((refit) => refit.id === baselineRefits[formation.id]);
-            const lockedByOtherChoice = Boolean(choice && choice.formationId !== formation.id);
+            const carriedRefit = baseFormation.refits.find((refit) => refit.id === baseline.refits[formation.id]);
+            const campaignCondition = formation.campaignCondition;
             return (
-              <div className={`workshop-formation ${choice?.formationId === formation.id ? "changed" : ""}`} key={formation.id}>
+              <div className={`workshop-formation ${choice?.formationId === formation.id ? "changed" : ""} ${campaignCondition?.state ?? "ready"}`} key={formation.id}>
                 <FormationPortrait formation={formation} compact />
-                <div className="workshop-formation-copy"><b>{formation.name}</b><small>CARRIES {carriedRefit.name}</small></div>
-                <div className="workshop-refit-options">
-                  {baseFormation.refits.map((refit) => (
+                <div className="workshop-formation-copy">
+                  <b>{formation.name}</b>
+                  <small>CARRIES {carriedRefit.name}</small>
+                  {campaignCondition && <em className={`workshop-condition ${campaignCondition.state}`}>{campaignCondition.label}{formation.disabledCapability ? ` · ${formation.disabledCapability} OFFLINE` : " · UNAVAILABLE"}</em>}
+                </div>
+                <div className="workshop-actions">
+                  {campaignCondition?.state === "damaged" && (
                     <button
-                      key={refit.id}
-                      className={formation.activeRefit.id === refit.id ? "selected" : ""}
-                      onClick={() => onChoose(formation.id, refit.id)}
-                      disabled={lockedByOtherChoice}
-                      aria-pressed={formation.activeRefit.id === refit.id}
+                      className={`workshop-recovery-action ${isSelected({ type: "repair", formationId: formation.id }) ? "selected" : ""}`}
+                      onClick={() => onChoose({ type: "repair", formationId: formation.id })}
+                      aria-pressed={isSelected({ type: "repair", formationId: formation.id })}
                     >
-                      <b>{refit.name}</b>
-                      <small>{refit.capabilities.join(" / ")} · CREATES {refit.creates}</small>
+                      <b>REPAIR DAMAGE</b><small>Restore {formation.disabledCapability} for the next operation.</small>
                     </button>
-                  ))}
+                  )}
+                  {campaignCondition?.state === "missing" ? (
+                    <button
+                      className={`workshop-recovery-action ${isSelected({ type: "recover", formationId: formation.id }) ? "selected" : ""}`}
+                      onClick={() => onChoose({ type: "recover", formationId: formation.id })}
+                      aria-pressed={isSelected({ type: "recover", formationId: formation.id })}
+                    >
+                      <b>RECOVER FORMATION</b><small>Return this formation to the next authored plan.</small>
+                    </button>
+                  ) : baseFormation.refits.map((refit) => {
+                    const action = { type: "refit", formationId: formation.id, refitId: refit.id };
+                    const carried = refit.id === baseline.refits[formation.id];
+                    return (
+                      <button
+                        key={refit.id}
+                        className={`${carried ? "carried" : ""} ${isSelected(action) ? "selected" : ""}`}
+                        onClick={() => onChoose(action)}
+                        disabled={carried}
+                        aria-pressed={isSelected(action)}
+                      >
+                        <b>{refit.name}</b>
+                        <small>{carried ? "INSTALLED" : `${refit.capabilities.join(" / ")} · CREATES ${refit.creates}`}</small>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
         </div>
         <div className="workshop-footer">
-          <span>{choice ? `${FORMATIONS.find((formation) => formation.id === choice.formationId).name} will enter Ashen Passage with a replacement package.` : "No replacement selected. Skipping the refit is allowed."}</span>
-          <button className="commit-button" onClick={onLaunch}><span><b>LAUNCH ASHEN PASSAGE</b><small>Lock refits and return to tactical planning.</small></span><ArrowRight weight="bold" /></button>
+          <span>{selectedAction} Any missing formation leaves one playbook stop empty.</span>
+          <button className="commit-button" onClick={onLaunch}><span><b>LAUNCH ASHEN PASSAGE</b><small>Lock the campaign state and return to tactical planning.</small></span><ArrowRight weight="bold" /></button>
         </div>
       </div>
     </div>
@@ -2551,7 +2611,7 @@ function SalvageWorkshop({ baselineRefits, choice, formations, nextOperation, on
 }
 
 function CompletionOverlay({ formations, hasNextOperation, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
-  const lostCount = FORMATIONS.length - profile.extractedCount;
+  const lostCount = formations.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
   const reinforcementWave = reinforcementWaveFor(operation);
@@ -2598,6 +2658,7 @@ export function App() {
   const [playbookId, setPlaybookId] = useState("trapline");
   const [conditionId, setConditionId] = useState("clear");
   const [refits, setRefits] = useState(defaultRefits);
+  const [campaignConditions, setCampaignConditions] = useState({});
   const [assignments, setAssignments] = useState(() => emptyAssignments(PLAYBOOKS[0]));
   const [branches, setBranches] = useState(defaultBranches);
   const [battleBranches, setBattleBranches] = useState(defaultBranches);
@@ -2627,9 +2688,19 @@ export function App() {
     () => MISSION_CONDITIONS.find((item) => item.id === conditionId) ?? MISSION_CONDITIONS[0],
     [conditionId],
   );
+  const allFormations = useMemo(
+    () => applyCampaignConditions(resolveFormations(refits), campaignConditions),
+    [campaignConditions, refits],
+  );
   const formations = useMemo(
-    () => resolveFormations(refits),
-    [refits],
+    () => allFormations.filter((formation) => formation.available),
+    [allFormations],
+  );
+  const workshopFormations = useMemo(
+    () => workshopBaseline
+      ? applyCampaignConditions(resolveFormations(workshopBaseline.refits), workshopBaseline.conditions)
+      : [],
+    [workshopBaseline],
   );
 
   const deployments = useMemo(
@@ -2643,9 +2714,11 @@ export function App() {
   );
 
   const planReady = useMemo(
-    () => playbook.roles.every((role) => Boolean(assignments[role.id]))
-      && new Set(Object.values(assignments).filter(Boolean)).size === FORMATIONS.length,
-    [assignments, playbook],
+    () => formations.length >= operation.requiredExtraction
+      && assignedCount === formations.length
+      && new Set(Object.values(assignments).filter(Boolean)).size === formations.length
+      && formations.every((formation) => Object.values(assignments).includes(formation.id)),
+    [assignedCount, assignments, formations, operation.requiredExtraction],
   );
 
   const tacticalSequence = useMemo(
@@ -2771,7 +2844,7 @@ export function App() {
     setAssignments(emptyAssignments(next));
     setBranches(defaultBranches(operation));
     setBattleBranches(defaultBranches(operation));
-    setSelected("harpoon");
+    setSelected(formations[0]?.id ?? "");
     setPickerRoleId(null);
     setPlacementFeedback(null);
     setDrillStep(-1);
@@ -2823,7 +2896,7 @@ export function App() {
         formationName: `${baseFormation.name} · ${nextRefit.name}`,
         beforeLinks: previousLinks,
         afterLinks: nextLinks,
-        forecast: `${nextProfile.extractedCount} / 5 EXTRACT · ${reinforcementForecast(nextProfile)}`,
+        forecast: `${nextProfile.extractedCount} / ${formations.length} EXTRACT · ${reinforcementForecast(nextProfile)}`,
         title: weakened ? "REFIT BREAKS CHAIN" : improved ? "REFIT STRENGTHENS CHAIN" : "REFIT REWIRES CHAIN",
         tone: weakened ? "weakened" : improved ? "strengthened" : "rewired",
       });
@@ -2839,7 +2912,7 @@ export function App() {
   };
 
   const assignFormationToRole = (roleId, formationId) => {
-    if (phase !== "plan" || !FORMATIONS.some((formation) => formation.id === formationId)) return;
+    if (phase !== "plan" || !formations.some((formation) => formation.id === formationId)) return;
     const targetRole = playbook.roles.find((role) => role.id === roleId);
     const sourceRole = playbook.roles.find((role) => assignments[role.id] === formationId);
     if (!targetRole) return;
@@ -2864,8 +2937,8 @@ export function App() {
     const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const targetIndex = playbook.roles.findIndex((role) => role.id === targetRole.id);
     const sourceIndex = sourceRole ? playbook.roles.findIndex((role) => role.id === sourceRole.id) : targetIndex;
-    const previousReady = playbook.roles.every((role) => Boolean(assignments[role.id]));
-    const nextReady = playbook.roles.every((role) => Boolean(nextAssignments[role.id]));
+    const previousReady = Object.values(assignments).filter(Boolean).length === formations.length;
+    const nextReady = Object.values(nextAssignments).filter(Boolean).length === formations.length;
     const previousWindow = previousProfile.timeSaved - previousProfile.overrun;
     const nextWindow = nextProfile.timeSaved - nextProfile.overrun;
     const improved = nextLinks > previousLinks || nextProfile.extractedCount > previousProfile.extractedCount || nextWindow > previousWindow;
@@ -2875,8 +2948,8 @@ export function App() {
     const tone = nextProtocolCount > previousProtocolCount ? "strengthened" : nextProtocolCount < previousProtocolCount ? "weakened" : nextReady && !previousReady ? "strengthened" : weakened ? "weakened" : improved ? "strengthened" : "rewired";
     const title = nextProtocolCount > previousProtocolCount ? "REFIT PROTOCOL ONLINE" : nextProtocolCount < previousProtocolCount ? "REFIT PROTOCOL DORMANT" : nextReady && !previousReady ? "PLAN ONLINE" : tone === "weakened" ? "CHAIN BROKEN" : tone === "strengthened" ? "CHAIN STRENGTHENED" : "CHAIN REWIRED";
     const forecast = nextReady
-      ? `${nextProfile.extractedCount} / 5 EXTRACT · ${reinforcementForecast(nextProfile)}`
-      : `${Object.values(nextAssignments).filter(Boolean).length} / 5 FORMATIONS PLACED`;
+      ? `${nextProfile.extractedCount} / ${formations.length} EXTRACT · ${reinforcementForecast(nextProfile)}`
+      : `${Object.values(nextAssignments).filter(Boolean).length} / ${formations.length} FORMATIONS PLACED`;
 
     placementRevisionRef.current += 1;
     setPlacementFeedback({
@@ -2903,7 +2976,7 @@ export function App() {
   };
 
   const beginFormationDrag = (event, formationId) => {
-    if (phase !== "plan" || !FORMATIONS.some((formation) => formation.id === formationId)) {
+    if (phase !== "plan" || !formations.some((formation) => formation.id === formationId)) {
       event.preventDefault();
       return;
     }
@@ -2985,7 +3058,14 @@ export function App() {
   const handleCompletionAction = () => {
     const hasNextOperation = operationIndex < OPERATIONS.length - 1;
     if (operationWon && hasNextOperation) {
-      setWorkshopBaseline({ ...refits });
+      const seriousConditions = seriousConditionsFromConsequences({
+        clashes: operationProfile.enemyClashes,
+        battleTime: operationProfile.completeAt,
+      });
+      setWorkshopBaseline({
+        refits: { ...refits },
+        conditions: mergeCampaignConditions(campaignConditions, seriousConditions),
+      });
       setSalvageChoice(null);
       setShowCompletion(false);
       setShowWorkshop(true);
@@ -2994,27 +3074,30 @@ export function App() {
     setShowCompletion(false);
   };
 
-  const chooseWorkshopRefit = (formationId, refitId) => {
+  const chooseWorkshopAction = (action) => {
     if (!showWorkshop || !workshopBaseline) return;
-    const formation = FORMATIONS.find((item) => item.id === formationId);
-    if (!formation?.refits.some((refit) => refit.id === refitId)) return;
-    if (salvageChoice && salvageChoice.formationId !== formationId) return;
-
-    const carriedRefitId = workshopBaseline[formationId];
-    if (refitId === carriedRefitId) {
-      setRefits({ ...workshopBaseline });
-      setSalvageChoice(null);
-      return;
-    }
-
-    setRefits({ ...workshopBaseline, [formationId]: refitId });
-    setSalvageChoice({ formationId, refitId });
+    const preview = applyWorkshopAction({ ...workshopBaseline, action, catalog: FORMATIONS });
+    if (!preview.applied) return;
+    const sameChoice = salvageChoice?.type === action.type
+      && salvageChoice?.formationId === action.formationId
+      && (action.type !== "refit" || salvageChoice?.refitId === action.refitId);
+    setSalvageChoice(sameChoice ? null : action);
   };
 
   const launchNextOperation = () => {
     const nextIndex = operationIndex + 1;
     const nextOperation = OPERATIONS[nextIndex];
-    if (!showWorkshop || !nextOperation) return;
+    if (!showWorkshop || !workshopBaseline || !nextOperation) return;
+    const campaignResult = applyWorkshopAction({
+      ...workshopBaseline,
+      action: salvageChoice,
+      catalog: FORMATIONS,
+    });
+    const nextFormations = applyCampaignConditions(resolveFormations(campaignResult.refits), campaignResult.conditions)
+      .filter((formation) => formation.available);
+    if (nextFormations.length < nextOperation.requiredExtraction) return;
+    setRefits(campaignResult.refits);
+    setCampaignConditions(campaignResult.conditions);
     setOperationIndex(nextIndex);
     setConditionId(nextOperation.conditionId);
     setAssignments(emptyAssignments(playbook));
@@ -3024,7 +3107,7 @@ export function App() {
     setBattleTime(0);
     setPlaybackIndex(0);
     setPlaybackPlaying(false);
-    setSelected("harpoon");
+    setSelected(nextFormations[0]?.id ?? "");
     setDrillStep(-1);
     setDrillComplete(false);
     setSeals(2);
@@ -3048,6 +3131,7 @@ export function App() {
     setPlaybookId("trapline");
     setConditionId("clear");
     setRefits(defaultRefits());
+    setCampaignConditions({});
     setAssignments(emptyAssignments(PLAYBOOKS[0]));
     setBranches(defaultBranches(OPERATIONS[0]));
     setBattleBranches(defaultBranches(OPERATIONS[0]));
@@ -3070,15 +3154,15 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
         <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
-        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} profile={operationProfile} />
+        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
       {showCompletion && <CompletionOverlay formations={formations} hasNextOperation={operationIndex < OPERATIONS.length - 1} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
-      {showWorkshop && workshopBaseline && <SalvageWorkshop baselineRefits={workshopBaseline} choice={salvageChoice} formations={formations} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopRefit} onLaunch={launchNextOperation} />}
+      {showWorkshop && workshopBaseline && <SalvageWorkshop baseline={workshopBaseline} choice={salvageChoice} formations={workshopFormations} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopAction} onLaunch={launchNextOperation} />}
     </main>
   );
 }
