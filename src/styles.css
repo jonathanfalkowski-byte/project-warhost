@@ -175,6 +175,15 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-entry svg { width: 19px; height: 19px; padding: 3px; border: 1px solid var(--route-color, #397c98); background: #0c1b20; }
 .field-plan-entry span { margin-top: 2px; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
 .field-plan-entry small { max-width: 92px; padding: 1px 3px; background: rgba(6, 13, 15, .9); color: #b5c3c6; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.field-plan-segment.state-momentum, .field-plan-entry.state-momentum, .field-plan-position.state-momentum { --route-color: #9bd874; --route-rgb: 155, 216, 116; }
+.field-plan-segment.state-delayed, .field-plan-entry.state-delayed, .field-plan-position.state-delayed { --route-color: #e8b55e; --route-rgb: 232, 181, 94; }
+.field-plan-segment.state-pinned, .field-plan-entry.state-pinned, .field-plan-position.state-pinned { --route-color: #e78a4f; --route-rgb: 231, 138, 79; }
+.field-plan-segment.state-damaged, .field-plan-entry.state-damaged, .field-plan-position.state-damaged,
+.field-plan-segment.state-cut-off, .field-plan-entry.state-cut-off, .field-plan-position.state-cut-off { --route-color: #ec684e; --route-rgb: 236, 104, 78; }
+.field-plan-layer.executing .field-plan-segment.state-delayed { opacity: .72; }
+.field-plan-layer.executing .field-plan-segment.state-pinned { height: 2px; opacity: .58; }
+.field-plan-layer.executing .field-plan-segment.state-damaged { height: 2px; opacity: .46; filter: saturate(.7); }
+.field-plan-layer.executing .field-plan-segment.state-cut-off { height: 1px; opacity: .32; background: transparent; border-top: 2px dashed #ec684e; box-shadow: none; }
 .enemy-plan-layer { position: absolute; z-index: 4; inset: 0; overflow: hidden; pointer-events: none; }
 .enemy-plan-segment { --enemy-route: #dc7042; position: absolute; z-index: 1; height: 3px; transform-origin: 0 50%; border-top: 1px dashed #ffae78; background: var(--enemy-route); box-shadow: 0 0 11px rgba(220, 92, 49, .48); }
 .enemy-plan-segment::before { content: ""; position: absolute; inset: -5px 0 auto; border-top: 1px dotted rgba(245, 130, 79, .38); }
@@ -296,6 +305,17 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .map-formation.selected .formation-image { border-color: #4cc1f3; filter: brightness(1.28) contrast(1.18) saturate(1.08); box-shadow: 0 0 12px rgba(41,169,232,.75), 0 8px 14px rgba(0,0,0,.75); }
 .map-formation-number { position: absolute; left: -8px; top: -8px; width: 22px; height: 22px; display: grid; place-items: center; background: #1c5370; color: #bdeaff; border: 1px solid #6ab8dc; font-family: "Barlow Condensed"; font-weight: 700; }
 .map-formation-label { position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%); padding: 2px 5px; background: rgba(7,10,10,.92); color: #d2d6d4; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .05em; white-space: nowrap; }
+.map-formation-state { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); min-width: 66px; padding: 2px 6px; border: 1px solid currentColor; background: rgba(8, 12, 11, .96); color: #efba63; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .1em; white-space: nowrap; box-shadow: 0 0 12px currentColor; }
+.map-formation.state-momentum .formation-image { border: 3px solid #9bd874; box-shadow: 0 0 24px rgba(142, 211, 102, .7), 0 8px 14px rgba(0,0,0,.75); }
+.map-formation.state-momentum .map-formation-state { color: #9bd874; }
+.map-formation.state-delayed .formation-image { border: 3px solid #e8b55e; box-shadow: 0 0 20px rgba(232, 181, 94, .58), 0 8px 14px rgba(0,0,0,.75); }
+.map-formation.state-delayed .map-formation-state { color: #e8b55e; }
+.map-formation.state-pinned .formation-image { border: 3px solid #e78a4f; filter: brightness(.92) saturate(.78); box-shadow: 0 0 18px rgba(231, 138, 79, .55), 0 8px 14px rgba(0,0,0,.75); }
+.map-formation.state-pinned .map-formation-state { color: #e78a4f; }
+.map-formation.state-damaged .formation-image { border: 3px solid #ec684e; filter: brightness(.72) saturate(.62); box-shadow: 0 0 20px rgba(236, 104, 78, .6), 0 8px 14px rgba(0,0,0,.75); }
+.map-formation.state-damaged .map-formation-state { color: #ec684e; }
+.map-formation.state-cut-off .formation-image { border: 3px dashed #f05245; filter: grayscale(.55) brightness(.62); box-shadow: 0 0 25px rgba(240, 82, 69, .72), 0 8px 14px rgba(0,0,0,.8); }
+.map-formation.state-cut-off .map-formation-state { color: #f05245; background: rgba(38, 10, 8, .98); }
 .map-formation.in-motion { animation: formationPulse 1.4s ease-in-out infinite alternate; }
 .map-formation.staged { z-index: 16; }
 .map-formation.staged .formation-image { border-color: #5aa8c8; box-shadow: 0 0 0 5px rgba(17, 70, 91, .32), 0 8px 14px rgba(0,0,0,.75); }
@@ -307,6 +327,17 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .battlefield-combo-beat > b { min-width: 0; color: #d4e5d0; font-size: 12px; letter-spacing: .04em; }
 .battlefield-combo-beat > svg { width: 18px; color: #a4e17e; }
 .battlefield-combo-beat > small { grid-column: 1 / -1; color: #9ab097; font-size: 9px; }
+.battle-consequence-ledger { position: absolute; z-index: 20; right: 1.5%; top: 13%; width: min(235px, 24%); display: grid; gap: 4px; padding: 8px; border: 1px solid #48534e; background: rgba(5, 10, 9, .94); box-shadow: 0 10px 25px rgba(0,0,0,.62); font-family: "Barlow Condensed"; pointer-events: none; transition: opacity .3s ease, filter .3s ease; }
+.battle-consequence-ledger.observing { opacity: .26; filter: saturate(.45); }
+.battle-consequence-ledger.overview { opacity: 1; }
+.battle-consequence-ledger > span { color: #96a39d; font-size: 8px; font-weight: 700; letter-spacing: .12em; }
+.battle-consequence-ledger > div { --state-color: #e8b55e; display: grid; grid-template-columns: 1fr auto; gap: 1px 6px; padding: 4px 6px; border-left: 3px solid var(--state-color); background: #111615; }
+.battle-consequence-ledger > div.state-momentum { --state-color: #9bd874; }
+.battle-consequence-ledger > div.state-pinned { --state-color: #e78a4f; }
+.battle-consequence-ledger > div.state-damaged, .battle-consequence-ledger > div.state-cut-off { --state-color: #ec684e; }
+.battle-consequence-ledger b { color: #d9dfdc; font-size: 9px; letter-spacing: .05em; }
+.battle-consequence-ledger em { color: var(--state-color); font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .08em; }
+.battle-consequence-ledger small { grid-column: 1 / -1; color: #747d78; font-size: 7px; letter-spacing: .04em; }
 
 .warhost-app.battle .left-rail, .warhost-app.battle .right-rail { opacity: .34; filter: saturate(.45); transition: opacity .35s ease, filter .35s ease; }
 .battlefield.playback-active .battlefield-art { filter: brightness(.48) saturate(.52) contrast(1.14); }

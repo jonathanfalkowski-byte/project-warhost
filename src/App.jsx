@@ -31,6 +31,7 @@ import {
   Wrench,
 } from "@phosphor-icons/react";
 import { resolveAshenCollision } from "./enemyCollision.js";
+import { battlefieldConsequencesAt } from "./battleConsequences.js";
 import {
   buildBattlePlayback,
   playbackIndexAfterStep,
@@ -1525,7 +1526,7 @@ const fieldSegmentStyle = (start, end, size) => {
   };
 };
 
-function TacticalFieldPlan({ assignments, branches, formations, operation, phase, playbook, playbackBeat }) {
+function TacticalFieldPlan({ assignments, branches, consequences, formations, operation, phase, playbook, playbackBeat }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const operationField = operationFieldFor(operation);
@@ -1559,7 +1560,8 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
     const playbackClass = execution && hasPlayerFocus
       ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted"
       : "";
-    return { ...route, roleIndex, role, formation, start, playbackClass };
+    const consequenceClass = formation && consequences?.[formation.id] ? `state-${consequences[formation.id].state}` : "";
+    return { ...route, roleIndex, role, formation, start, playbackClass, consequenceClass };
   });
   const executionRoutes = buildAuthoredFormationRoutes({
     plan,
@@ -1578,7 +1580,7 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
       id: `route-${route.roleIndex}-${index}`,
       start: point,
       end: points[index + 1],
-      className: `base lane-${route.roleIndex + 1} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""}`,
+      className: `base lane-${route.roleIndex + 1} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""}`,
     }));
   });
   const branchSegments = execution ? [] : breakpoints.flatMap((breakpoint, breakpointIndex) => {
@@ -1646,7 +1648,7 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
         </div>
       ))}
       {routes.map((route) => (
-        <div className={`field-plan-entry lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""} ${route.playbackClass}`} style={{ left: `${route.start.x}%`, top: `${route.start.y}%` }} key={`origin-${route.roleIndex}`}>
+        <div className={`field-plan-entry lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""} ${route.playbackClass} ${route.consequenceClass}`} style={{ left: `${route.start.x}%`, top: `${route.start.y}%` }} key={`origin-${route.roleIndex}`}>
           <Flag weight="fill" />
           <span>{route.formation ? route.formation.number : String(route.roleIndex + 1).padStart(2, "0")}</span>
           <small>{route.formation ? route.formation.name : `ROUTE ${String(route.roleIndex + 1).padStart(2, "0")}`}</small>
@@ -1655,8 +1657,9 @@ function TacticalFieldPlan({ assignments, branches, formations, operation, phase
       {plan.positions.map((position, index) => {
         const role = playbook.roles[index];
         const formation = formations.find((item) => item.id === assignments[role.id]);
+        const consequenceClass = formation && consequences?.[formation.id] ? `state-${consequences[formation.id].state}` : "";
         return (
-          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
+          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${consequenceClass} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
             <b>{String(index + 1).padStart(2, "0")}</b>
             <span>{role.label.split(" / ")[0]}</span>
             {formation && <em>{formation.name}</em>}
@@ -2020,6 +2023,7 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
   const playbackActive = phase === "battle" || phase === "complete";
   const focusedPlayerIds = playbackBeat?.playerFormationIds ?? [];
   const hasPlayerFocus = focusedPlayerIds.length > 0;
+  const consequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime });
   const operationField = operationFieldFor(operation);
   const authoredRoutes = buildAuthoredFormationRoutes({
     plan: operationField.plans[playbook.id],
@@ -2040,7 +2044,7 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} />
-      <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
+      <TacticalFieldPlan assignments={assignments} branches={branches} consequences={consequences.player} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
       <DoctrineCollisionOverlay beat={playbackBeat} operation={operation} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
@@ -2061,6 +2065,7 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
         const assignedNode = deployments[formation.id] ? NODES[deployments[formation.id]] : null;
         const node = assignedNode ?? STAGING_NODES[formation.id];
         const active = selected === formation.id;
+        const consequence = consequences.player[formation.id] ?? null;
         const authoredRoute = authoredRoutes.find((route) => route.formationId === formation.id);
         const routePosition = playbackActive && authoredRoute
           ? positionAlongAuthoredRoute({
@@ -2073,19 +2078,36 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
             draggable={phase === "plan"}
             onDragStart={(event) => onFormationDragStart(event, formation.id)}
-            aria-label={`${formation.name}, ${assignedNode ? formation.role : "unassigned"}, at ${node.label}`}
+            aria-label={`${formation.name}, ${assignedNode ? formation.role : "unassigned"}, at ${node.label}${consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
           >
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
+            {consequence && <span className="map-formation-state">{consequence.label}</span>}
           </button>
         );
       })}
+
+      {playbackActive && consequences.active.length > 0 && (
+        <div className={`battle-consequence-ledger ${hasPlayerFocus ? "observing" : "overview"}`} aria-live="polite">
+          <span>FIELD CONSEQUENCES · PERSISTENT</span>
+          {consequences.active.map((consequence) => {
+            const formation = formations.find((item) => item.id === consequence.formationId);
+            return (
+              <div className={`state-${consequence.state}`} key={consequence.formationId}>
+                <b>{formation?.name ?? consequence.formationId}</b>
+                <em>{consequence.label}</em>
+                <small>{consequence.cause}</small>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} />
       {phase === "drill" && (
@@ -2531,6 +2553,7 @@ function SalvageWorkshop({ baselineRefits, choice, formations, nextOperation, on
 function CompletionOverlay({ formations, hasNextOperation, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
   const lostCount = FORMATIONS.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
+  const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
   const reinforcementWave = reinforcementWaveFor(operation);
   const timingResult = profile.overrun > 0
     ? `The ${reinforcementWave.name} reached ${operation.extractionTitle} ${profile.overrun} seconds before extraction cleared.`
@@ -2544,6 +2567,9 @@ function CompletionOverlay({ formations, hasNextOperation, operation, rescued, u
     ? `Active Ashen field protocols: ${profile.protocols.map((protocol) => protocol.name).join(", ")}.`
     : "No installed refit found an Ashen field interface.";
   const engagementResult = `Engagements: ${profile.enemyClashes.map((clash) => `${clash.label} ${clash.resolution?.label ?? "UNRESOLVED"}${Number.isFinite(clash.resolution?.playerScore) ? ` ${clash.resolution.playerScore}-${clash.resolution.enemyScore}` : ""}`).join(", ")}.`;
+  const fieldStateResult = finalConsequences.active.length > 0
+    ? `Final field states: ${finalConsequences.active.map((consequence) => `${formations.find((formation) => formation.id === consequence.formationId)?.name ?? consequence.formationId} ${consequence.label}`).join(", ")}.`
+    : "No formation carried a battlefield consequence into extraction.";
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className={`decision-panel completion-panel ${won ? "victory" : "defeat"}`}>
@@ -2558,7 +2584,7 @@ function CompletionOverlay({ formations, hasNextOperation, operation, rescued, u
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
         </div>
-        <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+        <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {fieldStateResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{won && hasNextOperation ? "ENTER SALVAGE WORKSHOP" : "RETURN TO BATTLEFIELD"}</b><small>{won && hasNextOperation ? "Carry this detachment into the next operation." : "Inspect the completed operation state."}</small></span><ArrowRight /></button>
       </div>
     </div>
