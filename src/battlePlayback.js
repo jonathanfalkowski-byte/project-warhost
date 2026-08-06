@@ -93,6 +93,7 @@ export const buildBattlePlayback = ({
     playerFormationIds: [],
     routeState: null,
     doctrinePhase: null,
+    resolution: null,
     ...beat,
   });
 
@@ -144,7 +145,7 @@ export const buildBattlePlayback = ({
       kind: "enemy-intent",
       eyebrow: `ENEMY INTENT · E${enemyFormationIndex + 1}`,
       title: clash.label,
-      detail: `${clash.uses ? `Uses ${clash.uses}. ` : ""}Attempts to create ${clash.creates}.`,
+      detail: `${clash.uses ? `Uses ${clash.uses}. ` : ""}Attempts to create ${clash.creates}. Resistance ${clash.resistance}; answer with ${(clash.counterCapabilities ?? []).join(" / ")}.`,
       enemyFormationIndex,
       routeState: "intent",
     });
@@ -173,10 +174,13 @@ export const buildBattlePlayback = ({
       title: clash.resultText,
       detail: clash.eventText,
       enemyFormationIndex,
-      playerFormationIds: enemyFormationIndex === 0
-        ? [profile.enemyCollision?.sourceId, profile.enemyCollision?.receiverId].filter(Boolean)
-        : [],
+      playerFormationIds: clash.resolution?.actorIds?.length > 0
+        ? clash.resolution.actorIds
+        : enemyFormationIndex === 0
+          ? [profile.enemyCollision?.sourceId, profile.enemyCollision?.receiverId].filter(Boolean)
+          : [],
       routeState: clash.routeState,
+      resolution: clash.resolution ?? null,
     });
   });
 

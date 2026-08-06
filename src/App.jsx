@@ -42,6 +42,7 @@ import {
   positionAlongAuthoredRoute,
 } from "./fieldRoutes.js";
 import { PLAYBOOK_DOCTRINES, resolvePlaybookDoctrine } from "./playbookDoctrine.js";
+import { resolveTacticalEngagement } from "./tacticalResolution.js";
 
 const FORMATIONS = [
   {
@@ -475,6 +476,8 @@ const DEAD_CIRCUIT_ENEMY_PLAN = {
       label: "BETA SCREEN",
       creates: "FORTIFIED LANE",
       intelligence: "KNOWN",
+      counterCapabilities: ["CONTROL", "DENIAL"],
+      resistance: 7,
       counteredBy: ["FURNACE DRAGNET", "ASHEN CORDON"],
       impact: { reactorDelay: 15 },
       consequence: "Reactor thrust delayed +00:15",
@@ -486,6 +489,8 @@ const DEAD_CIRCUIT_ENEMY_PLAN = {
       uses: "FORTIFIED LANE",
       creates: "COUNTERFIRE",
       intelligence: "UNCERTAIN",
+      counterCapabilities: ["BREACH", "SHOCK"],
+      resistance: 8,
       counteredBy: ["EXECUTION BREACH", "THERMAL BREACH", "FORCED ENTRY", "FIELD REARM", "COVERED ADVANCE", "LOCKED BREACH"],
       impact: { missionDelay: 15 },
       consequence: "Extraction timetable delayed +00:15",
@@ -497,6 +502,8 @@ const DEAD_CIRCUIT_ENEMY_PLAN = {
       uses: "COUNTERFIRE",
       creates: "CUT OFF",
       intelligence: "UNKNOWN",
+      counterCapabilities: ["RECOVERY", "HOLD"],
+      resistance: 8,
       counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "LOCKSTEP HOLD"],
       impact: { recoveryLoss: 1 },
       consequence: "One formation cut off from extraction",
@@ -519,6 +526,8 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       label: "ASH VEIL",
       creates: "BLINDED CORRIDOR",
       intelligence: "KNOWN",
+      counterCapabilities: ["CONTROL", "COVER"],
+      resistance: 7,
       counteredBy: ["COVERED DRAG", "POWER WINCH", "FURNACE DRAGNET", "ASHEN CORDON", "MAGNETIC RELAY KEY", "VEIL FRACTURE", "FURNACE FEED"],
       impact: { reactorDelay: 15 },
       consequence: "Signal relay delayed +00:15",
@@ -530,6 +539,8 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       uses: "BLINDED CORRIDOR",
       creates: "RELAY LOCK",
       intelligence: "UNCERTAIN",
+      counterCapabilities: ["BREACH", "DENIAL"],
+      resistance: 8,
       counteredBy: ["THERMAL BREACH", "COVERED ADVANCE", "LOCKED BREACH", "WEDGE & WALL", "LOCKSTEP HOLD", "FURNACE FEED"],
       impact: { missionDelay: 15 },
       consequence: "Void Lift opening delayed +00:15",
@@ -541,6 +552,8 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       uses: "RELAY LOCK",
       creates: "LIFT SEALED",
       intelligence: "UNKNOWN",
+      counterCapabilities: ["RECOVERY", "HOLD"],
+      resistance: 8,
       counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "MOBILE RESUPPLY", "VOID LIFT BUBBLE"],
       impact: { recoveryLoss: 1 },
       consequence: "One formation sealed below the Void Lift",
@@ -891,6 +904,10 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs, condition,
     const label = score >= 95 ? "SYNCHRONIZED" : score >= 80 ? "READY" : score >= 65 ? "CAPABLE" : "STRAINED";
 
     return [role.id, {
+      formationId: formation.id,
+      formationName: formation.name,
+      refitName: formation.activeRefit.name,
+      capabilities: formation.capabilities,
       score,
       label,
       taskAligned,
@@ -933,24 +950,62 @@ const calculateRefitProtocols = (playbook, assignments, formations, operation) =
   }),
 );
 
-const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtocols = []) => {
+const calculateEnemyClashes = (operation, handoffs, activeProtocols = [], readiness = {}) => {
   const enemyPlan = enemyPlanFor(operation);
-  const counterActors = [...maneuvers, ...activeProtocols];
+  const staffedRoles = Object.values(readiness);
+  const actorWindows = [[0, 1], [2, 3], [4]];
+  const handoffWindows = [[0], [1, 2], [3]];
+  const resolutionForStage = (stage, stageIndex) => {
+    const actorIndices = actorWindows[stageIndex] ?? [];
+    const actors = actorIndices.map((index) => staffedRoles[index]).filter(Boolean);
+    const maneuver = (handoffWindows[stageIndex] ?? [])
+      .map((index) => handoffs[index]?.maneuver)
+      .find(Boolean) ?? null;
+    const protocol = activeProtocols.find((item) => actorIndices.includes(item.stopIndex)) ?? null;
+    return resolveTacticalEngagement({ actors, maneuver, protocol, enemyOrder: stage });
+  };
+  const starvedResolution = (stage, cause) => ({
+    outcome: "starved",
+    label: "STARVED",
+    impactScale: 0,
+    routeState: "starved",
+    verdict: cause,
+    playerScore: null,
+    enemyScore: stage.resistance,
+    margin: null,
+    factors: [],
+    matchedCapabilities: [],
+    missingCapabilities: stage.counterCapabilities,
+    actorIds: [],
+  });
   const baseClash = (stage, overrides = {}) => {
-    const counterManeuver = counterActors.find((maneuver) => stage.counteredBy.includes(maneuver.name));
+    const stageIndex = enemyPlan.stages.findIndex((item) => item.id === stage.id);
+    const resolution = resolutionForStage(stage, stageIndex);
+    const counterManeuver = resolution.counterActorName
+      ? [...handoffs.map((handoff) => handoff?.maneuver), ...activeProtocols].find((actor) => actor?.name === resolution.counterActorName)
+      : null;
     const formation = enemyPlan.formations.find((item) => item.id === stage.formationId);
-    const disrupted = Boolean(counterManeuver);
+    const disrupted = resolution.outcome === "decisive";
+    const resultText = resolution.outcome === "decisive"
+      ? `${counterManeuver?.name ?? "WARHOST PACKAGE"} BREAKS IT · ${resolution.playerScore} / ${resolution.enemyScore}`
+      : resolution.outcome === "checked"
+        ? `CHECKED · ${resolution.playerScore} / ${resolution.enemyScore} · CONSEQUENCE HALVED`
+        : resolution.outcome === "overrun"
+          ? `OVERRUN · ${resolution.playerScore} / ${resolution.enemyScore} · CONSEQUENCE MAGNIFIED`
+          : `LANDS · ${resolution.playerScore} / ${resolution.enemyScore} · ${stage.consequence}`;
     return {
       ...stage,
       actionAt: formation.actionAt,
       disrupted,
       counterManeuver,
-      appliesImpact: !disrupted,
-      routeState: disrupted ? "countered" : "passed",
-      resultText: disrupted ? `${counterManeuver.name} BREAKS IT` : `LANDS · ${stage.consequence}`,
+      appliesImpact: resolution.impactScale > 0,
+      impactScale: resolution.impactScale,
+      routeState: resolution.routeState,
+      resolution,
+      resultText,
       eventText: disrupted
-        ? `${counterManeuver.name} breaks the Helioch ${stage.label}.`
-        : `${stage.label} lands. ${stage.consequence}.`,
+        ? `${counterManeuver?.name ?? "The assigned Warhost formations"} breaks the Helioch ${stage.label}.`
+        : `${stage.label} ${resolution.outcome === "checked" ? "is checked but still alters the route" : "lands"}. ${resolution.verdict}`,
       ...overrides,
     };
   };
@@ -958,6 +1013,7 @@ const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtoco
   if (operation?.id !== "ashen-passage") return enemyPlan.stages.map((stage) => baseClash(stage));
 
   const [veilStage, wardStage, liftStage] = enemyPlan.stages;
+  const firstHandoff = handoffs[0];
   const firstWindowStaffed = Boolean(firstHandoff?.sourceId && firstHandoff?.receiverId);
   const firstWindowActors = [
     firstHandoff?.maneuver,
@@ -968,6 +1024,7 @@ const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtoco
     firstManeuverName: firstHandoff?.maneuver?.name ?? null,
     activeProtocolNames: firstWindowActors.filter((actor) => actor !== firstHandoff?.maneuver).map((actor) => actor.name),
     veilCounterNames: veilStage.counteredBy,
+    resolutionOutcome: resolutionForStage(veilStage, 0).outcome,
   });
   const collisionOutcome = resolvedCollision.outcome;
   const trapActor = firstWindowActors.find((actor) => actor.name === resolvedCollision.actorName);
@@ -1017,6 +1074,7 @@ const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtoco
       creates: "WARD STALLED",
       resultText: "STARVED · NO BLINDED CORRIDOR",
       eventText: "The Oath Ward stalls without a blinded corridor to exploit.",
+      resolution: starvedResolution(wardStage, "The upstream enemy condition never arrived."),
     });
     liftClash = baseClash(liftStage, {
       disrupted: true,
@@ -1027,6 +1085,7 @@ const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtoco
       creates: "LIFT OPEN",
       resultText: "STARVED · NO RELAY LOCK",
       eventText: "Lift Occupation never forms; the upstream enemy chain was broken.",
+      resolution: starvedResolution(liftStage, "The upstream enemy chain was broken."),
     });
   } else if (collisionOutcome === "diverted") {
     veilClash = baseClash(veilStage, {
@@ -1067,6 +1126,7 @@ const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtoco
       creates: "LIFT OPEN",
       resultText: "STARVED · ENEMY ROUTE LEFT THE LIFT",
       eventText: "Lift Occupation is abandoned while the enemy play converges on the Signal Furnace.",
+      resolution: starvedResolution(liftStage, "The opposing route abandoned this collision window."),
     });
   } else {
     veilClash = baseClash(veilStage, {
@@ -1089,6 +1149,7 @@ const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtoco
         creates: "LIFT OPEN",
         resultText: "STARVED · RELAY LOCK BROKEN",
         eventText: "Lift Occupation cannot form after the Oath Ward's relay lock is broken.",
+        resolution: starvedResolution(liftStage, "The required RELAY LOCK was broken upstream."),
       })
       : baseClash(liftStage);
   }
@@ -1110,8 +1171,8 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     protocolDelayReduction,
     delay: Math.max(0, baseReadinessSummary.delay - protocolDelayReduction),
   };
-  const enemyClashes = calculateEnemyClashes(maneuvers, operation, handoffs[0], activeProtocols);
-  const enemyTotal = (key) => enemyClashes.reduce((sum, clash) => sum + (clash.appliesImpact ? clash.impact[key] ?? 0 : 0), 0);
+  const enemyClashes = calculateEnemyClashes(operation, handoffs, activeProtocols, readiness);
+  const enemyTotal = (key) => Math.round(enemyClashes.reduce((sum, clash) => sum + (clash.appliesImpact ? (clash.impact[key] ?? 0) * (clash.impactScale ?? 1) : 0), 0));
   const breakpoints = breakpointsFor(operation);
   const breakpointImpacts = breakpointImpactsFor(operation);
   const branchEffects = breakpoints.map((breakpoint) => {
@@ -1134,7 +1195,7 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
   const overrun = Math.max(0, completeAt - BASE_OPERATION.completeAt);
   const reinforcementLoss = Math.ceil(overrun / 15);
   const protectedCount = total("protects") + protocolTotal("protects") + branchTotal("protects") + doctrine.impact.protects;
-  const enemyRecoveryLoss = enemyTotal("recoveryLoss");
+  const enemyRecoveryLoss = Math.ceil(enemyTotal("recoveryLoss"));
   const extractedCount = Math.max(3, Math.min(FORMATIONS.length, 3 + protectedCount) - reinforcementLoss - enemyRecoveryLoss);
 
   return {
@@ -2062,6 +2123,20 @@ function BattlePlaybackDirector({ beat, beats, index, playing, onToggle, onStep,
         </div>
         <b>{beat.title}</b>
         <p>{beat.detail}</p>
+        {beat.resolution && (
+          <div className={`playback-resolution outcome-${beat.resolution.outcome}`}>
+            {Number.isFinite(beat.resolution.playerScore) ? (
+              <>
+                <span><small>WARHOST</small><b>{beat.resolution.playerScore}</b></span>
+                <em>VS</em>
+                <span><small>ENEMY ORDER</small><b>{beat.resolution.enemyScore}</b></span>
+                <strong>{beat.resolution.label}</strong>
+              </>
+            ) : <strong>{beat.resolution.label} · UPSTREAM ORDER BROKEN</strong>}
+            <p>{beat.resolution.factors.filter((factor) => factor.score > 0).map((factor) => `${factor.label} +${factor.score}`).join(" · ") || beat.resolution.verdict}</p>
+            {beat.resolution.missingCapabilities.length > 0 && <small>MISSING ANSWER · {beat.resolution.missingCapabilities.join(" / ")}</small>}
+          </div>
+        )}
       </div>
       <div className="playback-transport" aria-label="Battle playback controls">
         <button className="playback-previous" onClick={() => onStep(-1)} disabled={atStart} aria-label="Previous battle beat"><ArrowRight weight="bold" /></button>
@@ -2125,6 +2200,13 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, clashes, prof
                     ? "OUTCOME UNREAD"
                     : clash.resultText}
                 </span>
+                {revealed && clash.resolution && (
+                  <span className={`enemy-resolution-summary outcome-${clash.resolution.outcome}`}>
+                    <b>{Number.isFinite(clash.resolution.playerScore) ? `WARHOST ${clash.resolution.playerScore} vs ORDER ${clash.resolution.enemyScore}` : "UPSTREAM CHAIN"}</b>
+                    <em>{clash.resolution.label}</em>
+                    <small>{clash.resolution.factors.filter((factor) => factor.score > 0).slice(0, 3).map((factor) => factor.label).join(" · ") || clash.resolution.verdict}</small>
+                  </span>
+                )}
               </div>
               {index < clashes.length - 1 && <ArrowRight className="enemy-chain-arrow" weight="bold" />}
             </Fragment>
@@ -2461,6 +2543,7 @@ function CompletionOverlay({ formations, hasNextOperation, operation, rescued, u
   const protocolResult = profile.protocols.length > 0
     ? `Active Ashen field protocols: ${profile.protocols.map((protocol) => protocol.name).join(", ")}.`
     : "No installed refit found an Ashen field interface.";
+  const engagementResult = `Engagements: ${profile.enemyClashes.map((clash) => `${clash.label} ${clash.resolution?.label ?? "UNRESOLVED"}${Number.isFinite(clash.resolution?.playerScore) ? ` ${clash.resolution.playerScore}-${clash.resolution.enemyScore}` : ""}`).join(", ")}.`;
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className={`decision-panel completion-panel ${won ? "victory" : "defeat"}`}>
@@ -2475,7 +2558,7 @@ function CompletionOverlay({ formations, hasNextOperation, operation, rescued, u
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
         </div>
-        <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+        <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{won && hasNextOperation ? "ENTER SALVAGE WORKSHOP" : "RETURN TO BATTLEFIELD"}</b><small>{won && hasNextOperation ? "Carry this detachment into the next operation." : "Inspect the completed operation state."}</small></span><ArrowRight /></button>
       </div>
     </div>

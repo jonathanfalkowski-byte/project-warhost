@@ -44,3 +44,21 @@ test("passes the Veil onward when no automatic reaction fires", () => {
     veilCounterNames,
   }), { outcome: "passed", actorName: null });
 });
+
+test("a named counter cannot trap the Veil when the assigned formations are overrun", () => {
+  assert.deepEqual(resolveAshenCollision({
+    firstWindowStaffed: true,
+    firstManeuverName: "FURNACE DRAGNET",
+    veilCounterNames,
+    resolutionOutcome: "overrun",
+  }), { outcome: "passed", actorName: null });
+});
+
+test("a checked formation pair can still spring the authored trap", () => {
+  assert.deepEqual(resolveAshenCollision({
+    firstWindowStaffed: true,
+    firstManeuverName: "FURNACE DRAGNET",
+    veilCounterNames,
+    resolutionOutcome: "checked",
+  }), { outcome: "trapped", actorName: "FURNACE DRAGNET" });
+});
