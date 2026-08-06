@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   applyCampaignConditions,
   applyWorkshopAction,
+  campaignOutcomeFor,
+  ensureCostlyContinuationConditions,
   mergeCampaignConditions,
   seriousConditionsFromConsequences,
 } from "../src/campaignPersistence.js";
@@ -82,4 +84,27 @@ test("invalid workshop actions are ignored and condition severity never improves
   );
   assert.equal(merged.alpha.state, "missing");
   assert.equal(merged.alpha.cause, "old");
+});
+
+test("a costly continuation always enters the next operation with a missing and damaged formation", () => {
+  const conditions = ensureCostlyContinuationConditions(
+    { beta: { state: "damaged", cause: "counterfire" }, unknown: { state: "missing" } },
+    ["alpha", "beta", "gamma"],
+  );
+  assert.equal(conditions.unknown, undefined);
+  assert.equal(conditions.beta.state, "missing");
+  assert.equal(conditions.gamma.state, "damaged");
+
+  const preserved = ensureCostlyContinuationConditions(
+    { alpha: { state: "missing" }, beta: { state: "damaged" } },
+    ["alpha", "beta", "gamma"],
+  );
+  assert.equal(preserved.alpha.state, "missing");
+  assert.equal(preserved.beta.state, "damaged");
+});
+
+test("campaign outcome distinguishes costly continuation from total defeat", () => {
+  assert.equal(campaignOutcomeFor({ hasNextOperation: true, extractedCount: 2 }), "continue");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: true, extractedCount: 1 }), "destroyed");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: false, extractedCount: 0 }), "terminal");
 });

@@ -11,6 +11,11 @@ const copyConditions = (conditions = {}) => Object.fromEntries(
     .map(([formationId, condition]) => [formationId, { ...condition, ...CAMPAIGN_STATES[condition.state] }]),
 );
 
+export const campaignOutcomeFor = ({ hasNextOperation = false, extractedCount = 0 } = {}) => {
+  if (!hasNextOperation) return "terminal";
+  return Number(extractedCount) >= 2 ? "continue" : "destroyed";
+};
+
 export const seriousConditionsFromConsequences = ({ clashes = [], battleTime = 0 } = {}) => {
   const consequences = battlefieldConsequencesAt({ clashes, battleTime });
   const conditions = {};
@@ -40,6 +45,38 @@ export const mergeCampaignConditions = (existing = {}, incoming = {}) => {
     if (!current || condition.severity >= current.severity) merged[formationId] = condition;
   });
   return merged;
+};
+
+export const ensureCostlyContinuationConditions = (conditions = {}, formationIds = []) => {
+  const validIds = [...new Set(formationIds.filter((formationId) => typeof formationId === "string" && formationId.length > 0))];
+  const validIdSet = new Set(validIds);
+  const nextConditions = copyConditions(Object.fromEntries(
+    Object.entries(conditions).filter(([formationId]) => validIdSet.has(formationId)),
+  ));
+  if (validIds.length === 0) return nextConditions;
+
+  if (!Object.values(nextConditions).some((condition) => condition.state === "missing")) {
+    const promotedId = [...validIds].reverse().find((formationId) => nextConditions[formationId]?.state === "damaged")
+      ?? validIds.at(-1);
+    nextConditions[promotedId] = {
+      state: "missing",
+      ...CAMPAIGN_STATES.missing,
+      cause: "COSTLY WITHDRAWAL",
+    };
+  }
+
+  if (!Object.values(nextConditions).some((condition) => condition.state === "damaged")) {
+    const damagedId = [...validIds].reverse().find((formationId) => nextConditions[formationId]?.state !== "missing");
+    if (damagedId) {
+      nextConditions[damagedId] = {
+        state: "damaged",
+        ...CAMPAIGN_STATES.damaged,
+        cause: "COSTLY WITHDRAWAL",
+      };
+    }
+  }
+
+  return nextConditions;
 };
 
 export const applyCampaignConditions = (formations = [], conditions = {}) => formations.map((formation) => {

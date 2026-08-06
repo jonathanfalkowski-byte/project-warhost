@@ -808,6 +808,11 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .completion-panel.defeat .victory-banner { border-color: #9b4b35; background: #36170f; color: #ff8c66; }
 .completion-panel.defeat .after-action-grid > div:nth-child(2) { border-color: #85412f; background: #24130e; }
 .completion-panel.defeat .after-action-grid > div:nth-child(2) svg { color: #ef7655; }
+.completion-panel.costly { border-color: #a96b37; }
+.completion-panel.costly .completion-icon, .completion-panel.costly .eyebrow { color: #f0a15f; }
+.completion-panel.costly .victory-banner { border-color: #a96b37; background: #32200f; color: #ffc071; font-size: 21px; }
+.completion-panel.costly .after-action-grid > div:nth-child(2) { border-color: #8d5b31; background: #24190f; }
+.completion-panel.costly .after-action-grid > div:nth-child(2) svg { color: #ef9f5b; }
 
 .workshop-panel { width: min(900px, 94vw); max-height: calc(100vh - 28px); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; border-color: #8b7447; background: #111512; }
 .workshop-heading { display: grid; grid-template-columns: minmax(0, 1fr) 170px; align-items: center; gap: 20px; }
