@@ -41,6 +41,7 @@ import {
   pointAlongRoute as pointAlongFieldRoute,
   positionAlongAuthoredRoute,
 } from "./fieldRoutes.js";
+import { PLAYBOOK_DOCTRINES, resolvePlaybookDoctrine } from "./playbookDoctrine.js";
 
 const FORMATIONS = [
   {
@@ -1095,9 +1096,10 @@ const calculateEnemyClashes = (maneuvers, operation, firstHandoff, activeProtoco
   return [veilClash, wardClash, liftClash];
 };
 
-const calculateOperationProfile = (handoffs, branchChoices, readiness, condition, operation, refitProtocols = {}) => {
+const calculateOperationProfile = (handoffs, branchChoices, readiness, condition, operation, refitProtocols = {}, playbook = PLAYBOOKS[0]) => {
   const maneuvers = handoffs.filter((handoff) => handoff.maneuver).map((handoff) => handoff.maneuver);
   const activeProtocols = Object.values(refitProtocols).filter((protocol) => protocol?.active);
+  const doctrine = resolvePlaybookDoctrine(playbook.id, handoffs);
   const baseReadinessSummary = summarizePlacementReadiness(readiness);
   const total = (key) => maneuvers.reduce((sum, maneuver) => sum + (maneuver.impact[key] ?? 0), 0);
   const protocolTotal = (key) => activeProtocols.reduce((sum, protocol) => sum + (protocol.impact[key] ?? 0), 0);
@@ -1121,17 +1123,17 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     };
   });
   const branchTotal = (key) => branchEffects.reduce((sum, branch) => sum + (branch.impact[key] ?? 0), 0);
-  const alphaAt = Math.max(30, BASE_OPERATION.alphaAt - total("alpha") - protocolTotal("alpha"));
-  const betaAt = Math.max(alphaAt + 45, BASE_OPERATION.betaAt - total("beta") - protocolTotal("beta"));
+  const alphaAt = Math.max(30, BASE_OPERATION.alphaAt - total("alpha") - protocolTotal("alpha") - doctrine.impact.alpha);
+  const betaAt = Math.max(alphaAt + 45, BASE_OPERATION.betaAt - total("beta") - protocolTotal("beta") - doctrine.impact.beta);
   const betaDecisionAt = Math.max(alphaAt + 15, betaAt - 45);
-  const reactorAt = Math.max(betaAt + 60, BASE_OPERATION.reactorAt - total("reactor") - protocolTotal("reactor") + branchTotal("reactorDelay") + enemyTotal("reactorDelay"));
+  const reactorAt = Math.max(betaAt + 60, BASE_OPERATION.reactorAt - total("reactor") - protocolTotal("reactor") - doctrine.impact.reactor + branchTotal("reactorDelay") + enemyTotal("reactorDelay"));
   const reactorExposeAt = Math.max(betaAt + 30, reactorAt - 45);
   const rescueDecisionAt = Math.max(betaAt + 30, Math.min(210, reactorExposeAt - 15));
-  const extractionAt = Math.max(reactorAt + 30, BASE_OPERATION.extractionAt - total("extraction") - protocolTotal("extraction")) + branchTotal("missionDelay") + enemyTotal("missionDelay") + readinessSummary.delay;
+  const extractionAt = Math.max(reactorAt + 30, BASE_OPERATION.extractionAt - total("extraction") - protocolTotal("extraction") - doctrine.impact.extraction) + branchTotal("missionDelay") + enemyTotal("missionDelay") + readinessSummary.delay + doctrine.impact.missionDelay;
   const completeAt = extractionAt + 15;
   const overrun = Math.max(0, completeAt - BASE_OPERATION.completeAt);
   const reinforcementLoss = Math.ceil(overrun / 15);
-  const protectedCount = total("protects") + protocolTotal("protects") + branchTotal("protects");
+  const protectedCount = total("protects") + protocolTotal("protects") + branchTotal("protects") + doctrine.impact.protects;
   const enemyRecoveryLoss = enemyTotal("recoveryLoss");
   const extractedCount = Math.max(3, Math.min(FORMATIONS.length, 3 + protectedCount) - reinforcementLoss - enemyRecoveryLoss);
 
@@ -1156,6 +1158,7 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     condition,
     effects: maneuvers,
     protocols: activeProtocols,
+    doctrine,
   };
 };
 
@@ -1359,6 +1362,7 @@ function FormationRoster({ formations, selected, onSelect, assignments, playbook
       <div className="playbook-list">
         {PLAYBOOKS.map((item) => {
           const Icon = item.icon;
+          const doctrine = PLAYBOOK_DOCTRINES[item.id];
           return (
             <button
               key={item.id}
@@ -1368,7 +1372,7 @@ function FormationRoster({ formations, selected, onSelect, assignments, playbook
               aria-pressed={playbook.id === item.id}
             >
               <Icon weight="duotone" />
-              <span><b>{item.name}</b><small>{item.summary}</small></span>
+              <span><b>{item.name}</b><small>{item.summary}</small><em>{doctrine.name}</em></span>
             </button>
           );
         })}
@@ -1781,12 +1785,14 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
+  const doctrine = profile.doctrine;
 
   if (phase === "battle" || phase === "complete") {
     return (
       <div className={`combo-panel panel-surface ${active ? "ready" : "broken"}`}>
         <span className="panel-label">{playbook.name}: {playbook.stages.map((stage) => stage.label).join(" → ")}</span>
         <p>{active ? playbook.intent : "One or more tactical roles are unresolved."}</p>
+        <div className={`doctrine-battle-readout ${doctrine.triggered ? "triggered" : "exposed"}`}><span>{doctrine.name}</span><b>{doctrine.result}</b></div>
         <div className="combo-steps">
           {playbook.stages.map((stage, index) => {
             const Icon = stage.icon;
@@ -1838,6 +1844,12 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
         <strong>{assignedCount} / {playbook.roles.length} PLACED</strong>
       </div>
       <p>Drag a visible formation from staging into a stop. Neighboring stops are checked in order for an automatic trigger → response combo.</p>
+      <div className={`playbook-doctrine ${doctrine.triggered ? "triggered" : "exposed"}`}>
+        <span>PLAYBOOK DOCTRINE · {doctrine.name}</span>
+        <b>{doctrine.strength}</b>
+        <small>EXPOSURE · {doctrine.exposure}</small>
+        <em>{doctrine.result}</em>
+      </div>
       <div className="route-terminals" aria-hidden="true"><span>FORMATION LANES</span><span>COMBO ORDER</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
@@ -2134,6 +2146,11 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planReady ? forecast : `${assignedCount} / 5 ASSIGNED`}</strong>
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
+        <div className={`doctrine-outlook ${profile.doctrine.triggered ? "triggered" : "exposed"}`}>
+          <span>TACTICAL DOCTRINE · {profile.doctrine.name}</span>
+          <b>{profile.doctrine.result}</b>
+          <small>{profile.doctrine.triggered ? "The selected playbook's advantage is active." : "The selected playbook's exposure remains active."}</small>
+        </div>
         {profile.readiness.staffedCount > 0 && (
           <div className={`readiness-impact ${profile.readiness.delay > 0 ? "penalty" : "aligned"}`}>
             <span>FORMATION READINESS</span>
@@ -2420,9 +2437,9 @@ function CompletionOverlay({ formations, hasNextOperation, operation, rescued, u
           <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>PLAN VS PLAN</span><b>{profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</b><Seal weight="duotone" /></div>
+          <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
         </div>
-        <p className="completion-note">Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+        <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{won && hasNextOperation ? "ENTER SALVAGE WORKSHOP" : "RETURN TO BATTLEFIELD"}</b><small>{won && hasNextOperation ? "Carry this detachment into the next operation." : "Inspect the completed operation state."}</small></span><ArrowRight /></button>
       </div>
     </div>
@@ -2504,8 +2521,8 @@ export function App() {
   const activeBranches = phase === "plan" || phase === "drill" ? branches : battleBranches;
 
   const operationProfile = useMemo(
-    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness, condition, operation, refitProtocols),
-    [activeBranches, condition, operation, placementReadiness, refitProtocols, tacticalHandoffs],
+    () => calculateOperationProfile(tacticalHandoffs, activeBranches, placementReadiness, condition, operation, refitProtocols, playbook),
+    [activeBranches, condition, operation, placementReadiness, playbook, refitProtocols, tacticalHandoffs],
   );
 
   const operationEvents = useMemo(
@@ -2641,8 +2658,8 @@ export function App() {
       const nextReadiness = calculatePlacementReadiness(playbook, assignments, nextSequence.handoffs, condition, nextFormations);
       const previousProtocols = calculateRefitProtocols(playbook, assignments, formations, operation);
       const nextProtocols = calculateRefitProtocols(playbook, assignments, nextFormations, operation);
-      const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation, previousProtocols);
-      const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation, nextProtocols);
+      const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation, previousProtocols, playbook);
+      const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation, nextProtocols, playbook);
       const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
       const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
       const previousWindow = previousProfile.timeSaved - previousProfile.overrun;
@@ -2695,8 +2712,8 @@ export function App() {
     const nextReadiness = calculatePlacementReadiness(playbook, nextAssignments, nextSequence.handoffs, condition, formations);
     const previousProtocols = calculateRefitProtocols(playbook, assignments, formations, operation);
     const nextProtocols = calculateRefitProtocols(playbook, nextAssignments, formations, operation);
-    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation, previousProtocols);
-    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation, nextProtocols);
+    const previousProfile = calculateOperationProfile(previousSequence.handoffs, activeBranches, previousReadiness, condition, operation, previousProtocols, playbook);
+    const nextProfile = calculateOperationProfile(nextSequence.handoffs, activeBranches, nextReadiness, condition, operation, nextProtocols, playbook);
     const previousLinks = previousSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const nextLinks = nextSequence.handoffs.filter((handoff) => handoff.maneuver).length;
     const targetIndex = playbook.roles.findIndex((role) => role.id === targetRole.id);

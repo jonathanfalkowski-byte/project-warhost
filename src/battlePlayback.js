@@ -1,11 +1,12 @@
 const BEAT_PRIORITY = {
   brief: 0,
-  "enemy-intent": 1,
-  contact: 2,
-  response: 3,
-  result: 4,
-  mission: 5,
-  complete: 6,
+  doctrine: 1,
+  "enemy-intent": 2,
+  contact: 3,
+  response: 4,
+  result: 5,
+  mission: 6,
+  complete: 7,
 };
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -44,6 +45,18 @@ export const buildBattlePlayback = ({
     title: `${operation.shortName}: both commands are in motion.`,
     detail: "No direct orders remain. Watch the authored routes meet, react, and change.",
   });
+
+  if (profile.doctrine) {
+    addBeat({
+      id: "playbook-doctrine",
+      at: 5,
+      kind: "doctrine",
+      eyebrow: "TACTICAL DOCTRINE ACTIVE",
+      title: profile.doctrine.name,
+      detail: profile.doctrine.result,
+      routeState: profile.doctrine.triggered ? "doctrine-active" : "doctrine-exposed",
+    });
+  }
 
   const enemyEventTexts = new Set(profile.enemyClashes.map((clash) => clash.eventText));
   events

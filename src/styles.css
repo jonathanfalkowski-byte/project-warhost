@@ -113,8 +113,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playbook-row span { display: grid; }
 .playbook-row b { font-family: "Barlow Condensed"; letter-spacing: .08em; font-size: 13px; }
 .playbook-row small { color: #7d8581; font-size: 10px; line-height: 1.2; }
+.playbook-row em { margin-top: 2px; color: #8f8060; font-family: "Barlow Condensed"; font-size: 8px; font-style: normal; letter-spacing: .1em; }
 .playbook-row.selected { border-color: var(--blue); background: #102331; box-shadow: inset 3px 0 #1688bd; }
 .playbook-row.selected > svg, .playbook-row.selected b { color: #59c2f4; }
+.playbook-row.selected em { color: #d0b06b; }
 .playbook-row:disabled { cursor: default; }
 .doctrine-list { padding: 6px; display: grid; gap: 4px; }
 .doctrine-row { width: 100%; min-height: 54px; padding: 8px 10px; display: grid; grid-template-columns: 32px 1fr; align-items: center; gap: 8px; border: 1px solid #313a36; background: #111615; text-align: left; cursor: pointer; }
@@ -341,6 +343,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 
 .battle-playback-director { --playback-accent: #65c9f3; position: absolute; z-index: 30; inset: 0; pointer-events: none; font-family: "Barlow Condensed", sans-serif; }
 .battle-playback-director.enemy-intent { --playback-accent: #f08a52; }
+.battle-playback-director.doctrine { --playback-accent: #d2ad61; }
 .battle-playback-director.contact { --playback-accent: #f2bf5f; }
 .battle-playback-director.result.route-trapped,
 .battle-playback-director.result.route-countered,
@@ -369,6 +372,11 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playback-timeline button.result { background-color: #7f5237; }
 .playback-timeline button.current { height: 9px; background: var(--playback-accent); box-shadow: 0 0 12px var(--playback-accent); }
 .combo-panel { position: absolute; z-index: 10; left: 3%; top: 39%; width: 265px; padding: 10px; }
+.doctrine-battle-readout { margin: 7px 0; display: grid; gap: 2px; padding: 5px 6px; border-left: 3px solid #b38146; background: #1d1810; font-family: "Barlow Condensed"; }
+.doctrine-battle-readout span { color: #cba45f; font-size: 8px; letter-spacing: .09em; }
+.doctrine-battle-readout b { color: #d3c49d; font-size: 9px; font-weight: 500; }
+.doctrine-battle-readout.triggered { border-color: #73a255; background: #152017; }
+.doctrine-battle-readout.triggered span, .doctrine-battle-readout.triggered b { color: #9bd079; }
 .playbook-board { position: absolute; z-index: 15; left: 3%; top: 24%; width: min(860px, 90%); padding: 11px 13px; background: rgba(8, 14, 14, .96); border-color: #3b6879; box-shadow: 0 14px 32px rgba(0, 0, 0, .48); }
 .playbook-board.incomplete { box-shadow: inset 0 0 0 1px rgba(41, 169, 232, .1), 0 14px 32px rgba(0, 0, 0, .48); }
 .playbook-board.ready { border-color: #5b8b53; }
@@ -378,6 +386,13 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playbook-board-heading > strong { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; color: #62c8f3; }
 .playbook-board.ready .playbook-board-heading > strong { color: #8bcf68; }
 .playbook-board > p { margin: 5px 0 11px; color: #a6b0ac; font-size: 11px; }
+.playbook-doctrine { margin: -4px 0 8px; display: grid; grid-template-columns: 145px minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 3px 10px; padding: 6px 8px; border: 1px solid #6b5d3e; background: linear-gradient(90deg, #1c1911, #101616); font-family: "Barlow Condensed"; }
+.playbook-doctrine > span { grid-row: 1 / 3; color: #d0ad63; font-size: 9px; font-weight: 700; letter-spacing: .09em; }
+.playbook-doctrine > b { color: #c6d2cc; font-size: 9px; font-weight: 500; line-height: 1.25; }
+.playbook-doctrine > small { color: #a88c77; font-size: 8px; line-height: 1.25; }
+.playbook-doctrine > em { grid-column: 2 / 4; color: #d9c689; font-size: 8px; font-style: normal; letter-spacing: .06em; }
+.playbook-doctrine.triggered { border-color: #698f53; background: linear-gradient(90deg, #172318, #101716); }
+.playbook-doctrine.triggered > span, .playbook-doctrine.triggered > em { color: #9bcf78; }
 .route-terminals { margin: 0 2px 4px; display: flex; justify-content: space-between; color: #5d7f8d; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .12em; }
 .playbook-route { display: grid; grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr); align-items: stretch; }
 .route-leg { position: relative; display: grid; place-items: center; color: #4b7486; }
@@ -529,6 +544,12 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .condition-effect > span b { color: #eca663; font-size: 10px; }
 .prototype-note { color: #66736e; font-family: "Barlow Condensed"; font-size: 7px; line-height: 1.2; letter-spacing: .06em; }
 .readiness-impact { margin-top: 9px; display: grid; gap: 2px; padding: 7px; border-left: 3px solid #61954b; background: #142018; font-family: "Barlow Condensed"; }
+.doctrine-outlook { margin-top: 8px; display: grid; gap: 2px; padding: 7px; border-left: 3px solid #b17b45; background: #21170f; font-family: "Barlow Condensed"; }
+.doctrine-outlook > span { color: #c99a5f; font-size: 8px; letter-spacing: .09em; }
+.doctrine-outlook > b { color: #e0c58e; font-size: 10px; letter-spacing: .03em; }
+.doctrine-outlook > small { color: #987d68; font-size: 7px; line-height: 1.25; }
+.doctrine-outlook.triggered { border-color: #6c9d53; background: #142018; }
+.doctrine-outlook.triggered > span, .doctrine-outlook.triggered > b { color: #9ed17d; }
 .readiness-impact > span { color: #75936b; font-size: 8px; letter-spacing: .1em; }
 .readiness-impact > b { color: #9fd17f; font-size: 12px; letter-spacing: .04em; }
 .readiness-impact > small { color: #788979; font-size: 7px; line-height: 1.25; letter-spacing: .03em; }
