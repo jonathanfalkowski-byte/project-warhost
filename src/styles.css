@@ -341,6 +341,32 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .map-formation.playback-focused { z-index: 14; opacity: 1; filter: none; transform: translate(-50%, -50%) scale(1.16); animation: playbackPlayerPulse .85s ease-in-out infinite alternate; }
 .map-formation.playback-focused .formation-image { border: 3px solid #69d2ff; box-shadow: 0 0 28px rgba(49, 184, 239, .9), 0 10px 18px rgba(0,0,0,.8); }
 
+.enemy-plan-layer.doctrine-player-play .enemy-plan-segment,
+.enemy-plan-layer.doctrine-player-play .enemy-plan-stop,
+.enemy-plan-layer.doctrine-player-play .enemy-plan-formation,
+.enemy-plan-layer.doctrine-field-change .enemy-plan-segment,
+.enemy-plan-layer.doctrine-field-change .enemy-plan-stop,
+.enemy-plan-layer.doctrine-field-change .enemy-plan-formation { opacity: .025 !important; filter: grayscale(1); }
+.enemy-plan-layer.doctrine-player-play .reinforcement-route,
+.enemy-plan-layer.doctrine-player-play .reinforcement-intercept,
+.enemy-plan-layer.doctrine-player-play .reinforcement-wave,
+.enemy-plan-layer.doctrine-field-change .reinforcement-route,
+.enemy-plan-layer.doctrine-field-change .reinforcement-intercept,
+.enemy-plan-layer.doctrine-field-change .reinforcement-wave { opacity: .02 !important; }
+.field-plan-layer.executing .field-plan-segment.playback-focused { animation: playerDoctrineRoute 1.05s ease-out both; }
+.enemy-plan-segment.doctrine-counter-reveal { animation: enemyCounterRoute .85s ease-out both; }
+.enemy-plan-stop.doctrine-counter-reveal,
+.enemy-plan-formation.doctrine-counter-reveal { animation: enemyCounterArrival .7s .35s ease-out both; }
+
+.doctrine-collision-overlay { --collision-accent: #66cef6; position: absolute; z-index: 19; min-width: 118px; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; padding: 7px 10px; border: 1px solid var(--collision-accent); background: rgba(5, 14, 17, .95); color: var(--collision-accent); box-shadow: 0 0 24px color-mix(in srgb, var(--collision-accent) 42%, transparent), 0 8px 18px rgba(0,0,0,.7); font-family: "Barlow Condensed", sans-serif; pointer-events: none; animation: doctrineCollisionReveal .45s ease-out; }
+.doctrine-collision-overlay span { font-size: 8px; font-weight: 700; letter-spacing: .14em; }
+.doctrine-collision-overlay b { color: #eef4f1; font-size: 12px; letter-spacing: .08em; }
+.doctrine-collision-overlay svg { position: absolute; right: -17px; top: 50%; width: 29px; height: 29px; padding: 5px; transform: translateY(-50%); border: 2px solid currentColor; border-radius: 50%; background: #2b130c; color: #f1814c; box-shadow: 0 0 18px rgba(240, 103, 54, .72); }
+.doctrine-collision-overlay.enemy-counter { --collision-accent: #f1814c; }
+.doctrine-collision-overlay.outcome.doctrine-active { --collision-accent: #9cdb72; background: rgba(12, 30, 17, .96); }
+.doctrine-collision-overlay.outcome.doctrine-exposed { --collision-accent: #ef7650; background: rgba(37, 15, 10, .96); }
+.doctrine-collision-overlay.outcome svg { color: var(--collision-accent); }
+
 .battle-playback-director { --playback-accent: #65c9f3; position: absolute; z-index: 30; inset: 0; pointer-events: none; font-family: "Barlow Condensed", sans-serif; }
 .battle-playback-director.enemy-intent { --playback-accent: #f08a52; }
 .battle-playback-director.doctrine { --playback-accent: #d2ad61; }
@@ -771,6 +797,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 @keyframes playbackCollisionPulse { from { filter: drop-shadow(0 0 5px currentColor); } to { filter: drop-shadow(0 0 18px currentColor); } }
 @keyframes playbackPlayerPulse { from { filter: brightness(.9); } to { filter: brightness(1.22); } }
 @keyframes playerRouteArrow { from { filter: drop-shadow(0 0 2px currentColor); transform: scale(.88); } to { filter: drop-shadow(0 0 9px currentColor); transform: scale(1.18); } }
+@keyframes playerDoctrineRoute { from { clip-path: inset(0 100% 0 0); filter: brightness(.8); } to { clip-path: inset(0); filter: brightness(1.25); } }
+@keyframes enemyCounterRoute { from { clip-path: inset(0 100% 0 0); opacity: 0; } to { clip-path: inset(0); opacity: 1; } }
+@keyframes enemyCounterArrival { from { opacity: 0; filter: brightness(.6); } to { opacity: 1; filter: brightness(1); } }
+@keyframes doctrineCollisionReveal { from { opacity: 0; transform: translate(-50%, -50%) scale(.72); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; } }
 @media (max-width: 1260px) {
   .warhost-app { min-width: 980px; }

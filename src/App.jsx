@@ -1656,14 +1656,20 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
     return [formation.start, formation.end];
   };
 
+  const focusedEnemyIndices = playbackBeat?.enemyFormationIndices?.length
+    ? playbackBeat.enemyFormationIndices
+    : Number.isInteger(playbackBeat?.enemyFormationIndex) ? [playbackBeat.enemyFormationIndex] : [];
+  const doctrinePhase = playbackBeat?.doctrinePhase ?? "none";
+
   return (
-    <div className="enemy-plan-layer" ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
+    <div className={`enemy-plan-layer doctrine-${doctrinePhase}`} ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
       {enemyPlan.formations.map((formation, index) => {
         const clash = clashes[index];
         const inBattle = phase === "battle" || phase === "complete";
-        const playbackHasEnemyFocus = Number.isInteger(playbackBeat?.enemyFormationIndex);
-        const playbackFocused = playbackBeat?.enemyFormationIndex === index;
+        const playbackHasEnemyFocus = focusedEnemyIndices.length > 0;
+        const playbackFocused = focusedEnemyIndices.includes(index);
         const playbackClass = playbackHasEnemyFocus ? playbackFocused ? "playback-focused" : "playback-muted" : "";
+        const counterRevealClass = playbackFocused && (doctrinePhase === "enemy-counter" || doctrinePhase === "outcome") ? "doctrine-counter-reveal" : "";
         const progress = inBattle ? Math.min(1, battleTime / formation.actionAt) : 0;
         const route = routeForClash(formation, clash, index);
         const position = pointAlongFieldRoute(route, progress);
@@ -1672,14 +1678,14 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
         return (
           <Fragment key={formation.id}>
             {route.slice(0, -1).map((start, segmentIndex) => (
-              <div className={`enemy-plan-segment enemy-lane-${index + 1} ${clash.routeState} ${playbackClass}`} style={fieldSegmentStyle(start, route[segmentIndex + 1], layerSize)} key={`${formation.id}-segment-${segmentIndex}`}>
+              <div className={`enemy-plan-segment enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={fieldSegmentStyle(start, route[segmentIndex + 1], layerSize)} key={`${formation.id}-segment-${segmentIndex}`}>
                 <ArrowRight weight="bold" />
               </div>
             ))}
-            <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${playbackClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
+            <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
               <b>{formation.number}</b><span>{clash.label}</span>
             </div>
-            <div className={`enemy-plan-formation ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass}`} style={{ left: `${position.x}%`, top: `${position.y}%` }}>
+            <div className={`enemy-plan-formation ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass} ${counterRevealClass}`} style={{ left: `${position.x}%`, top: `${position.y}%` }}>
               <img src="/assets/helioch-sentinels.png" alt={`${formation.name} executing ${clash.label}`} />
               <span>{formation.number}</span>
               <small>{resolved ? clash.routeState === "starved" ? "CHAIN STARVED" : clash.routeState === "diverted" || clash.routeState === "redirected" ? "REROUTED" : clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
@@ -1705,6 +1711,35 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
         <span>{reinforcementWave.number}</span>
         <small>{waveArrived ? reinforcementWave.order : `WAVE · T+${fmtDuration(reinforcementWave.arrivalAt)}`}</small>
       </div>
+    </div>
+  );
+}
+
+function DoctrineCollisionOverlay({ beat, operation, playbook }) {
+  if (!beat?.doctrinePhase) return null;
+  const operationField = operationFieldFor(operation);
+  const positions = operationField.plans[playbook.id]?.positions ?? [];
+  const midpoint = (left, right) => ({
+    x: ((left?.x ?? 50) + (right?.x ?? 50)) / 2,
+    y: ((left?.y ?? 50) + (right?.y ?? 50)) / 2,
+  });
+  const point = playbook.id === "spear"
+    ? operationField.landmarks.reactor
+    : playbook.id === "pressure"
+      ? midpoint(operationField.landmarks.alpha, operationField.landmarks.beta)
+      : midpoint(positions[0], positions[1]);
+  const phaseLabels = {
+    "player-play": "YOUR PLAY",
+    "field-change": "FIELD CHANGES",
+    "enemy-counter": "ENEMY COUNTER-LINES",
+    outcome: "COLLISION RESOLVED",
+  };
+
+  return (
+    <div className={`doctrine-collision-overlay ${playbook.id} ${beat.doctrinePhase} ${beat.routeState ?? ""}`} style={{ left: `${point.x}%`, top: `${point.y}%` }} aria-hidden="true">
+      <span>{phaseLabels[beat.doctrinePhase]}</span>
+      <b>{playbook.id === "trapline" ? "KILL BOX" : playbook.id === "spear" ? "THRUST / REAR" : "TWO AXES"}</b>
+      {(beat.doctrinePhase === "enemy-counter" || beat.doctrinePhase === "outcome") && <Crosshair weight="duotone" />}
     </div>
   );
 }
@@ -1939,12 +1974,13 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
   const roleActionTimes = [profile.alphaAt, profile.betaAt, profile.reactorExposeAt, profile.reactorAt, profile.extractionAt];
 
   return (
-    <section className={`battlefield phase-${phase} operation-${operation.id} ${playbackActive ? "playback-active" : ""}`} aria-label={`${operation.name} mission map`}>
+    <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""}`} aria-label={`${operation.name} mission map`}>
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} />
       <TacticalFieldPlan assignments={assignments} branches={branches} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
+      <DoctrineCollisionOverlay beat={playbackBeat} operation={operation} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
       <ObjectiveMarker className="alpha-objective" number="1" title={operation.controlTitles[0]} description={alphaState === "secured" ? "SECURED · western route open" : "Seize and hold"} state={alphaState} />
@@ -2532,13 +2568,14 @@ export function App() {
   const playbackBeats = useMemo(
     () => buildBattlePlayback({
       operation,
+      playbookId: playbook.id,
       profile: operationProfile,
       handoffs: tacticalHandoffs,
       formations,
       events: operationEvents,
       comboTimes: comboWindowTimes(operationProfile),
     }),
-    [formations, operation, operationEvents, operationProfile, tacticalHandoffs],
+    [formations, operation, operationEvents, operationProfile, playbook.id, tacticalHandoffs],
   );
   const currentPlaybackBeat = playbackBeats[Math.min(playbackIndex, playbackBeats.length - 1)] ?? null;
   const operationWon = operationProfile.extractedCount >= operation.requiredExtraction;

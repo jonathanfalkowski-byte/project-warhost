@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildBattlePlayback,
+  buildDoctrineSignatureBeats,
   playbackIndexAfterStep,
   playbackTimeForIndex,
 } from "../src/battlePlayback.js";
@@ -62,4 +63,47 @@ test("playback stepping and time lookup stay inside the authored sequence", () =
   assert.equal(playbackIndexAfterStep(beats.length - 1, 1, beats.length), beats.length - 1);
   assert.equal(playbackTimeForIndex(beats, 999), 120);
   assert.equal(playbackTimeForIndex([], 2), 0);
+});
+
+const doctrineFixture = (playbookId, triggered = true) => ({
+  playbookId,
+  profile: { doctrine: { triggered, result: triggered ? "ADVANTAGE ACTIVE" : "EXPOSURE ACTIVE" } },
+  handoffs: [
+    { sourceId: "third", receiverId: "first" },
+    { sourceId: "first", receiverId: "fourth" },
+    { sourceId: "fourth", receiverId: "second" },
+  ],
+  formations: [
+    { id: "first", name: "FIRST" },
+    { id: "second", name: "SECOND" },
+    { id: "third", name: "THIRD" },
+    { id: "fourth", name: "FOURTH" },
+  ],
+});
+
+test("each doctrine shows player play, field change, enemy counter, then outcome", () => {
+  for (const playbookId of ["trapline", "spear", "pressure"]) {
+    const beats = buildDoctrineSignatureBeats(doctrineFixture(playbookId));
+    assert.deepEqual(beats.map((beat) => beat.doctrinePhase), ["player-play", "field-change", "enemy-counter", "outcome"]);
+    assert.deepEqual(beats.map((beat) => beat.at), [5, 10, 15, 20]);
+    assert.equal(beats[0].enemyFormationIndices, undefined);
+    assert.ok(beats[2].enemyFormationIndices.length >= 1);
+  }
+});
+
+test("doctrine signatures preserve staffed slot order and expose different enemy responses", () => {
+  const trapline = buildDoctrineSignatureBeats(doctrineFixture("trapline"));
+  const spear = buildDoctrineSignatureBeats(doctrineFixture("spear"));
+  const pressure = buildDoctrineSignatureBeats(doctrineFixture("pressure", false));
+
+  assert.deepEqual(trapline[0].playerFormationIds, ["third", "first"]);
+  assert.deepEqual(spear[2].enemyFormationIndices, [0, 1]);
+  assert.match(spear[3].title, /rear guard/i);
+  assert.match(pressure[3].title, /fail to regroup/i);
+  assert.notEqual(trapline[2].title, pressure[2].title);
+});
+
+test("unknown doctrines do not invent a signature sequence", () => {
+  assert.deepEqual(buildDoctrineSignatureBeats(doctrineFixture("unknown")), []);
+  assert.deepEqual(buildDoctrineSignatureBeats({ playbookId: "trapline", profile: null }), []);
 });
