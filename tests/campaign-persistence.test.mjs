@@ -104,7 +104,8 @@ test("a costly continuation always enters the next operation with a missing and 
 });
 
 test("campaign outcome distinguishes costly continuation from total defeat", () => {
-  assert.equal(campaignOutcomeFor({ hasNextOperation: true, extractedCount: 2 }), "continue");
-  assert.equal(campaignOutcomeFor({ hasNextOperation: true, extractedCount: 1 }), "destroyed");
-  assert.equal(campaignOutcomeFor({ hasNextOperation: false, extractedCount: 0 }), "terminal");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: true, operationWon: false }), "continue");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: true, operationWon: true }), "continue");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: false, operationWon: false }), "destroyed");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: false, operationWon: true }), "terminal");
 });

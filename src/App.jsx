@@ -2645,6 +2645,11 @@ function CompletionOverlay({ formations, canContinue, campaignDestroyed, operati
   const actionDetail = canContinue
     ? won ? "Carry this detachment into the next operation." : "Withdraw, accept persistent losses, and continue the campaign."
     : campaignDestroyed ? "The surviving force cannot continue to the next operation." : "Inspect the completed operation state.";
+  const operationResult = won
+    ? `${operation.primaryResult} and ${profile.extractedCount} formations escaped.`
+    : canContinue
+      ? `${operation.primaryResult}, but only ${profile.extractedCount} formations cleared the timed extraction. Scattered survivors regrouped for a costly withdrawal.`
+      : `${operation.primaryResult}, but only ${profile.extractedCount} formations escaped before the detachment collapsed.`;
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className={`decision-panel completion-panel ${won ? "victory" : campaignDestroyed ? "defeat" : canContinue ? "costly" : "defeat"}`}>
@@ -2652,7 +2657,7 @@ function CompletionOverlay({ formations, canContinue, campaignDestroyed, operati
         <p className="eyebrow">{outcomeLabel}</p>
         <div className="victory-banner">{outcomeBanner}</div>
         <h2 id="complete-title">{outcomeTitle}</h2>
-        <p>{operation.primaryResult} and {profile.extractedCount} formations escaped. Victory required the primary objective plus at least {operation.requiredExtraction} extracted formations.</p>
+        <p>{operationResult} Victory required the primary objective plus at least {operation.requiredExtraction} extracted formations.</p>
         <div className="after-action-grid">
           <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
@@ -2777,7 +2782,7 @@ export function App() {
   const currentPlaybackBeat = playbackBeats[Math.min(playbackIndex, playbackBeats.length - 1)] ?? null;
   const operationWon = operationProfile.extractedCount >= operation.requiredExtraction;
   const hasNextOperation = operationIndex < OPERATIONS.length - 1;
-  const campaignOutcome = campaignOutcomeFor({ hasNextOperation, extractedCount: operationProfile.extractedCount });
+  const campaignOutcome = campaignOutcomeFor({ hasNextOperation, operationWon });
   const campaignDestroyed = campaignOutcome === "destroyed";
   const canContinueCampaign = campaignOutcome === "continue";
 

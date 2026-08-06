@@ -11,9 +11,9 @@ const copyConditions = (conditions = {}) => Object.fromEntries(
     .map(([formationId, condition]) => [formationId, { ...condition, ...CAMPAIGN_STATES[condition.state] }]),
 );
 
-export const campaignOutcomeFor = ({ hasNextOperation = false, extractedCount = 0 } = {}) => {
-  if (!hasNextOperation) return "terminal";
-  return Number(extractedCount) >= 2 ? "continue" : "destroyed";
+export const campaignOutcomeFor = ({ hasNextOperation = false, operationWon = false } = {}) => {
+  if (hasNextOperation) return "continue";
+  return operationWon ? "terminal" : "destroyed";
 };
 
 export const seriousConditionsFromConsequences = ({ clashes = [], battleTime = 0 } = {}) => {
