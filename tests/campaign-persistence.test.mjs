@@ -5,6 +5,7 @@ import {
   applyWorkshopAction,
   campaignOutcomeFor,
   ensureCostlyContinuationConditions,
+  formationFatesFor,
   integrityLossFor,
   mergeCampaignConditions,
   seriousConditionsFromConsequences,
@@ -119,4 +120,35 @@ test("integrity loss distinguishes victory, defeat, rout, and annihilation", () 
   assert.equal(integrityLossFor({ operationWon: false, extractedCount: 0 }), 3);
   assert.equal(integrityLossFor({ operationWon: false, extractedCount: -5 }), 3);
   assert.equal(integrityLossFor({ operationWon: false, extractedCount: "invalid" }), 3);
+});
+
+test("formation fates follow staffed slot order and distinguish force collapse from unit loss", () => {
+  const formations = [
+    { id: "alpha", name: "ALPHA" },
+    { id: "beta", name: "BETA" },
+    { id: "gamma", name: "GAMMA" },
+  ];
+  const consequences = {
+    alpha: { state: "cut-off", severity: 5, cause: "OATH PURSUIT" },
+    beta: { state: "damaged", severity: 4, cause: "BETA SCREEN" },
+  };
+  const partial = formationFatesFor({
+    formations,
+    formationOrderIds: ["beta", "gamma", "alpha"],
+    extractedCount: 2,
+    consequences,
+  });
+  assert.deepEqual(partial.map(({ formation }) => formation.id), ["beta", "gamma", "alpha"]);
+  assert.deepEqual(partial.map(({ fate }) => fate), ["damaged", "extracted", "missing"]);
+
+  const collapsed = formationFatesFor({
+    formations,
+    formationOrderIds: ["beta", "gamma", "alpha"],
+    extractedCount: 0,
+    consequences,
+    campaignDestroyed: true,
+  });
+  assert.equal(collapsed.filter(({ fate }) => fate === "destroyed").length, 1);
+  assert.equal(collapsed.find(({ fate }) => fate === "destroyed").formation.id, "alpha");
+  assert.equal(collapsed.filter(({ fate }) => fate === "missing").length, 2);
 });

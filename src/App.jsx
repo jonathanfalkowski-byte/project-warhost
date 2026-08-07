@@ -37,6 +37,7 @@ import {
   applyWorkshopAction,
   campaignOutcomeFor,
   ensureCostlyContinuationConditions,
+  formationFatesFor,
   integrityLossFor,
   mergeCampaignConditions,
   seriousConditionsFromConsequences,
@@ -2632,7 +2633,7 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
   );
 }
 
-function CompletionOverlay({ formations, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
+function CompletionOverlay({ formations, assignments, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
   const lostCount = formations.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
@@ -2652,12 +2653,19 @@ function CompletionOverlay({ formations, canContinue, campaignDestroyed, integri
   const fieldStateResult = finalConsequences.active.length > 0
     ? `Final field states: ${finalConsequences.active.map((consequence) => `${formations.find((formation) => formation.id === consequence.formationId)?.name ?? consequence.formationId} ${consequence.label}`).join(", ")}.`
     : "No formation carried a battlefield consequence into extraction.";
+  const formationFates = formationFatesFor({
+    formations,
+    formationOrderIds: playbook.roles.map((role) => assignments[role.id]).filter(Boolean),
+    extractedCount: profile.extractedCount,
+    consequences: finalConsequences.player,
+    campaignDestroyed,
+  });
   const outcomeLabel = won ? "OPERATION SUCCESS" : campaignDestroyed ? "CAMPAIGN DEFEAT" : canContinue ? "COSTLY CONTINUATION" : "OPERATION FAILED";
-  const outcomeBanner = won ? "VICTORY" : campaignDestroyed ? "DETACHMENT DESTROYED" : canContinue ? "WITHDRAWAL" : "DEFEAT";
+  const outcomeBanner = won ? "VICTORY" : campaignDestroyed ? "WARHOST BROKEN" : canContinue ? "WITHDRAWAL" : "DEFEAT";
   const outcomeTitle = won
     ? `${operation.shortName} is secured.`
     : campaignDestroyed
-      ? `${operation.shortName} destroyed the Warhost.`
+      ? "Warhost Integrity is exhausted."
       : canContinue
         ? `${operation.shortName} was lost—but the campaign continues.`
         : `${operation.shortName} was lost.`;
@@ -2669,7 +2677,7 @@ function CompletionOverlay({ formations, canContinue, campaignDestroyed, integri
     ? `${operation.primaryResult} and ${profile.extractedCount} formations escaped.`
     : canContinue
       ? `${operation.primaryResult}, but only ${profile.extractedCount} formations cleared the timed extraction. Scattered survivors regrouped for a costly withdrawal.`
-      : `${operation.primaryResult}, but only ${profile.extractedCount} formations escaped before the detachment collapsed.`;
+      : `${operation.primaryResult}, but only ${profile.extractedCount} formations escaped before the Warhost lost the ability to continue.`;
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
       <div className={`decision-panel completion-panel ${won ? "victory" : campaignDestroyed ? "defeat" : canContinue ? "costly" : "defeat"}`}>
@@ -2685,6 +2693,19 @@ function CompletionOverlay({ formations, canContinue, campaignDestroyed, integri
           <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
+        <section className="formation-fate-ledger" aria-label="Formation fates">
+          <header><span>FORMATION FATES · TACTICAL SLOT ORDER</span><small>{campaignDestroyed ? "The campaign is over; surviving formations cannot continue as a Warhost." : "Named outcomes at operation end."}</small></header>
+          <div className="formation-fate-list">
+            {formationFates.map(({ formation, fate, label, detail }, index) => (
+              <div className={`formation-fate ${fate}`} key={formation.id}>
+                <span className="formation-fate-slot">{String(index + 1).padStart(2, "0")}</span>
+                <img src={formation.asset} alt="" />
+                <span className="formation-fate-copy"><b>{formation.name}</b><small>{detail}</small></span>
+                <strong>{label}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
         <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {fieldStateResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{actionLabel}</b><small>{actionDetail}</small></span><ArrowRight /></button>
       </div>
@@ -3217,7 +3238,7 @@ export function App() {
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
-      {showCompletion && <CompletionOverlay formations={formations} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
+      {showCompletion && <CompletionOverlay formations={formations} assignments={assignments} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
       {showWorkshop && workshopBaseline && <SalvageWorkshop baseline={workshopBaseline} choice={salvageChoice} formations={workshopFormations} integrity={warhostIntegrity} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopAction} onLaunch={launchNextOperation} />}
     </main>
   );

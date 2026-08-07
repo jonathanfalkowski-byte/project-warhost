@@ -792,7 +792,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .decision-actions .spend-seal { border-color: #a16428; background: #291a10; }
 .decision-actions .spend-seal > svg { color: #d6a45f; }
 .decision-actions button:disabled { opacity: .4; cursor: not-allowed; }
-.completion-panel { width: min(650px, 90vw); border-color: #668d4e; text-align: center; }
+.completion-panel { width: min(720px, 92vw); max-height: calc(100vh - 24px); overflow-y: auto; border-color: #668d4e; text-align: center; }
 .completion-icon { width: 64px; height: 64px; color: #8ed068; }
 .completion-panel .eyebrow { color: #8ed068; }
 .victory-banner { margin: 8px auto 0; width: fit-content; padding: 4px 18px; border: 1px solid #78ae56; background: #1a3217; color: #a4e17c; font-family: "Barlow Condensed"; font-size: 26px; font-weight: 700; letter-spacing: .16em; }
@@ -806,6 +806,24 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .integrity-after-action.holding svg { color: #dfaa58; }
 .integrity-after-action.collapsed { border-color: #8f3e2c; background: #2b110c; }
 .integrity-after-action.collapsed b, .integrity-after-action.collapsed svg { color: #ef7655; }
+.formation-fate-ledger { margin: -10px 0 18px; border: 1px solid #35413b; background: #0b1110; text-align: left; }
+.formation-fate-ledger > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 10px; border-bottom: 1px solid #35413b; }
+.formation-fate-ledger > header span { color: #87928d; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 600; letter-spacing: .1em; }
+.formation-fate-ledger > header small { color: #727d78; font-size: 9px; text-align: right; }
+.formation-fate-list { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #27302c; }
+.formation-fate { min-width: 0; display: grid; grid-template-columns: 25px 38px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px; background: #111715; box-shadow: inset 3px 0 #56615c; }
+.formation-fate-slot { color: #65736d; font-family: "Barlow Condensed"; font-size: 10px; }
+.formation-fate img { width: 38px; height: 38px; border: 1px solid #39443f; object-fit: cover; }
+.formation-fate-copy { min-width: 0; display: grid; gap: 2px; }
+.formation-fate-copy b { overflow: hidden; color: #d4d9d6; font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
+.formation-fate-copy small { overflow: hidden; color: #7e8a84; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.formation-fate > strong { padding: 3px 5px; border: 1px solid currentColor; color: #8ccf69; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .07em; }
+.formation-fate.damaged { box-shadow: inset 3px 0 #bd813c; }
+.formation-fate.damaged > strong { color: #e1a45c; }
+.formation-fate.missing { box-shadow: inset 3px 0 #c35d39; }
+.formation-fate.missing > strong { color: #e9835f; }
+.formation-fate.destroyed { background: #23100d; box-shadow: inset 3px 0 #e14f34; }
+.formation-fate.destroyed > strong { color: #ff7657; }
 .debrief-button { min-height: 68px; width: 100%; }
 .completion-note { margin: -10px 0 18px !important; font-size: 11px !important; }
 .completion-panel.defeat { border-color: #9b4b35; }
