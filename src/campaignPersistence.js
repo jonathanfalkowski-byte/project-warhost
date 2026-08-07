@@ -14,7 +14,9 @@ const copyConditions = (conditions = {}) => Object.fromEntries(
 export const integrityLossFor = ({ operationWon = false, extractedCount = 0 } = {}) => {
   if (operationWon) return 0;
   const safeExtractedCount = Math.max(0, Math.floor(Number(extractedCount) || 0));
-  return safeExtractedCount > 0 ? 1 : 2;
+  if (safeExtractedCount <= 0) return 3;
+  if (safeExtractedCount === 1) return 2;
+  return 1;
 };
 
 export const campaignOutcomeFor = ({ hasNextOperation = false, operationWon = false, integrityRemaining = 0 } = {}) => {

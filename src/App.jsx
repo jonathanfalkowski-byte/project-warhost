@@ -2315,7 +2315,7 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
         <div className="campaign-integrity-readout">
           <span>WARHOST INTEGRITY</span>
           <IntegrityMeter value={integrity} />
-          <small>DEFEAT −1 · ROUT WITH ZERO EXTRACTED −2 · ZERO ENDS THE RUN</small>
+          <small>DEFEAT WITH 2+ EXTRACTED −1 · ONE EXTRACTED −2 · ZERO EXTRACTED −3 · ZERO ENDS THE RUN</small>
         </div>
         {formationCount < FORMATIONS.length && <p className="campaign-shortfall"><Warning weight="fill" /> {FORMATIONS.length - formationCount} FORMATION MISSING · LEAVE AN AUTHORED STOP EMPTY</p>}
         <p><b>{playbook.name}:</b> {playbook.intent}</p>

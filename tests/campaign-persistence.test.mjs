@@ -112,10 +112,11 @@ test("campaign outcome distinguishes costly continuation from total defeat", () 
   assert.equal(campaignOutcomeFor({ hasNextOperation: false, operationWon: true, integrityRemaining: 3 }), "terminal");
 });
 
-test("integrity loss distinguishes victory, defeat, and rout", () => {
+test("integrity loss distinguishes victory, defeat, rout, and annihilation", () => {
   assert.equal(integrityLossFor({ operationWon: true, extractedCount: 0 }), 0);
   assert.equal(integrityLossFor({ operationWon: false, extractedCount: 2 }), 1);
-  assert.equal(integrityLossFor({ operationWon: false, extractedCount: 0 }), 2);
-  assert.equal(integrityLossFor({ operationWon: false, extractedCount: -5 }), 2);
-  assert.equal(integrityLossFor({ operationWon: false, extractedCount: "invalid" }), 2);
+  assert.equal(integrityLossFor({ operationWon: false, extractedCount: 1 }), 2);
+  assert.equal(integrityLossFor({ operationWon: false, extractedCount: 0 }), 3);
+  assert.equal(integrityLossFor({ operationWon: false, extractedCount: -5 }), 3);
+  assert.equal(integrityLossFor({ operationWon: false, extractedCount: "invalid" }), 3);
 });
