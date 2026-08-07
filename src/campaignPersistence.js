@@ -11,7 +11,15 @@ const copyConditions = (conditions = {}) => Object.fromEntries(
     .map(([formationId, condition]) => [formationId, { ...condition, ...CAMPAIGN_STATES[condition.state] }]),
 );
 
-export const campaignOutcomeFor = ({ hasNextOperation = false, operationWon = false } = {}) => {
+export const integrityLossFor = ({ operationWon = false, extractedCount = 0 } = {}) => {
+  if (operationWon) return 0;
+  const safeExtractedCount = Math.max(0, Math.floor(Number(extractedCount) || 0));
+  return safeExtractedCount > 0 ? 1 : 2;
+};
+
+export const campaignOutcomeFor = ({ hasNextOperation = false, operationWon = false, integrityRemaining = 0 } = {}) => {
+  const safeIntegrity = Math.max(0, Math.floor(Number(integrityRemaining) || 0));
+  if (safeIntegrity <= 0) return "destroyed";
   if (hasNextOperation) return "continue";
   return operationWon ? "terminal" : "destroyed";
 };

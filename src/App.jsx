@@ -37,6 +37,7 @@ import {
   applyWorkshopAction,
   campaignOutcomeFor,
   ensureCostlyContinuationConditions,
+  integrityLossFor,
   mergeCampaignConditions,
   seriousConditionsFromConsequences,
 } from "./campaignPersistence.js";
@@ -2301,7 +2302,7 @@ function MissionConditionSelector({ condition, locked, phase, onCondition }) {
   );
 }
 
-function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, rescueComplete, playbook, assignedCount, formationCount, profile }) {
+function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, rescueComplete, playbook, assignedCount, formationCount, integrity, profile }) {
   const forecast = profile.overrun > 0
     ? `${profile.extractedCount} / ${formationCount} EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
     : `${profile.extractedCount} / ${formationCount} EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
@@ -2311,6 +2312,11 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planReady ? forecast : `${assignedCount} / ${formationCount} AVAILABLE ASSIGNED`}</strong>
+        <div className="campaign-integrity-readout">
+          <span>WARHOST INTEGRITY</span>
+          <IntegrityMeter value={integrity} />
+          <small>DEFEAT −1 · ROUT WITH ZERO EXTRACTED −2 · ZERO ENDS THE RUN</small>
+        </div>
         {formationCount < FORMATIONS.length && <p className="campaign-shortfall"><Warning weight="fill" /> {FORMATIONS.length - formationCount} FORMATION MISSING · LEAVE AN AUTHORED STOP EMPTY</p>}
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
         <div className={`doctrine-outlook ${profile.doctrine.triggered ? "triggered" : "exposed"}`}>
@@ -2359,6 +2365,16 @@ function ProgressRow({ label, done, optional = false }) {
     <div className={`progress-row ${done ? "done" : ""}`}>
       {done ? <CheckCircle weight="fill" /> : <MapPin weight="duotone" />}
       <span>{label}{optional ? " · optional" : ""}</span>
+    </div>
+  );
+}
+
+function IntegrityMeter({ value, max = 3 }) {
+  const safeValue = Math.max(0, Math.min(max, Math.floor(Number(value) || 0)));
+  return (
+    <div className="integrity-meter" aria-label={`${safeValue} of ${max} Warhost Integrity remaining`}>
+      <strong>{safeValue} / {max}</strong>
+      <span>{Array.from({ length: max }, (_, index) => <Shield key={index} weight={index < safeValue ? "fill" : "thin"} />)}</span>
     </div>
   );
 }
@@ -2519,7 +2535,7 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
   );
 }
 
-function SalvageWorkshop({ baseline, choice, formations, nextOperation, onChoose, onLaunch }) {
+function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperation, onChoose, onLaunch }) {
   const incomingCondition = MISSION_CONDITIONS.find((condition) => condition.id === nextOperation.conditionId);
   const selectedAction = choice
     ? choice.type === "repair"
@@ -2550,6 +2566,10 @@ function SalvageWorkshop({ baseline, choice, formations, nextOperation, onChoose
           <b>{nextOperation.name}</b>
           <small>{nextOperation.victory}</small>
           <em>{incomingCondition.name} · {incomingCondition.effect}</em>
+        </div>
+        <div className="workshop-integrity">
+          <span><b>WARHOST INTEGRITY CARRIED FORWARD</b><small>Another defeat or rout may end the run before the final operation.</small></span>
+          <IntegrityMeter value={integrity} />
         </div>
         <div className="workshop-formations">
           {formations.map((formation) => {
@@ -2612,7 +2632,7 @@ function SalvageWorkshop({ baseline, choice, formations, nextOperation, onChoose
   );
 }
 
-function CompletionOverlay({ formations, canContinue, campaignDestroyed, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
+function CompletionOverlay({ formations, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
   const lostCount = formations.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
@@ -2644,7 +2664,7 @@ function CompletionOverlay({ formations, canContinue, campaignDestroyed, operati
   const actionLabel = canContinue ? "ENTER SALVAGE WORKSHOP" : campaignDestroyed ? "BEGIN NEW CAMPAIGN" : "RETURN TO BATTLEFIELD";
   const actionDetail = canContinue
     ? won ? "Carry this detachment into the next operation." : "Withdraw, accept persistent losses, and continue the campaign."
-    : campaignDestroyed ? "The surviving force cannot continue to the next operation." : "Inspect the completed operation state.";
+    : campaignDestroyed ? "Warhost Integrity reached zero. This run is over." : "Inspect the completed operation state.";
   const operationResult = won
     ? `${operation.primaryResult} and ${profile.extractedCount} formations escaped.`
     : canContinue
@@ -2663,6 +2683,7 @@ function CompletionOverlay({ formations, canContinue, campaignDestroyed, operati
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
+          <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
         <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {fieldStateResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{actionLabel}</b><small>{actionDetail}</small></span><ArrowRight /></button>
@@ -2679,6 +2700,7 @@ export function App() {
   const [conditionId, setConditionId] = useState("clear");
   const [refits, setRefits] = useState(defaultRefits);
   const [campaignConditions, setCampaignConditions] = useState({});
+  const [warhostIntegrity, setWarhostIntegrity] = useState(3);
   const [assignments, setAssignments] = useState(() => emptyAssignments(PLAYBOOKS[0]));
   const [branches, setBranches] = useState(defaultBranches);
   const [battleBranches, setBattleBranches] = useState(defaultBranches);
@@ -2782,7 +2804,9 @@ export function App() {
   const currentPlaybackBeat = playbackBeats[Math.min(playbackIndex, playbackBeats.length - 1)] ?? null;
   const operationWon = operationProfile.extractedCount >= operation.requiredExtraction;
   const hasNextOperation = operationIndex < OPERATIONS.length - 1;
-  const campaignOutcome = campaignOutcomeFor({ hasNextOperation, operationWon });
+  const integrityLoss = integrityLossFor({ operationWon, extractedCount: operationProfile.extractedCount });
+  const integrityAfterMission = Math.max(0, warhostIntegrity - integrityLoss);
+  const campaignOutcome = campaignOutcomeFor({ hasNextOperation, operationWon, integrityRemaining: integrityAfterMission });
   const campaignDestroyed = campaignOutcome === "destroyed";
   const canContinueCampaign = campaignOutcome === "continue";
 
@@ -3092,6 +3116,7 @@ export function App() {
         refits: { ...refits },
         conditions: mergeCampaignConditions(campaignConditions, seriousConditions),
       });
+      setWarhostIntegrity(integrityAfterMission);
       setSalvageChoice(null);
       setShowCompletion(false);
       setShowWorkshop(true);
@@ -3162,6 +3187,7 @@ export function App() {
     setConditionId("clear");
     setRefits(defaultRefits());
     setCampaignConditions({});
+    setWarhostIntegrity(3);
     setAssignments(emptyAssignments(PLAYBOOKS[0]));
     setBranches(defaultBranches(OPERATIONS[0]));
     setBattleBranches(defaultBranches(OPERATIONS[0]));
@@ -3186,13 +3212,13 @@ export function App() {
       <div className="mission-shell">
         <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
         <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
-        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} profile={operationProfile} />
+        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
-      {showCompletion && <CompletionOverlay formations={formations} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
-      {showWorkshop && workshopBaseline && <SalvageWorkshop baseline={workshopBaseline} choice={salvageChoice} formations={workshopFormations} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopAction} onLaunch={launchNextOperation} />}
+      {showCompletion && <CompletionOverlay formations={formations} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
+      {showWorkshop && workshopBaseline && <SalvageWorkshop baseline={workshopBaseline} choice={salvageChoice} formations={workshopFormations} integrity={warhostIntegrity} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopAction} onLaunch={launchNextOperation} />}
     </main>
   );
 }

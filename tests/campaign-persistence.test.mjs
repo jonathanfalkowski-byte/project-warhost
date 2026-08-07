@@ -5,6 +5,7 @@ import {
   applyWorkshopAction,
   campaignOutcomeFor,
   ensureCostlyContinuationConditions,
+  integrityLossFor,
   mergeCampaignConditions,
   seriousConditionsFromConsequences,
 } from "../src/campaignPersistence.js";
@@ -104,8 +105,17 @@ test("a costly continuation always enters the next operation with a missing and 
 });
 
 test("campaign outcome distinguishes costly continuation from total defeat", () => {
-  assert.equal(campaignOutcomeFor({ hasNextOperation: true, operationWon: false }), "continue");
-  assert.equal(campaignOutcomeFor({ hasNextOperation: true, operationWon: true }), "continue");
-  assert.equal(campaignOutcomeFor({ hasNextOperation: false, operationWon: false }), "destroyed");
-  assert.equal(campaignOutcomeFor({ hasNextOperation: false, operationWon: true }), "terminal");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: true, operationWon: false, integrityRemaining: 2 }), "continue");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: true, operationWon: true, integrityRemaining: 3 }), "continue");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: true, operationWon: false, integrityRemaining: 0 }), "destroyed");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: false, operationWon: false, integrityRemaining: 2 }), "destroyed");
+  assert.equal(campaignOutcomeFor({ hasNextOperation: false, operationWon: true, integrityRemaining: 3 }), "terminal");
+});
+
+test("integrity loss distinguishes victory, defeat, and rout", () => {
+  assert.equal(integrityLossFor({ operationWon: true, extractedCount: 0 }), 0);
+  assert.equal(integrityLossFor({ operationWon: false, extractedCount: 2 }), 1);
+  assert.equal(integrityLossFor({ operationWon: false, extractedCount: 0 }), 2);
+  assert.equal(integrityLossFor({ operationWon: false, extractedCount: -5 }), 2);
+  assert.equal(integrityLossFor({ operationWon: false, extractedCount: "invalid" }), 2);
 });
