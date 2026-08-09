@@ -14,6 +14,35 @@ const ENEMY_STATES = Object.freeze({
   starved: Object.freeze({ state: "starved", label: "STARVED" }),
 });
 
+const boundedDisplayNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.min(9, Math.max(0, Math.round(numeric))) : 0;
+};
+
+const compactDisplayText = (value, fallback) => typeof value === "string" && value.trim().length > 0
+  ? value.trim().toUpperCase().slice(0, 32)
+  : fallback;
+
+export const formationStatusDisplay = ({ consequence = null, formationFate = null } = {}) => {
+  const label = formationFate?.battleLabel ?? consequence?.label ?? null;
+  if (typeof label !== "string" || label.length === 0) return null;
+  const combat = consequence?.combat ?? formationFate?.consequence?.combat ?? null;
+  if (combat) {
+    const pressure = compactDisplayText(combat.pressureType, "CONTACT");
+    const target = compactDisplayText(combat.target, "ENDURANCE");
+    const starting = boundedDisplayNumber(combat.starting);
+    const remaining = boundedDisplayNumber(combat.remaining);
+    return {
+      label: compactDisplayText(label, "FIELD STATE"),
+      detail: `${pressure} · ${target} ${starting}→${remaining}`,
+    };
+  }
+  return {
+    label: compactDisplayText(label, "FIELD STATE"),
+    detail: compactDisplayText(formationFate?.detail ?? consequence?.cause, "BATTLEFIELD CONDITION"),
+  };
+};
+
 const playerStateFor = (outcome, actorIndex) => {
   if (outcome === "decisive") return "momentum";
   if (outcome === "checked") return "delayed";

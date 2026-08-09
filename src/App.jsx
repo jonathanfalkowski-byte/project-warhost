@@ -31,7 +31,7 @@ import {
   Wrench,
 } from "@phosphor-icons/react";
 import { resolveAshenCollision } from "./enemyCollision.js";
-import { battlefieldConsequencesAt } from "./battleConsequences.js";
+import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
 import {
   applyCampaignConditions,
   applyWorkshopAction,
@@ -2064,6 +2064,18 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   );
 }
 
+function BattleStateLegend() {
+  return (
+    <aside className="battle-state-legend" aria-label="Battlefield status legend">
+      <span>BATTLEFIELD READ</span>
+      <div><i className="active-contact" /><b>ACTIVE CONTACT</b><small>Blue pulse · fighting now</small></div>
+      <div><i className="outside-contact" /><b>OUTSIDE CONTACT</b><small>Dimmed · not in this fight</small></div>
+      <div><i className="under-pressure" /><b>UNDER PRESSURE</b><small>Amber · delayed or pinned</small></div>
+      <div><i className="serious-state" /><b>SERIOUS STATE</b><small>Red · damaged or cut off</small></div>
+    </aside>
+  );
+}
+
 function Battlefield({ formations, formationFates, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onFormationDragStart, readiness, refitProtocols, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
   const alphaState = battleTime >= profile.alphaAt ? "secured" : "active";
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
@@ -2119,6 +2131,7 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
         const active = selected === formation.id;
         const consequence = consequences.player[formation.id] ?? null;
         const formationFate = resolvedFormationFates.get(formation.id) ?? null;
+        const statusDisplay = formationStatusDisplay({ consequence, formationFate });
         const authoredRoute = authoredRoutes.find((route) => route.formationId === formation.id);
         const routePosition = playbackActive && authoredRoute
           ? positionAlongAuthoredRoute({
@@ -2143,7 +2156,7 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
-            {(formationFate || consequence) && <span className="map-formation-state">{formationFate?.battleLabel ?? `${consequence.label} · ${consequence.cause}`}</span>}
+            {statusDisplay && <span className="map-formation-state"><b>{statusDisplay.label}</b><small>{statusDisplay.detail}</small></span>}
           </button>
         );
       })}
@@ -2164,6 +2177,7 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
         </div>
       )}
 
+      {playbackActive && <BattleStateLegend />}
       <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} />
       {phase === "drill" && (
         <div className="drill-status" role="status">

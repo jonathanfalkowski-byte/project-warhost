@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { battlefieldConsequencesAt } from "../src/battleConsequences.js";
+import { battlefieldConsequencesAt, formationStatusDisplay } from "../src/battleConsequences.js";
 
 const clash = (actionAt, outcome, actorIds, label = "ENEMY ORDER") => ({
   actionAt,
@@ -86,4 +86,23 @@ test("specific endurance impacts replace generic outcome labels with causal comb
   assert.equal(state.player.hauler.state, "cut-off");
   assert.equal(state.player.hauler.cause, "GANTRY SEVER · PURSUIT MOBILITY 4→0");
   assert.equal(state.player.hauler.combat.remaining, 0);
+});
+
+test("formation status display names the condition and the affected endurance track", () => {
+  const display = formationStatusDisplay({
+    consequence: {
+      label: "CUT OFF",
+      combat: { pressureType: "pursuit", target: "mobility", starting: 4, remaining: 0 },
+    },
+  });
+
+  assert.deepEqual(display, { label: "CUT OFF", detail: "PURSUIT · MOBILITY 4→0" });
+});
+
+test("formation status display retains a readable fallback without combat values", () => {
+  assert.deepEqual(
+    formationStatusDisplay({ consequence: { label: "PINNED", cause: "Beta screen" } }),
+    { label: "PINNED", detail: "BETA SCREEN" },
+  );
+  assert.equal(formationStatusDisplay(), null);
 });
