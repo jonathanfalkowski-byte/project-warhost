@@ -2126,7 +2126,7 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
-            {(formationFate || consequence) && <span className="map-formation-state">{formationFate?.battleLabel ?? consequence.label}</span>}
+            {(formationFate || consequence) && <span className="map-formation-state">{formationFate?.battleLabel ?? `${consequence.label} · ${consequence.cause}`}</span>}
           </button>
         );
       })}
@@ -2195,6 +2195,16 @@ function BattlePlaybackDirector({ beat, beats, index, playing, onToggle, onStep,
             ) : <strong>{beat.resolution.label} · UPSTREAM ORDER BROKEN</strong>}
             <p>{beat.resolution.factors.filter((factor) => factor.score > 0).map((factor) => `${factor.label} +${factor.score}`).join(" · ") || beat.resolution.verdict}</p>
             {beat.resolution.missingCapabilities.length > 0 && <small>MISSING ANSWER · {beat.resolution.missingCapabilities.join(" / ")}</small>}
+          </div>
+        )}
+        {beat.statusChanges?.length > 0 && (
+          <div className="playback-status-changes" aria-label="Formation status changes">
+            <span>FORMATION IMPACT</span>
+            {beat.statusChanges.map((statusChange) => (
+              <b className={`state-${statusChange.state}`} key={`${statusChange.formationId}-${statusChange.label}`}>
+                {statusChange.formationName}<em>{statusChange.label}</em>
+              </b>
+            ))}
           </div>
         )}
       </div>
@@ -2699,11 +2709,22 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         <section className="formation-fate-ledger" aria-label="Formation fates">
           <header><span>FORMATION FATES · TACTICAL SLOT ORDER</span><small>{campaignDestroyed ? "The campaign is over; surviving formations cannot continue as a Warhost." : "Named outcomes at operation end."}</small></header>
           <div className="formation-fate-list">
-            {formationFates.map(({ formation, fate, label, detail }, index) => (
+            {formationFates.map(({ formation, fate, label, detail, history }, index) => (
               <div className={`formation-fate ${fate}`} key={formation.id}>
                 <span className="formation-fate-slot">{String(index + 1).padStart(2, "0")}</span>
                 <img src={formation.asset} alt="" />
-                <span className="formation-fate-copy"><b>{formation.name}</b><small>{detail}</small></span>
+                <span className="formation-fate-copy">
+                  <b>{formation.name}</b>
+                  <span className="formation-fate-history" aria-label={`${formation.name} status history`}>
+                    {history.map((historyItem, historyIndex) => (
+                      <Fragment key={`${historyItem.label}-${historyItem.at}-${historyIndex}`}>
+                        {historyIndex > 0 && <i aria-hidden="true">→</i>}
+                        <em className={`state-${historyItem.state}`} title={historyItem.cause}>{historyItem.label}</em>
+                      </Fragment>
+                    ))}
+                  </span>
+                  <small>{detail}</small>
+                </span>
                 <strong>{label}</strong>
               </div>
             ))}

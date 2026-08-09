@@ -70,18 +70,48 @@ export const formationFatesFor = ({
   ]));
 
   return ordered.map(({ formation, orderIndex, consequence }) => {
+    const consequenceAt = Math.max(0, Math.min(safeCompleteAt, Math.floor(Number(consequence?.at) || safeExtractionAt)));
+    const consequenceLabel = typeof consequence?.label === "string"
+      ? consequence.label
+      : typeof consequence?.state === "string"
+        ? consequence.state.replaceAll("-", " ").toUpperCase()
+        : null;
+    const initialHistory = consequenceLabel ? [{
+      label: consequenceLabel,
+      state: consequence.state,
+      at: consequenceAt,
+      source: "collision",
+      cause: consequence.cause ?? "Battlefield contact",
+    }] : [];
+    const appendHistory = (history, event) => history.at(-1)?.label === event.label ? history : [...history, event];
+    const withHistory = (events) => events.reduce(appendHistory, initialHistory);
     const shared = { formation, formationId: formation.id, orderIndex, consequence };
     if (formation.id === destroyedId) {
-      return { ...shared, fate: "destroyed", label: "DESTROYED", battleLabel: "DESTROYED", at: unaccountedTimes.get(formation.id) ?? safeCompleteAt, detail: consequence?.cause ? `Lost during ${consequence.cause}.` : "Lost during the final collapse." };
+      const fateAt = unaccountedTimes.get(formation.id) ?? safeCompleteAt;
+      const cutOffAt = Math.max(safeExtractionAt, fateAt - 1);
+      const history = withHistory([
+        { label: "CUT OFF", state: "cut-off", at: cutOffAt, source: "extraction", cause: "Extraction route severed" },
+        { label: "DESTROYED", state: "destroyed", at: fateAt, source: "extraction", cause: consequence?.cause ?? "Final collapse" },
+      ]);
+      return { ...shared, fate: "destroyed", label: "DESTROYED", battleLabel: "DESTROYED", at: fateAt, history, detail: consequence?.cause ? `Lost during ${consequence.cause}.` : "Lost during the final collapse." };
     }
     if (unaccountedIds.has(formation.id)) {
-      return { ...shared, fate: "missing", label: "MISSING", battleLabel: "CUT OFF", at: unaccountedTimes.get(formation.id) ?? safeCompleteAt, detail: consequence?.cause ? `Last contact during ${consequence.cause}.` : "Did not clear extraction; status unconfirmed." };
+      const fateAt = unaccountedTimes.get(formation.id) ?? safeCompleteAt;
+      const history = withHistory([
+        { label: "CUT OFF", state: "cut-off", at: fateAt, source: "extraction", cause: "Extraction route severed" },
+        { label: "MISSING", state: "missing", at: safeCompleteAt, source: "operation", cause: "Failed to report after extraction" },
+      ]);
+      return { ...shared, fate: "missing", label: "MISSING", battleLabel: "CUT OFF", at: fateAt, history, detail: consequence?.cause ? `Last contact during ${consequence.cause}.` : "Did not clear extraction; status unconfirmed." };
     }
     if (Number(consequence?.severity ?? 0) >= 3) {
-      const consequenceAt = Math.max(0, Math.min(safeCompleteAt, Math.floor(Number(consequence?.at) || safeExtractionAt)));
-      return { ...shared, fate: "damaged", label: "DAMAGED", battleLabel: "DAMAGED", at: consequenceAt, detail: consequence?.cause ? `Extracted after ${consequence.cause}.` : "Extracted but no longer combat-ready." };
+      const history = withHistory([
+        { label: "DAMAGED", state: "damaged", at: Math.max(consequenceAt, safeExtractionAt - 1), source: "battlefield", cause: consequence?.cause ?? "Battlefield damage" },
+        { label: "EXTRACTED", state: "extracted", at: safeCompleteAt, source: "operation", cause: "Cleared extraction while damaged" },
+      ]);
+      return { ...shared, fate: "damaged", label: "DAMAGED", battleLabel: "DAMAGED", at: consequenceAt, history, detail: consequence?.cause ? `Extracted after ${consequence.cause}.` : "Extracted but no longer combat-ready." };
     }
-    return { ...shared, fate: "extracted", label: "EXTRACTED", battleLabel: "EXTRACTED", at: safeCompleteAt, detail: "Cleared the operation and remains available." };
+    const history = withHistory([{ label: "EXTRACTED", state: "extracted", at: safeCompleteAt, source: "operation", cause: "Cleared extraction" }]);
+    return { ...shared, fate: "extracted", label: "EXTRACTED", battleLabel: "EXTRACTED", at: safeCompleteAt, history, detail: "Cleared the operation and remains available." };
   });
 };
 

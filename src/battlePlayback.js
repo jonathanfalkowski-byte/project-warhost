@@ -141,6 +141,13 @@ export const buildBattlePlayback = ({
   });
 
   profile.enemyClashes.forEach((clash, enemyFormationIndex) => {
+    const statusChanges = formationFates.flatMap((formationFate) => (formationFate.history ?? [])
+      .filter((historyItem) => historyItem.source === "collision" && historyItem.at === clash.actionAt)
+      .map((historyItem) => ({
+        formationId: formationFate.formationId,
+        formationName: formationFate.formation?.name ?? formationFate.formationId,
+        ...historyItem,
+      })));
     addBeat({
       id: `enemy-intent-${clash.id}`,
       at: Math.max(5, clash.actionAt - 15),
@@ -183,6 +190,7 @@ export const buildBattlePlayback = ({
           : [],
       routeState: clash.routeState,
       resolution: clash.resolution ?? null,
+      statusChanges,
     });
   });
 

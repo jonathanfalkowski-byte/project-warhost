@@ -322,14 +322,14 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .map-formation.selected .formation-image { border-color: #4cc1f3; filter: brightness(1.28) contrast(1.18) saturate(1.08); box-shadow: 0 0 12px rgba(41,169,232,.75), 0 8px 14px rgba(0,0,0,.75); }
 .map-formation-number { position: absolute; left: -8px; top: -8px; width: 22px; height: 22px; display: grid; place-items: center; background: #1c5370; color: #bdeaff; border: 1px solid #6ab8dc; font-family: "Barlow Condensed"; font-weight: 700; }
 .map-formation-label { position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%); padding: 2px 5px; background: rgba(7,10,10,.92); color: #d2d6d4; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .05em; white-space: nowrap; }
-.map-formation-state { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); min-width: 66px; padding: 2px 6px; border: 1px solid currentColor; background: rgba(8, 12, 11, .96); color: #efba63; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .1em; white-space: nowrap; box-shadow: 0 0 12px currentColor; }
+.map-formation-state { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); min-width: 66px; max-width: 170px; overflow: hidden; padding: 2px 6px; border: 1px solid currentColor; background: rgba(8, 12, 11, .96); color: #efba63; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-overflow: ellipsis; white-space: nowrap; box-shadow: 0 0 12px currentColor; }
 .map-formation.state-momentum .formation-image { border: 3px solid #9bd874; box-shadow: 0 0 24px rgba(142, 211, 102, .7), 0 8px 14px rgba(0,0,0,.75); }
 .map-formation.state-momentum .map-formation-state { color: #9bd874; }
 .map-formation.state-delayed .formation-image { border: 3px solid #e8b55e; box-shadow: 0 0 20px rgba(232, 181, 94, .58), 0 8px 14px rgba(0,0,0,.75); }
 .map-formation.state-delayed .map-formation-state { color: #e8b55e; }
 .map-formation.state-pinned .formation-image { border: 3px solid #e78a4f; filter: brightness(.92) saturate(.78); box-shadow: 0 0 18px rgba(231, 138, 79, .55), 0 8px 14px rgba(0,0,0,.75); }
 .map-formation.state-pinned .map-formation-state { color: #e78a4f; }
-.map-formation.state-damaged .formation-image { border: 3px solid #ec684e; filter: brightness(.72) saturate(.62); box-shadow: 0 0 20px rgba(236, 104, 78, .6), 0 8px 14px rgba(0,0,0,.75); }
+.map-formation.state-damaged .formation-image { border: 3px solid #ec684e; filter: brightness(.72) saturate(.62); box-shadow: 0 0 20px rgba(236, 104, 78, .6), 0 8px 14px rgba(0,0,0,.75); animation: formationDamageImpact .65s ease-out; }
 .map-formation.state-damaged .map-formation-state { color: #ec684e; }
 .map-formation.state-cut-off .formation-image { border: 3px dashed #f05245; filter: grayscale(.55) brightness(.62); box-shadow: 0 0 25px rgba(240, 82, 69, .72), 0 8px 14px rgba(0,0,0,.8); }
 .map-formation.state-cut-off .map-formation-state { color: #f05245; background: rgba(38, 10, 8, .98); }
@@ -457,6 +457,12 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playback-resolution.outcome-decisive, .playback-resolution.outcome-starved { --resolution-color: #98d570; }
 .playback-resolution.outcome-checked { --resolution-color: #efc56c; }
 .playback-resolution.outcome-overrun { --resolution-color: #f17450; }
+.playback-status-changes { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 7px; margin-top: 3px; padding: 7px 9px; border: 1px solid #984a34; background: rgba(47, 15, 10, .94); animation: formationStatusReveal .45s ease-out; }
+.playback-status-changes > span { margin-right: 3px; color: #ec8d68; font-size: 8px; font-weight: 700; letter-spacing: .12em; }
+.playback-status-changes > b { display: flex; align-items: center; gap: 7px; padding: 3px 5px; border-left: 3px solid #e29a52; background: #181713; color: #dfe4e1; font-size: 9px; letter-spacing: .05em; }
+.playback-status-changes > b.state-damaged, .playback-status-changes > b.state-cut-off { border-color: #f06d4e; }
+.playback-status-changes > b.state-pinned { border-color: #e59a50; }
+.playback-status-changes > b > em { color: #f18a62; font-size: 10px; font-style: normal; letter-spacing: .1em; }
 .playback-transport { position: absolute; left: 50%; bottom: 5.2%; transform: translateX(-50%); display: flex; align-items: stretch; border: 1px solid #4e5a55; background: rgba(7, 12, 11, .97); box-shadow: 0 10px 30px rgba(0,0,0,.72); pointer-events: auto; }
 .playback-transport button { min-width: 42px; min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 10px; border: 0; border-right: 1px solid #3c4642; background: transparent; color: #9ccce0; cursor: pointer; }
 .playback-transport button:hover:not(:disabled) { background: #14252a; color: #d3f2ff; }
@@ -838,6 +844,14 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .formation-fate-copy { min-width: 0; display: grid; gap: 2px; }
 .formation-fate-copy b { overflow: hidden; color: #d4d9d6; font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
 .formation-fate-copy small { overflow: hidden; color: #7e8a84; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.formation-fate-history { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 3px; }
+.formation-fate-history em { padding: 1px 3px; border: 1px solid #56625c; color: #9eaaa4; font-family: "Barlow Condensed"; font-size: 7px; font-style: normal; font-weight: 700; letter-spacing: .05em; }
+.formation-fate-history em.state-pinned { border-color: #a06c38; color: #dc9d58; }
+.formation-fate-history em.state-damaged, .formation-fate-history em.state-cut-off { border-color: #a84e37; color: #ec7958; }
+.formation-fate-history em.state-missing { border-color: #b45b3e; color: #ef8763; }
+.formation-fate-history em.state-destroyed { border-color: #d74531; background: #2b0d09; color: #ff684e; }
+.formation-fate-history em.state-extracted { border-color: #5f8e4e; color: #91cf72; }
+.formation-fate-history i { color: #67736d; font-size: 8px; font-style: normal; }
 .formation-fate > strong { padding: 3px 5px; border: 1px solid currentColor; color: #8ccf69; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .07em; }
 .formation-fate.damaged { box-shadow: inset 3px 0 #bd813c; }
 .formation-fate.damaged > strong { color: #e1a45c; }
@@ -918,6 +932,8 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 @keyframes comboFormationReceiver { from { border-color: #b6ed91; box-shadow: 0 0 10px rgba(137, 215, 99, .55), 0 8px 14px rgba(0,0,0,.75); } to { border-color: #f1cf68; box-shadow: 0 0 28px rgba(220, 193, 77, .92), 0 8px 14px rgba(0,0,0,.75); } }
 @keyframes comboBeatReveal { from { opacity: 0; transform: translate(-50%, -10px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes formationPulse { from { filter: brightness(.9); } to { filter: brightness(1.18); } }
+@keyframes formationDamageImpact { 0% { transform: scale(1); filter: brightness(1.6) saturate(.4); } 35% { transform: scale(1.18); filter: brightness(.45) saturate(.25); } 100% { transform: scale(1); filter: brightness(.72) saturate(.62); } }
+@keyframes formationStatusReveal { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes formationFateReveal { from { opacity: 1; transform: translate(-50%, -50%) scale(1.12); } to { opacity: .76; transform: translate(-50%, -50%) scale(1); } }
 @keyframes enemyThreatPulse { from { box-shadow: 0 0 8px rgba(219, 89, 44, .42); } to { box-shadow: 0 0 20px rgba(245, 99, 46, .82); } }
 @keyframes playbackBeatReveal { from { opacity: 0; transform: translate(-50%, -9px) scale(.985); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }

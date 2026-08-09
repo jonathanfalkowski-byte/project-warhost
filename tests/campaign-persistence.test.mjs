@@ -144,6 +144,8 @@ test("formation fates follow staffed slot order and distinguish force collapse f
   assert.deepEqual(partial.map(({ fate }) => fate), ["damaged", "extracted", "missing"]);
   assert.deepEqual(partial.map(({ at }) => at), [40, 105, 98]);
   assert.equal(partial[2].battleLabel, "CUT OFF");
+  assert.deepEqual(partial[0].history.map(({ label }) => label), ["DAMAGED", "EXTRACTED"]);
+  assert.deepEqual(partial[2].history.map(({ label }) => label), ["CUT OFF", "MISSING"]);
 
   const collapsed = formationFatesFor({
     formations,
@@ -159,4 +161,6 @@ test("formation fates follow staffed slot order and distinguish force collapse f
   assert.equal(collapsed.filter(({ fate }) => fate === "missing").length, 2);
   assert.ok(collapsed.every(({ at }) => at >= 90 && at <= 105));
   assert.ok(collapsed.find(({ fate }) => fate === "destroyed").at > Math.max(...collapsed.filter(({ fate }) => fate === "missing").map(({ at }) => at)));
+  assert.deepEqual(collapsed.find(({ formation }) => formation.id === "beta").history.map(({ label }) => label), ["DAMAGED", "CUT OFF", "MISSING"]);
+  assert.deepEqual(collapsed.find(({ fate }) => fate === "destroyed").history.map(({ label }) => label), ["CUT OFF", "DESTROYED"]);
 });
