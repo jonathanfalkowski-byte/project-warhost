@@ -195,6 +195,12 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-layer.executing .field-plan-segment.state-pinned { height: 2px; opacity: .58; }
 .field-plan-layer.executing .field-plan-segment.state-damaged { height: 2px; opacity: .46; filter: saturate(.7); }
 .field-plan-layer.executing .field-plan-segment.state-cut-off { height: 1px; opacity: .32; background: transparent; border-top: 2px dashed #ec684e; box-shadow: none; }
+.field-plan-segment.fate-missing, .field-plan-entry.fate-missing, .field-plan-position.fate-missing { --route-color: #f0784f; --route-rgb: 240, 120, 79; }
+.field-plan-segment.fate-missing { height: 1px; opacity: .28 !important; background: transparent; border-top: 2px dashed #f0784f; box-shadow: none; }
+.field-plan-segment.fate-destroyed, .field-plan-entry.fate-destroyed, .field-plan-position.fate-destroyed { --route-color: #ff4f39; --route-rgb: 255, 79, 57; }
+.field-plan-segment.fate-destroyed { height: 1px; opacity: .18 !important; background: transparent; border-top: 2px dotted #ff4f39; box-shadow: none; }
+.field-plan-segment.fate-damaged, .field-plan-entry.fate-damaged, .field-plan-position.fate-damaged { --route-color: #e49a54; --route-rgb: 228, 154, 84; }
+.field-plan-segment.fate-extracted, .field-plan-entry.fate-extracted, .field-plan-position.fate-extracted { --route-color: #8bd26b; --route-rgb: 139, 210, 107; }
 .enemy-plan-layer { position: absolute; z-index: 4; inset: 0; overflow: hidden; pointer-events: none; }
 .enemy-plan-segment { --enemy-route: #dc7042; position: absolute; z-index: 1; height: 3px; transform-origin: 0 50%; border-top: 1px dashed #ffae78; background: var(--enemy-route); box-shadow: 0 0 11px rgba(220, 92, 49, .48); }
 .enemy-plan-segment::before { content: ""; position: absolute; inset: -5px 0 auto; border-top: 1px dotted rgba(245, 130, 79, .38); }
@@ -327,6 +333,18 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .map-formation.state-damaged .map-formation-state { color: #ec684e; }
 .map-formation.state-cut-off .formation-image { border: 3px dashed #f05245; filter: grayscale(.55) brightness(.62); box-shadow: 0 0 25px rgba(240, 82, 69, .72), 0 8px 14px rgba(0,0,0,.8); }
 .map-formation.state-cut-off .map-formation-state { color: #f05245; background: rgba(38, 10, 8, .98); }
+.map-formation.fate-extracted .formation-image { border: 3px solid #8bd26b; box-shadow: 0 0 24px rgba(124, 207, 90, .68), 0 8px 14px rgba(0,0,0,.75); }
+.map-formation.fate-extracted .map-formation-state { color: #9cde7e; }
+.map-formation.fate-damaged .formation-image { border: 3px solid #e49a54; filter: brightness(.66) saturate(.66); box-shadow: 0 0 25px rgba(228, 119, 65, .72), 0 8px 14px rgba(0,0,0,.8); }
+.map-formation.fate-damaged .map-formation-state { color: #edaa63; background: rgba(39, 22, 9, .98); }
+.map-formation.fate-missing { animation: formationFateReveal .5s ease-out both; }
+.map-formation.fate-missing .formation-image { border: 3px dashed #f0784f; filter: grayscale(.72) brightness(.43); box-shadow: 0 0 28px rgba(240, 94, 65, .7), 0 8px 14px rgba(0,0,0,.84); }
+.map-formation.fate-missing .map-formation-state { color: #f38b63; background: rgba(38, 12, 8, .98); }
+.map-formation.fate-destroyed { animation: formationFateReveal .5s ease-out both; }
+.map-formation.fate-destroyed .formation-image { border: 3px solid #ff4f39; filter: grayscale(1) brightness(.2); box-shadow: 0 0 34px rgba(255, 61, 40, .78), 0 8px 14px rgba(0,0,0,.9); }
+.map-formation.fate-destroyed .map-formation-number { border-color: #a83025; background: #3a0d09; color: #ff806b; }
+.map-formation.fate-destroyed .map-formation-state { color: #ff654d; background: rgba(48, 7, 5, .99); }
+.map-formation.fate-destroyed::after { content: "×"; position: absolute; z-index: 3; inset: 5px; display: grid; place-items: center; border-radius: 50%; color: #ff5b43; font-family: "Barlow Condensed"; font-size: 78px; font-weight: 400; line-height: 1; text-shadow: 0 0 14px #d72f1d; pointer-events: none; }
 .map-formation.in-motion { animation: formationPulse 1.4s ease-in-out infinite alternate; }
 .map-formation.staged { z-index: 16; }
 .map-formation.staged .formation-image { border-color: #5aa8c8; box-shadow: 0 0 0 5px rgba(17, 70, 91, .32), 0 8px 14px rgba(0,0,0,.75); }
@@ -419,6 +437,9 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .battle-playback-director.result.route-diverted,
 .battle-playback-director.result.route-redirected { --playback-accent: #f1bd65; }
 .battle-playback-director.result.route-passed { --playback-accent: #f1714c; }
+.battle-playback-director.fate.route-fate-damaged { --playback-accent: #e5a15c; }
+.battle-playback-director.fate.route-fate-missing { --playback-accent: #f0784f; }
+.battle-playback-director.fate.route-fate-destroyed { --playback-accent: #ff5038; }
 .battle-playback-director.complete { --playback-accent: #91d26d; }
 .playback-narration { position: absolute; left: 50%; top: 3%; width: min(620px, 78%); transform: translateX(-50%); display: grid; gap: 5px; padding: 13px 16px 14px; border: 1px solid var(--playback-accent); border-left-width: 5px; background: linear-gradient(100deg, rgba(7, 12, 12, .985), rgba(11, 18, 18, .94)); box-shadow: 0 0 38px rgba(0,0,0,.78), 0 0 22px color-mix(in srgb, var(--playback-accent) 28%, transparent); pointer-events: auto; animation: playbackBeatReveal .34s ease-out; }
 .playback-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--playback-accent); font-size: 11px; font-weight: 700; letter-spacing: .13em; }
@@ -897,6 +918,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 @keyframes comboFormationReceiver { from { border-color: #b6ed91; box-shadow: 0 0 10px rgba(137, 215, 99, .55), 0 8px 14px rgba(0,0,0,.75); } to { border-color: #f1cf68; box-shadow: 0 0 28px rgba(220, 193, 77, .92), 0 8px 14px rgba(0,0,0,.75); } }
 @keyframes comboBeatReveal { from { opacity: 0; transform: translate(-50%, -10px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes formationPulse { from { filter: brightness(.9); } to { filter: brightness(1.18); } }
+@keyframes formationFateReveal { from { opacity: 1; transform: translate(-50%, -50%) scale(1.12); } to { opacity: .76; transform: translate(-50%, -50%) scale(1); } }
 @keyframes enemyThreatPulse { from { box-shadow: 0 0 8px rgba(219, 89, 44, .42); } to { box-shadow: 0 0 20px rgba(245, 99, 46, .82); } }
 @keyframes playbackBeatReveal { from { opacity: 0; transform: translate(-50%, -9px) scale(.985); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes playbackCollisionPulse { from { filter: drop-shadow(0 0 5px currentColor); } to { filter: drop-shadow(0 0 18px currentColor); } }

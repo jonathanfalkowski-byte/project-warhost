@@ -32,6 +32,8 @@ export const formationFatesFor = ({
   extractedCount = 0,
   consequences = {},
   campaignDestroyed = false,
+  extractionAt = 0,
+  completeAt = extractionAt,
 } = {}) => {
   const validFormations = Array.isArray(formations)
     ? formations.filter((formation) => formation && typeof formation.id === "string")
@@ -56,19 +58,30 @@ export const formationFatesFor = ({
   const destroyedId = campaignDestroyed && safeExtractedCount === 0
     ? exposedFirst[0]?.formation.id ?? null
     : null;
+  const safeExtractionAt = Math.max(0, Math.floor(Number(extractionAt) || 0));
+  const safeCompleteAt = Math.max(safeExtractionAt, Math.floor(Number(completeAt) || safeExtractionAt));
+  const unaccountedSequence = [
+    ...exposedFirst.slice(0, unaccountedCount).filter(({ formation }) => formation.id !== destroyedId),
+    ...exposedFirst.slice(0, unaccountedCount).filter(({ formation }) => formation.id === destroyedId),
+  ];
+  const unaccountedTimes = new Map(unaccountedSequence.map(({ formation }, index) => [
+    formation.id,
+    Math.round(safeExtractionAt + ((index + 1) / (unaccountedSequence.length + 1)) * (safeCompleteAt - safeExtractionAt)),
+  ]));
 
   return ordered.map(({ formation, orderIndex, consequence }) => {
-    const shared = { formation, orderIndex, consequence };
+    const shared = { formation, formationId: formation.id, orderIndex, consequence };
     if (formation.id === destroyedId) {
-      return { ...shared, fate: "destroyed", label: "DESTROYED", detail: consequence?.cause ? `Lost during ${consequence.cause}.` : "Lost during the final collapse." };
+      return { ...shared, fate: "destroyed", label: "DESTROYED", battleLabel: "DESTROYED", at: unaccountedTimes.get(formation.id) ?? safeCompleteAt, detail: consequence?.cause ? `Lost during ${consequence.cause}.` : "Lost during the final collapse." };
     }
     if (unaccountedIds.has(formation.id)) {
-      return { ...shared, fate: "missing", label: "MISSING", detail: consequence?.cause ? `Last contact during ${consequence.cause}.` : "Did not clear extraction; status unconfirmed." };
+      return { ...shared, fate: "missing", label: "MISSING", battleLabel: "CUT OFF", at: unaccountedTimes.get(formation.id) ?? safeCompleteAt, detail: consequence?.cause ? `Last contact during ${consequence.cause}.` : "Did not clear extraction; status unconfirmed." };
     }
     if (Number(consequence?.severity ?? 0) >= 3) {
-      return { ...shared, fate: "damaged", label: "DAMAGED", detail: consequence?.cause ? `Extracted after ${consequence.cause}.` : "Extracted but no longer combat-ready." };
+      const consequenceAt = Math.max(0, Math.min(safeCompleteAt, Math.floor(Number(consequence?.at) || safeExtractionAt)));
+      return { ...shared, fate: "damaged", label: "DAMAGED", battleLabel: "DAMAGED", at: consequenceAt, detail: consequence?.cause ? `Extracted after ${consequence.cause}.` : "Extracted but no longer combat-ready." };
     }
-    return { ...shared, fate: "extracted", label: "EXTRACTED", detail: "Cleared the operation and remains available." };
+    return { ...shared, fate: "extracted", label: "EXTRACTED", battleLabel: "EXTRACTED", at: safeCompleteAt, detail: "Cleared the operation and remains available." };
   });
 };
 

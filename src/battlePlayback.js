@@ -6,7 +6,8 @@ const BEAT_PRIORITY = {
   response: 4,
   result: 5,
   mission: 6,
-  complete: 7,
+  fate: 7,
+  complete: 8,
 };
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -85,6 +86,7 @@ export const buildBattlePlayback = ({
   formations,
   events,
   comboTimes,
+  formationFates = [],
 }) => {
   const beats = [];
   const addBeat = (beat) => beats.push({
@@ -183,6 +185,28 @@ export const buildBattlePlayback = ({
       resolution: clash.resolution ?? null,
     });
   });
+
+  formationFates
+    .filter((formationFate) => formationFate?.fate && formationFate.fate !== "extracted")
+    .forEach((formationFate) => {
+      const name = formationFate.formation?.name ?? "Formation";
+      const titles = {
+        damaged: `${name} takes lasting damage.`,
+        missing: `${name} is cut off from the Warhost.`,
+        destroyed: `${name} is destroyed before extraction.`,
+      };
+      addBeat({
+        id: `formation-fate-${formationFate.formationId}`,
+        at: formationFate.at,
+        kind: "fate",
+        eyebrow: `FORMATION FATE · SLOT ${String(formationFate.orderIndex + 1).padStart(2, "0")}`,
+        title: titles[formationFate.fate] ?? `${name}: ${formationFate.battleLabel}.`,
+        detail: formationFate.detail,
+        playerFormationIds: [formationFate.formationId],
+        routeState: `fate-${formationFate.fate}`,
+        formationFate,
+      });
+    });
 
   addBeat({
     id: "operation-resolved",

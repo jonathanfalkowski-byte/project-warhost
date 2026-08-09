@@ -65,6 +65,22 @@ test("playback stepping and time lookup stay inside the authored sequence", () =
   assert.equal(playbackTimeForIndex([], 2), 0);
 });
 
+test("formation losses become authored playback beats before operation resolution", () => {
+  const input = fixture();
+  input.formationFates = [
+    { formationId: "harpoon", formation: input.formations[0], orderIndex: 0, fate: "missing", battleLabel: "CUT OFF", at: 108, detail: "The route was severed." },
+    { formationId: "railjack", formation: input.formations[1], orderIndex: 1, fate: "destroyed", battleLabel: "DESTROYED", at: 115, detail: "Lost under pursuit." },
+    { formationId: "reserve", formation: { id: "reserve", name: "RESERVE" }, orderIndex: 2, fate: "extracted", battleLabel: "EXTRACTED", at: 120, detail: "Clear." },
+  ];
+  const beats = buildBattlePlayback(input);
+  const fateBeats = beats.filter((beat) => beat.kind === "fate");
+  assert.deepEqual(fateBeats.map((beat) => beat.playerFormationIds), [["harpoon"], ["railjack"]]);
+  assert.deepEqual(fateBeats.map((beat) => beat.at), [108, 115]);
+  assert.match(fateBeats[0].title, /cut off/i);
+  assert.match(fateBeats[1].title, /destroyed/i);
+  assert.equal(beats.at(-1).kind, "complete");
+});
+
 const doctrineFixture = (playbookId, triggered = true) => ({
   playbookId,
   profile: { doctrine: { triggered, result: triggered ? "ADVANTAGE ACTIVE" : "EXPOSURE ACTIVE" } },

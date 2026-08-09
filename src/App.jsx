@@ -1551,13 +1551,16 @@ const fieldSegmentStyle = (start, end, size) => {
   };
 };
 
-function TacticalFieldPlan({ assignments, branches, consequences, formations, operation, phase, playbook, playbackBeat }) {
+function TacticalFieldPlan({ assignments, battleTime, branches, consequences, formationFates, formations, operation, phase, playbook, playbackBeat }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const operationField = operationFieldFor(operation);
   const plan = operationField.plans[playbook.id];
   const breakpoints = breakpointsFor(operation);
   const execution = phase === "battle" || phase === "complete";
+  const resolvedFates = new Map((execution ? formationFates : [])
+    .filter((formationFate) => formationFate.at <= battleTime)
+    .map((formationFate) => [formationFate.formationId, formationFate]));
   const focusedPlayerIds = playbackBeat?.playerFormationIds ?? [];
   const hasPlayerFocus = focusedPlayerIds.length > 0;
 
@@ -1586,7 +1589,8 @@ function TacticalFieldPlan({ assignments, branches, consequences, formations, op
       ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted"
       : "";
     const consequenceClass = formation && consequences?.[formation.id] ? `state-${consequences[formation.id].state}` : "";
-    return { ...route, roleIndex, role, formation, start, playbackClass, consequenceClass };
+    const fateClass = formation && resolvedFates.has(formation.id) ? `fate-${resolvedFates.get(formation.id).fate}` : "";
+    return { ...route, roleIndex, role, formation, start, playbackClass, consequenceClass, fateClass };
   });
   const executionRoutes = buildAuthoredFormationRoutes({
     plan,
@@ -1605,7 +1609,7 @@ function TacticalFieldPlan({ assignments, branches, consequences, formations, op
       id: `route-${route.roleIndex}-${index}`,
       start: point,
       end: points[index + 1],
-      className: `base lane-${route.roleIndex + 1} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""}`,
+      className: `base lane-${route.roleIndex + 1} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
     }));
   });
   const branchSegments = execution ? [] : breakpoints.flatMap((breakpoint, breakpointIndex) => {
@@ -1673,7 +1677,7 @@ function TacticalFieldPlan({ assignments, branches, consequences, formations, op
         </div>
       ))}
       {routes.map((route) => (
-        <div className={`field-plan-entry lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""} ${route.playbackClass} ${route.consequenceClass}`} style={{ left: `${route.start.x}%`, top: `${route.start.y}%` }} key={`origin-${route.roleIndex}`}>
+        <div className={`field-plan-entry lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""} ${route.playbackClass} ${route.consequenceClass} ${route.fateClass}`} style={{ left: `${route.start.x}%`, top: `${route.start.y}%` }} key={`origin-${route.roleIndex}`}>
           <Flag weight="fill" />
           <span>{route.formation ? route.formation.number : String(route.roleIndex + 1).padStart(2, "0")}</span>
           <small>{route.formation ? route.formation.name : `ROUTE ${String(route.roleIndex + 1).padStart(2, "0")}`}</small>
@@ -1683,8 +1687,9 @@ function TacticalFieldPlan({ assignments, branches, consequences, formations, op
         const role = playbook.roles[index];
         const formation = formations.find((item) => item.id === assignments[role.id]);
         const consequenceClass = formation && consequences?.[formation.id] ? `state-${consequences[formation.id].state}` : "";
+        const fateClass = formation && resolvedFates.has(formation.id) ? `fate-${resolvedFates.get(formation.id).fate}` : "";
         return (
-          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${consequenceClass} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
+          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${consequenceClass} ${fateClass} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
             <b>{String(index + 1).padStart(2, "0")}</b>
             <span>{role.label.split(" / ")[0]}</span>
             {formation && <em>{formation.name}</em>}
@@ -2042,8 +2047,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   );
 }
 
-function Battlefield({ formations, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onFormationDragStart, readiness, refitProtocols, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
-  const activeFormations = phase === "complete" ? formations.slice(0, profile.extractedCount).map((formation) => formation.id) : formations.map((formation) => formation.id);
+function Battlefield({ formations, formationFates, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onFormationDragStart, readiness, refitProtocols, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
   const alphaState = battleTime >= profile.alphaAt ? "secured" : "active";
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
   const reactorState = battleTime >= profile.reactorAt ? "secured" : "threat";
@@ -2052,6 +2056,9 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
   const focusedPlayerIds = playbackBeat?.playerFormationIds ?? [];
   const hasPlayerFocus = focusedPlayerIds.length > 0;
   const consequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime });
+  const resolvedFormationFates = new Map((playbackActive ? formationFates : [])
+    .filter((formationFate) => formationFate.at <= battleTime)
+    .map((formationFate) => [formationFate.formationId, formationFate]));
   const operationField = operationFieldFor(operation);
   const authoredRoutes = buildAuthoredFormationRoutes({
     plan: operationField.plans[playbook.id],
@@ -2072,7 +2079,7 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} />
-      <TacticalFieldPlan assignments={assignments} branches={branches} consequences={consequences.player} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
+      <TacticalFieldPlan assignments={assignments} battleTime={battleTime} branches={branches} consequences={consequences.player} formationFates={formationFates} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
       <DoctrineCollisionOverlay beat={playbackBeat} operation={operation} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
@@ -2089,16 +2096,19 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
       <div className={`combo-path combo-burn ${planReady ? "active warm" : ""}`} aria-hidden="true" />
       <div className={`combo-path combo-break ${planReady ? "active" : ""}`} aria-hidden="true" />
       <div className={`kill-zone ${planReady ? "active" : ""}`}><span>DECISION AREA</span></div>
-      {formations.filter((formation) => activeFormations.includes(formation.id)).map((formation) => {
+      {formations.map((formation) => {
         const assignedNode = deployments[formation.id] ? NODES[deployments[formation.id]] : null;
         const node = assignedNode ?? STAGING_NODES[formation.id];
         const active = selected === formation.id;
         const consequence = consequences.player[formation.id] ?? null;
+        const formationFate = resolvedFormationFates.get(formation.id) ?? null;
         const authoredRoute = authoredRoutes.find((route) => route.formationId === formation.id);
         const routePosition = playbackActive && authoredRoute
           ? positionAlongAuthoredRoute({
               points: authoredRoute.points,
-              battleTime,
+              battleTime: formationFate && (formationFate.fate === "missing" || formationFate.fate === "destroyed")
+                ? Math.min(battleTime, formationFate.at)
+                : battleTime,
               actionAt: roleActionTimes[authoredRoute.roleIndex] ?? profile.extractionAt,
               completeAt: profile.completeAt,
             })
@@ -2106,17 +2116,17 @@ function Battlefield({ formations, selected, onSelect, deployments, phase, battl
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
             draggable={phase === "plan"}
             onDragStart={(event) => onFormationDragStart(event, formation.id)}
-            aria-label={`${formation.name}, ${assignedNode ? formation.role : "unassigned"}, at ${node.label}${consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
+            aria-label={`${formation.name}, ${assignedNode ? formation.role : "unassigned"}, at ${node.label}${formationFate ? `, ${formationFate.battleLabel}` : consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
           >
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
-            {consequence && <span className="map-formation-state">{consequence.label}</span>}
+            {(formationFate || consequence) && <span className="map-formation-state">{formationFate?.battleLabel ?? consequence.label}</span>}
           </button>
         );
       })}
@@ -2633,7 +2643,7 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
   );
 }
 
-function CompletionOverlay({ formations, assignments, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
+function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
   const lostCount = formations.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
@@ -2653,13 +2663,6 @@ function CompletionOverlay({ formations, assignments, canContinue, campaignDestr
   const fieldStateResult = finalConsequences.active.length > 0
     ? `Final field states: ${finalConsequences.active.map((consequence) => `${formations.find((formation) => formation.id === consequence.formationId)?.name ?? consequence.formationId} ${consequence.label}`).join(", ")}.`
     : "No formation carried a battlefield consequence into extraction.";
-  const formationFates = formationFatesFor({
-    formations,
-    formationOrderIds: playbook.roles.map((role) => assignments[role.id]).filter(Boolean),
-    extractedCount: profile.extractedCount,
-    consequences: finalConsequences.player,
-    campaignDestroyed,
-  });
   const outcomeLabel = won ? "OPERATION SUCCESS" : campaignDestroyed ? "CAMPAIGN DEFEAT" : canContinue ? "COSTLY CONTINUATION" : "OPERATION FAILED";
   const outcomeBanner = won ? "VICTORY" : campaignDestroyed ? "WARHOST BROKEN" : canContinue ? "WITHDRAWAL" : "DEFEAT";
   const outcomeTitle = won
@@ -2806,6 +2809,33 @@ export function App() {
     [activeBranches, condition, operation, placementReadiness, playbook, refitProtocols, tacticalHandoffs],
   );
 
+  const operationWon = operationProfile.extractedCount >= operation.requiredExtraction;
+  const hasNextOperation = operationIndex < OPERATIONS.length - 1;
+  const integrityLoss = integrityLossFor({ operationWon, extractedCount: operationProfile.extractedCount });
+  const integrityAfterMission = Math.max(0, warhostIntegrity - integrityLoss);
+  const campaignOutcome = campaignOutcomeFor({ hasNextOperation, operationWon, integrityRemaining: integrityAfterMission });
+  const campaignDestroyed = campaignOutcome === "destroyed";
+  const canContinueCampaign = campaignOutcome === "continue";
+  const finalConsequences = useMemo(
+    () => battlefieldConsequencesAt({ clashes: operationProfile.enemyClashes, battleTime: operationProfile.completeAt }),
+    [operationProfile.completeAt, operationProfile.enemyClashes],
+  );
+  const formationOrderIds = useMemo(
+    () => playbook.roles.map((role) => assignments[role.id]).filter(Boolean),
+    [assignments, playbook.roles],
+  );
+  const operationFormationFates = useMemo(
+    () => formationFatesFor({
+      formations,
+      formationOrderIds,
+      extractedCount: operationProfile.extractedCount,
+      consequences: finalConsequences.player,
+      campaignDestroyed,
+      extractionAt: operationProfile.extractionAt,
+      completeAt: operationProfile.completeAt,
+    }),
+    [campaignDestroyed, finalConsequences.player, formationOrderIds, formations, operationProfile.completeAt, operationProfile.extractedCount, operationProfile.extractionAt],
+  );
   const operationEvents = useMemo(
     () => buildOperationEvents(operationProfile, operation),
     [operation, operationProfile],
@@ -2819,17 +2849,11 @@ export function App() {
       formations,
       events: operationEvents,
       comboTimes: comboWindowTimes(operationProfile),
+      formationFates: operationFormationFates,
     }),
-    [formations, operation, operationEvents, operationProfile, playbook.id, tacticalHandoffs],
+    [formations, operation, operationEvents, operationFormationFates, operationProfile, playbook.id, tacticalHandoffs],
   );
   const currentPlaybackBeat = playbackBeats[Math.min(playbackIndex, playbackBeats.length - 1)] ?? null;
-  const operationWon = operationProfile.extractedCount >= operation.requiredExtraction;
-  const hasNextOperation = operationIndex < OPERATIONS.length - 1;
-  const integrityLoss = integrityLossFor({ operationWon, extractedCount: operationProfile.extractedCount });
-  const integrityAfterMission = Math.max(0, warhostIntegrity - integrityLoss);
-  const campaignOutcome = campaignOutcomeFor({ hasNextOperation, operationWon, integrityRemaining: integrityAfterMission });
-  const campaignDestroyed = campaignOutcome === "destroyed";
-  const canContinueCampaign = campaignOutcome === "continue";
 
   const drillSteps = useMemo(
     () => [
@@ -3232,13 +3256,13 @@ export function App() {
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
         <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
-        <Battlefield formations={formations} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
+        <Battlefield formations={formations} formationFates={operationFormationFates} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
-      {showCompletion && <CompletionOverlay formations={formations} assignments={assignments} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
+      {showCompletion && <CompletionOverlay formations={formations} formationFates={operationFormationFates} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
       {showWorkshop && workshopBaseline && <SalvageWorkshop baseline={workshopBaseline} choice={salvageChoice} formations={workshopFormations} integrity={warhostIntegrity} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopAction} onLaunch={launchNextOperation} />}
     </main>
   );

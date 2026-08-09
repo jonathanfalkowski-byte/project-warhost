@@ -129,17 +129,21 @@ test("formation fates follow staffed slot order and distinguish force collapse f
     { id: "gamma", name: "GAMMA" },
   ];
   const consequences = {
-    alpha: { state: "cut-off", severity: 5, cause: "OATH PURSUIT" },
-    beta: { state: "damaged", severity: 4, cause: "BETA SCREEN" },
+    alpha: { state: "cut-off", severity: 5, cause: "OATH PURSUIT", at: 70 },
+    beta: { state: "damaged", severity: 4, cause: "BETA SCREEN", at: 40 },
   };
   const partial = formationFatesFor({
     formations,
     formationOrderIds: ["beta", "gamma", "alpha"],
     extractedCount: 2,
     consequences,
+    extractionAt: 90,
+    completeAt: 105,
   });
   assert.deepEqual(partial.map(({ formation }) => formation.id), ["beta", "gamma", "alpha"]);
   assert.deepEqual(partial.map(({ fate }) => fate), ["damaged", "extracted", "missing"]);
+  assert.deepEqual(partial.map(({ at }) => at), [40, 105, 98]);
+  assert.equal(partial[2].battleLabel, "CUT OFF");
 
   const collapsed = formationFatesFor({
     formations,
@@ -147,8 +151,12 @@ test("formation fates follow staffed slot order and distinguish force collapse f
     extractedCount: 0,
     consequences,
     campaignDestroyed: true,
+    extractionAt: 90,
+    completeAt: 105,
   });
   assert.equal(collapsed.filter(({ fate }) => fate === "destroyed").length, 1);
   assert.equal(collapsed.find(({ fate }) => fate === "destroyed").formation.id, "alpha");
   assert.equal(collapsed.filter(({ fate }) => fate === "missing").length, 2);
+  assert.ok(collapsed.every(({ at }) => at >= 90 && at <= 105));
+  assert.ok(collapsed.find(({ fate }) => fate === "destroyed").at > Math.max(...collapsed.filter(({ fate }) => fate === "missing").map(({ at }) => at)));
 });
