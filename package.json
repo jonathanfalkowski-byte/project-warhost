@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
-    "test:game": "node --test tests/enemy-collision.test.mjs tests/battle-playback.test.mjs tests/battle-consequences.test.mjs tests/campaign-persistence.test.mjs tests/field-routes.test.mjs tests/playbook-doctrine.test.mjs tests/tactical-resolution.test.mjs",
+    "test:game": "node --test tests/enemy-collision.test.mjs tests/battle-playback.test.mjs tests/battle-consequences.test.mjs tests/campaign-persistence.test.mjs tests/extraction-resolution.test.mjs tests/field-routes.test.mjs tests/playbook-doctrine.test.mjs tests/tactical-resolution.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs"
   },
   "dependencies": {

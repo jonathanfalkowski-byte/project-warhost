@@ -679,6 +679,14 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .readiness-impact.penalty { border-color: #d66c42; background: #24150f; }
 .readiness-impact.penalty > span, .readiness-impact.penalty > b { color: #ef8b5e; }
 .readiness-impact.penalty > small { color: #a47c69; }
+.extraction-breakdown { margin-top: 7px; display: grid; gap: 2px; padding: 7px; border-left: 3px solid #77a95b; background: #142018; font-family: "Barlow Condensed"; }
+.extraction-breakdown > span { color: #82ae6a; font-size: 8px; letter-spacing: .1em; }
+.extraction-breakdown > b { color: #a9d98c; font-size: 10px; letter-spacing: .03em; }
+.extraction-breakdown > small { color: #768a72; font-size: 7px; line-height: 1.25; }
+.extraction-breakdown.costly { border-color: #d29148; background: #21180f; }
+.extraction-breakdown.costly > span, .extraction-breakdown.costly > b { color: #e6aa5f; }
+.extraction-breakdown.broken { border-color: #d85f42; background: #28130e; }
+.extraction-breakdown.broken > span, .extraction-breakdown.broken > b { color: #ef7959; }
 .refit-protocol-impact { margin-top: 7px; display: grid; gap: 2px; padding: 7px; border: 1px solid #638e4e; background: linear-gradient(90deg, #132318, #101a17); font-family: "Barlow Condensed"; box-shadow: inset 0 0 18px rgba(105, 169, 75, .08); }
 .refit-protocol-impact > span { color: #82bd68; font-size: 8px; letter-spacing: .1em; }
 .refit-protocol-impact > b { color: #b5db9f; font-size: 10px; letter-spacing: .04em; }

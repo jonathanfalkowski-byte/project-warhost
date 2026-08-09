@@ -32,6 +32,7 @@ import {
 } from "@phosphor-icons/react";
 import { resolveAshenCollision } from "./enemyCollision.js";
 import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
+import { resolveExtractionOutcome } from "./extractionResolution.js";
 import {
   applyCampaignConditions,
   applyWorkshopAction,
@@ -1216,11 +1217,17 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
   const extractionAt = Math.max(reactorAt + 30, BASE_OPERATION.extractionAt - total("extraction") - protocolTotal("extraction") - doctrine.impact.extraction) + branchTotal("missionDelay") + enemyTotal("missionDelay") + readinessSummary.delay + doctrine.impact.missionDelay;
   const completeAt = extractionAt + 15;
   const overrun = Math.max(0, completeAt - BASE_OPERATION.completeAt);
-  const reinforcementLoss = Math.ceil(overrun / 15);
   const protectedCount = total("protects") + protocolTotal("protects") + branchTotal("protects") + doctrine.impact.protects;
   const enemyRecoveryLoss = Math.ceil(enemyTotal("recoveryLoss"));
   const deployedCount = readinessSummary.staffedCount;
-  const extractedCount = Math.max(0, Math.min(deployedCount, 3 + protectedCount) - reinforcementLoss - enemyRecoveryLoss);
+  const extraction = resolveExtractionOutcome({
+    deployedCount,
+    requiredExtraction: operation?.requiredExtraction,
+    protectedCount,
+    overrun,
+    recoveryLoss: enemyRecoveryLoss,
+  });
+  const { extractedCount, reserveCapacity, waveLoss: reinforcementLoss } = extraction;
 
   return {
     alphaAt,
@@ -1232,6 +1239,7 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     extractionAt,
     completeAt,
     extractedCount,
+    reserveCapacity,
     timeSaved: Math.max(0, BASE_OPERATION.completeAt - completeAt),
     overrun,
     reinforcementLoss,
@@ -2381,6 +2389,13 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
             <span>FORMATION READINESS</span>
             <b>{profile.readiness.average}% · {profile.readiness.delay > 0 ? `+${fmtDuration(profile.readiness.delay)} EXECUTION DELAY` : "NO TASK-FIT DELAY"}</b>
             <small>{profile.readiness.alignedCount} / {profile.readiness.staffedCount} STAFFED FORMATIONS TASK-ALIGNED{profile.readiness.protocolDelayReduction > 0 ? ` · REFIT ABSORBED ${fmtDuration(profile.readiness.protocolDelayReduction)} OF ${fmtDuration(profile.readiness.rawDelay)} IMPROVISED DELAY` : ""} · COMBO EFFECTS RESOLVE SEPARATELY</small>
+          </div>
+        )}
+        {planReady && (
+          <div className={`extraction-breakdown ${profile.extractedCount >= operation.requiredExtraction ? "viable" : profile.extractedCount > 0 ? "costly" : "broken"}`}>
+            <span>EXTRACTION BREAKDOWN</span>
+            <b>{profile.reserveCapacity} CAPACITY − {profile.reinforcementLoss} WAVE − {profile.enemyRecoveryLoss} ROUTE = {profile.extractedCount} CLEAR</b>
+            <small>THE ENEMY WAVE REMOVES ONE RECOVERY SLOT PER COMPLETE 30 SECONDS OF CONTACT.</small>
           </div>
         )}
         {profile.protocols.length > 0 && (
