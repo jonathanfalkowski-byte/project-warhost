@@ -51,6 +51,13 @@ export const formationFatesFor = ({
   const safeExtractedCount = Math.max(0, Math.min(ordered.length, Math.floor(Number(extractedCount) || 0)));
   const unaccountedCount = ordered.length - safeExtractedCount;
   const exposedFirst = [...ordered].sort((left, right) => {
+    const combatRisk = (item) => {
+      const combat = item.consequence?.combat;
+      if (!combat) return 0;
+      return (Number(combat.damage) || 0) * 10 + (Number(combat.remaining) <= 0 ? 50 : 0);
+    };
+    const combatDifference = combatRisk(right) - combatRisk(left);
+    if (combatDifference) return combatDifference;
     const severityDifference = Number(right.consequence?.severity ?? 0) - Number(left.consequence?.severity ?? 0);
     return severityDifference || right.orderIndex - left.orderIndex;
   });

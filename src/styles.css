@@ -86,6 +86,11 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .dossier-identity small { display: flex; align-items: center; gap: 4px; color: #84c8e4; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .06em; }
 .dossier-identity small svg { width: 13px; }
 .formation-dossier > p { margin: 8px 0; color: #a7b0ac; font-size: 10px; line-height: 1.35; }
+.dossier-endurance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 7px 0; }
+.dossier-endurance > div { display: grid; gap: 1px; padding: 5px; border: 1px solid #304850; background: #101a1d; }
+.dossier-endurance span { color: #74909a; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .09em; text-transform: uppercase; }
+.dossier-endurance b { color: #d3e4e7; font-family: "Barlow Condensed"; font-size: 15px; }
+.dossier-endurance small { color: #63bee1; font-size: 7px; letter-spacing: 0; white-space: nowrap; }
 .dossier-campaign-state { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 5px; margin: 7px 0; padding: 6px; border-left: 3px solid #db6943; background: #27140e; color: #ef8b68; }
 .dossier-campaign-state > svg { width: 15px; }
 .dossier-campaign-state > span { display: grid; }

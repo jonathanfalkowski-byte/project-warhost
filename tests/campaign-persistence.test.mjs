@@ -164,3 +164,21 @@ test("formation fates follow staffed slot order and distinguish force collapse f
   assert.deepEqual(collapsed.find(({ formation }) => formation.id === "beta").history.map(({ label }) => label), ["DAMAGED", "CUT OFF", "MISSING"]);
   assert.deepEqual(collapsed.find(({ fate }) => fate === "destroyed").history.map(({ label }) => label), ["CUT OFF", "DESTROYED"]);
 });
+
+test("specific combat exposure decides which formation fails extraction before generic severity", () => {
+  const formations = [{ id: "alpha" }, { id: "beta" }, { id: "gamma" }];
+  const fates = formationFatesFor({
+    formations,
+    formationOrderIds: ["alpha", "beta", "gamma"],
+    extractedCount: 2,
+    consequences: {
+      alpha: { state: "pinned", label: "PINNED", severity: 3, combat: { damage: 1, remaining: 3 } },
+      beta: { state: "delayed", label: "DELAYED", severity: 2, combat: { damage: 4, remaining: 0 } },
+    },
+    extractionAt: 90,
+    completeAt: 105,
+  });
+
+  assert.equal(fates.find(({ formation }) => formation.id === "beta").fate, "missing");
+  assert.equal(fates.find(({ formation }) => formation.id === "alpha").fate, "damaged");
+});

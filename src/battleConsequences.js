@@ -22,9 +22,9 @@ const playerStateFor = (outcome, actorIndex) => {
   return null;
 };
 
-const applyPlayerState = (player, formationId, state, cause, at, outcome) => {
+const applyPlayerState = (player, formationId, state, cause, at, outcome, combat = null) => {
   if (typeof formationId !== "string" || !PLAYER_STATES[state]) return;
-  const next = { state, ...PLAYER_STATES[state], cause, at, outcome };
+  const next = { state, ...PLAYER_STATES[state], cause, at, outcome, combat };
   const current = player[formationId];
   if (!current || next.severity >= current.severity) player[formationId] = next;
 };
@@ -43,6 +43,16 @@ export const battlefieldConsequencesAt = ({ clashes = [], battleTime = 0 } = {})
 
     const cause = typeof clash.label === "string" ? clash.label : `ENEMY ORDER E${enemyIndex + 1}`;
     enemy[enemyIndex] = { ...ENEMY_STATES[outcome], cause, at: actionAt, outcome };
+    const actorImpacts = Array.isArray(clash?.resolution?.actorImpacts) ? clash.resolution.actorImpacts : [];
+    if (actorImpacts.length > 0) {
+      actorImpacts.forEach((impact) => {
+        const axis = typeof impact?.target === "string" ? impact.target.toUpperCase() : "ENDURANCE";
+        const pressure = typeof impact?.pressureType === "string" ? impact.pressureType : "CONTACT";
+        const detail = `${cause} · ${pressure} ${axis} ${impact.starting}→${impact.remaining}`;
+        applyPlayerState(player, impact?.formationId, impact?.state, detail, actionAt, outcome, impact);
+      });
+      return;
+    }
     const actorIds = Array.isArray(clash?.resolution?.actorIds) ? clash.resolution.actorIds : [];
     actorIds.forEach((formationId, actorIndex) => {
       applyPlayerState(player, formationId, playerStateFor(outcome, actorIndex), cause, actionAt, outcome);
@@ -55,4 +65,3 @@ export const battlefieldConsequencesAt = ({ clashes = [], battleTime = 0 } = {})
     active: Object.entries(player).map(([formationId, consequence]) => ({ formationId, ...consequence })),
   };
 };
-

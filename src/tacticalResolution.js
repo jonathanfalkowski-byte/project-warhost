@@ -9,6 +9,46 @@ const stringList = (value) => Array.isArray(value)
   ? [...new Set(value.filter((item) => typeof item === "string" && item.length > 0))]
   : [];
 
+const ENDURANCE_AXES = Object.freeze(["armor", "cohesion", "mobility"]);
+
+const enduranceFor = (actor, axis) => boundedNumber(actor?.endurance?.[axis], 1, 1, 9);
+
+export const resolveFormationImpact = ({ actor = {}, actorIndex = 0, enemyOrder = {}, impactScale = 0 } = {}) => {
+  const requestedAxis = enemyOrder?.pressure?.target;
+  const target = ENDURANCE_AXES.includes(requestedAxis) ? requestedAxis : "cohesion";
+  const pressureType = typeof enemyOrder?.pressure?.type === "string" ? enemyOrder.pressure.type : "CONTACT";
+  const strength = boundedNumber(enemyOrder?.pressure?.strength, 2, 0, 9);
+  const starting = enduranceFor(actor, target);
+  const safeScale = boundedNumber(impactScale, 0, 0, 2);
+  const secondaryScale = Number(actorIndex) > 0 ? 0.75 : 1;
+  const rawDamage = safeScale > 0 ? Math.max(1, Math.ceil(strength * safeScale * secondaryScale)) : 0;
+  const handoffProtection = rawDamage > 0 && (actor?.inboundReaction || actor?.outboundLink) ? 1 : 0;
+  const damage = Math.max(0, rawDamage - handoffProtection);
+  const remaining = Math.max(0, starting - damage);
+  const seriousHit = damage >= Math.max(2, Math.ceil(starting * 0.5));
+  const state = damage <= 0
+    ? "momentum"
+    : remaining <= 0 && target === "mobility"
+      ? "cut-off"
+      : target === "armor" && seriousHit
+        ? "damaged"
+        : target === "cohesion" && seriousHit
+          ? "pinned"
+          : "delayed";
+
+  return {
+    formationId: typeof actor?.formationId === "string" ? actor.formationId : null,
+    target,
+    pressureType,
+    strength,
+    starting,
+    damage,
+    remaining,
+    handoffProtection,
+    state,
+  };
+};
+
 const OUTCOMES = Object.freeze({
   decisive: Object.freeze({ label: "DECISIVE", impactScale: 0, routeState: "countered", verdict: "Enemy order broken before it can alter the mission." }),
   checked: Object.freeze({ label: "CHECKED", impactScale: 0.5, routeState: "diverted", verdict: "Enemy order lands only partially; its consequence is halved." }),
@@ -46,6 +86,12 @@ export const resolveTacticalEngagement = ({
   const margin = playerScore - enemyScore;
   const outcome = margin >= 2 ? "decisive" : margin >= 0 ? "checked" : margin >= -2 ? "costly" : "overrun";
   const outcomeMeta = OUTCOMES[outcome];
+  const actorImpacts = validActors.map((actor, actorIndex) => resolveFormationImpact({
+    actor,
+    actorIndex,
+    enemyOrder,
+    impactScale: outcomeMeta.impactScale,
+  }));
 
   const factors = [
     { id: "capability", label: `CAPABILITY ${matchedCapabilities.length}/${requiredCapabilities.length}`, score: capabilityScore },
@@ -68,6 +114,6 @@ export const resolveTacticalEngagement = ({
     counterActorName,
     factors,
     actorIds: validActors.map((actor) => actor.formationId).filter(Boolean),
+    actorImpacts,
   };
 };
-

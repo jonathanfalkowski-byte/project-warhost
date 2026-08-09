@@ -61,3 +61,29 @@ test("starved and malformed clashes do not invent player damage", () => {
   assert.deepEqual(battlefieldConsequencesAt({ clashes: "invalid", battleTime: "invalid" }).active, []);
 });
 
+test("specific endurance impacts replace generic outcome labels with causal combat detail", () => {
+  const state = battlefieldConsequencesAt({
+    clashes: [{
+      actionAt: 30,
+      label: "GANTRY SEVER",
+      resolution: {
+        outcome: "overrun",
+        actorIds: ["hauler"],
+        actorImpacts: [{
+          formationId: "hauler",
+          target: "mobility",
+          pressureType: "PURSUIT",
+          starting: 4,
+          damage: 4,
+          remaining: 0,
+          state: "cut-off",
+        }],
+      },
+    }],
+    battleTime: 30,
+  });
+
+  assert.equal(state.player.hauler.state, "cut-off");
+  assert.equal(state.player.hauler.cause, "GANTRY SEVER · PURSUIT MOBILITY 4→0");
+  assert.equal(state.player.hauler.combat.remaining, 0);
+});

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveTacticalEngagement } from "../src/tacticalResolution.js";
+import { resolveFormationImpact, resolveTacticalEngagement } from "../src/tacticalResolution.js";
 
 const enemyOrder = {
   resistance: 8,
@@ -9,7 +9,7 @@ const enemyOrder = {
   counteredBy: ["FURNACE DRAGNET"],
 };
 
-const actor = (formationId, capabilities, score = 80) => ({ formationId, capabilities, score });
+const actor = (formationId, capabilities, score = 80, endurance = { armor: 3, cohesion: 3, mobility: 3 }) => ({ formationId, capabilities, score, endurance });
 
 test("aligned formations plus an exact handoff counter break an enemy order", () => {
   const result = resolveTacticalEngagement({
@@ -63,3 +63,43 @@ test("malformed numeric and array inputs are bounded safely", () => {
   assert.equal(result.counterActorName, null);
 });
 
+test("enemy pressure attacks a specific endurance axis and handoffs absorb part of the hit", () => {
+  const exposed = resolveFormationImpact({
+    actor: actor("breaker", ["BREACH"], 80, { armor: 5, cohesion: 3, mobility: 2 }),
+    enemyOrder: { pressure: { type: "FIREPOWER", target: "armor", strength: 4 } },
+    impactScale: 1,
+  });
+  const supported = resolveFormationImpact({
+    actor: { ...actor("breaker", ["BREACH"], 80, { armor: 5, cohesion: 3, mobility: 2 }), inboundReaction: true },
+    enemyOrder: { pressure: { type: "FIREPOWER", target: "armor", strength: 4 } },
+    impactScale: 1,
+  });
+
+  assert.deepEqual({ target: exposed.target, damage: exposed.damage, remaining: exposed.remaining, state: exposed.state }, { target: "armor", damage: 4, remaining: 1, state: "damaged" });
+  assert.equal(supported.damage, 3);
+  assert.equal(supported.handoffProtection, 1);
+});
+
+test("pursuit cuts off a formation only when mobility is exhausted", () => {
+  const impact = resolveFormationImpact({
+    actor: actor("hauler", ["RECOVERY"], 70, { armor: 3, cohesion: 4, mobility: 4 }),
+    enemyOrder: { pressure: { type: "PURSUIT", target: "mobility", strength: 5 } },
+    impactScale: 1,
+  });
+
+  assert.equal(impact.remaining, 0);
+  assert.equal(impact.state, "cut-off");
+});
+
+test("malformed endurance and pressure values remain bounded", () => {
+  const impact = resolveFormationImpact({
+    actor: { formationId: "test", endurance: { armor: -99 } },
+    enemyOrder: { pressure: { target: "armor", strength: 999 } },
+    impactScale: 999,
+  });
+
+  assert.equal(impact.starting, 1);
+  assert.equal(impact.strength, 9);
+  assert.equal(impact.remaining, 0);
+  assert.equal(impact.state, "damaged");
+});

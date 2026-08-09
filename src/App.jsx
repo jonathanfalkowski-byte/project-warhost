@@ -61,6 +61,7 @@ const FORMATIONS = [
     number: "1",
     name: "HARPOON RIG",
     role: "DISPLACE",
+    endurance: { armor: 3, cohesion: 3, mobility: 5 },
     capabilities: ["CONTROL", "MOBILITY"],
     refits: [
       { id: "winch", name: "GRAVITIC WINCH", summary: "Control package built for forced movement.", capabilities: ["CONTROL", "MOBILITY"], creates: "DISPLACED" },
@@ -78,6 +79,7 @@ const FORMATIONS = [
     number: "2",
     name: "FURNACE CREW",
     role: "DENY",
+    endurance: { armor: 2, cohesion: 4, mobility: 3 },
     capabilities: ["DENIAL", "AREA"],
     refits: [
       { id: "jets", name: "SMELTER JETS", summary: "Wide thermal denial across exposed lanes.", capabilities: ["DENIAL", "AREA"], creates: "OVERHEATED" },
@@ -95,6 +97,7 @@ const FORMATIONS = [
     number: "3",
     name: "BREAKER EXO",
     role: "BREACH",
+    endurance: { armor: 5, cohesion: 3, mobility: 2 },
     capabilities: ["BREACH", "SHOCK"],
     refits: [
       { id: "ram", name: "RAM FRAME", summary: "Direct shock package for rupturing a fixed target.", capabilities: ["BREACH", "SHOCK"], creates: "BREACHED" },
@@ -112,6 +115,7 @@ const FORMATIONS = [
     number: "4",
     name: "RAILJACK",
     role: "HOLD",
+    endurance: { armor: 4, cohesion: 5, mobility: 2 },
     capabilities: ["HOLD", "COVER"],
     refits: [
       { id: "plates", name: "BASTION PLATES", summary: "Armored screen for holding captured ground.", capabilities: ["HOLD", "COVER"], creates: "SCREENED" },
@@ -129,6 +133,7 @@ const FORMATIONS = [
     number: "5",
     name: "SALVAGE HAULER",
     role: "EXTRACT",
+    endurance: { armor: 3, cohesion: 4, mobility: 4 },
     capabilities: ["RECOVERY", "SUPPORT"],
     refits: [
       { id: "crane", name: "RECOVERY CRANE", summary: "Sustainment rig for damaged formations and crew.", capabilities: ["RECOVERY", "SUPPORT"], creates: "SUPPLIED" },
@@ -488,6 +493,7 @@ const DEAD_CIRCUIT_ENEMY_PLAN = {
       creates: "FORTIFIED LANE",
       intelligence: "KNOWN",
       counterCapabilities: ["CONTROL", "DENIAL"],
+      pressure: { type: "SUPPRESSION", target: "cohesion", strength: 3 },
       resistance: 7,
       counteredBy: ["FURNACE DRAGNET", "ASHEN CORDON"],
       impact: { reactorDelay: 15 },
@@ -501,6 +507,7 @@ const DEAD_CIRCUIT_ENEMY_PLAN = {
       creates: "COUNTERFIRE",
       intelligence: "UNCERTAIN",
       counterCapabilities: ["BREACH", "SHOCK"],
+      pressure: { type: "FIREPOWER", target: "armor", strength: 4 },
       resistance: 8,
       counteredBy: ["EXECUTION BREACH", "THERMAL BREACH", "FORCED ENTRY", "FIELD REARM", "COVERED ADVANCE", "LOCKED BREACH"],
       impact: { missionDelay: 15 },
@@ -514,6 +521,7 @@ const DEAD_CIRCUIT_ENEMY_PLAN = {
       creates: "CUT OFF",
       intelligence: "UNKNOWN",
       counterCapabilities: ["RECOVERY", "HOLD"],
+      pressure: { type: "PURSUIT", target: "mobility", strength: 5 },
       resistance: 8,
       counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "LOCKSTEP HOLD"],
       impact: { recoveryLoss: 1 },
@@ -538,6 +546,7 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       creates: "BLINDED CORRIDOR",
       intelligence: "KNOWN",
       counterCapabilities: ["CONTROL", "COVER"],
+      pressure: { type: "SIGNAL SHOCK", target: "cohesion", strength: 3 },
       resistance: 7,
       counteredBy: ["COVERED DRAG", "POWER WINCH", "FURNACE DRAGNET", "ASHEN CORDON", "MAGNETIC RELAY KEY", "VEIL FRACTURE", "FURNACE FEED"],
       impact: { reactorDelay: 15 },
@@ -551,6 +560,7 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       creates: "RELAY LOCK",
       intelligence: "UNCERTAIN",
       counterCapabilities: ["BREACH", "DENIAL"],
+      pressure: { type: "FIREPOWER", target: "armor", strength: 4 },
       resistance: 8,
       counteredBy: ["THERMAL BREACH", "COVERED ADVANCE", "LOCKED BREACH", "WEDGE & WALL", "LOCKSTEP HOLD", "FURNACE FEED"],
       impact: { missionDelay: 15 },
@@ -564,6 +574,7 @@ const ASHEN_PASSAGE_ENEMY_PLAN = {
       creates: "LIFT SEALED",
       intelligence: "UNKNOWN",
       counterCapabilities: ["RECOVERY", "HOLD"],
+      pressure: { type: "OCCUPATION", target: "mobility", strength: 5 },
       resistance: 8,
       counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "MOBILE RESUPPLY", "VOID LIFT BUBBLE"],
       impact: { recoveryLoss: 1 },
@@ -919,6 +930,7 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs, condition,
       formationName: formation.name,
       refitName: formation.activeRefit.name,
       capabilities: formation.capabilities,
+      endurance: formation.endurance,
       score,
       label,
       taskAligned,
@@ -1380,6 +1392,11 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness, p
         <div><span>FORMATION {formation.number}</span><b>{formation.name}</b><small><Icon weight="duotone" /> {formation.role}</small></div>
       </div>
       <p>{formation.purpose}</p>
+      <div className="dossier-endurance" aria-label="Formation endurance profile">
+        {Object.entries(formation.endurance).map(([axis, value]) => (
+          <div key={axis}><span>{axis}</span><b>{value}</b><small>{"■".repeat(value)}{"□".repeat(5 - value)}</small></div>
+        ))}
+      </div>
       {formation.campaignCondition && (
         <div className={`dossier-campaign-state ${formation.campaignCondition.state}`}>
           <Warning weight="fill" />
