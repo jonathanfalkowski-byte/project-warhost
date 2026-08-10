@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  adjacentFormationIdsFor,
   capabilityMatchesFor,
   formationInteractionsFor,
+  interactionDirectionFor,
   neighboringInteractionHints,
 } from "../src/formationInteractions.js";
 
@@ -32,9 +34,26 @@ test("neighbor hints include only currently adjacent formations", () => {
   assert.match(hints[0].text, /FURNACE CREW can react/);
 });
 
+test("interaction direction is classified relative to the inspected formation", () => {
+  const links = formationInteractionsFor({ formations, formationId: "harpoon" });
+  assert.equal(interactionDirectionFor(links.find((link) => link.partnerId === "furnace")), "outgoing");
+  assert.equal(interactionDirectionFor(links.find((link) => link.partnerId === "railjack")), "incoming");
+  assert.equal(interactionDirectionFor({ outgoing: {}, incoming: {} }), "mutual");
+  assert.equal(interactionDirectionFor(null), null);
+});
+
+test("adjacency follows staffed tactical slot order rather than formation roster order", () => {
+  const roles = [{ id: "lead" }, { id: "guard" }, { id: "assault" }, { id: "rear" }];
+  const assignments = { lead: "furnace", guard: "harpoon", assault: "breaker", rear: "railjack" };
+  assert.deepEqual(adjacentFormationIdsFor({ roles, assignments, formationId: "harpoon" }), ["furnace", "breaker"]);
+  assert.deepEqual(adjacentFormationIdsFor({ roles, assignments, formationId: "railjack" }), ["breaker"]);
+});
+
 test("malformed interaction requests fail closed", () => {
   assert.deepEqual(formationInteractionsFor({ formations: null, formationId: "harpoon" }), []);
   assert.deepEqual(formationInteractionsFor({ formations, formationId: "unknown" }), []);
   assert.deepEqual(capabilityMatchesFor({ formation: null, demands: ["CONTROL"] }), []);
   assert.deepEqual(neighboringInteractionHints({ formations, formationId: "harpoon", neighborIds: "furnace" }), []);
+  assert.deepEqual(adjacentFormationIdsFor({ roles: null, assignments: {}, formationId: "harpoon" }), []);
+  assert.deepEqual(adjacentFormationIdsFor({ roles: [], assignments: null, formationId: "harpoon" }), []);
 });

@@ -28,6 +28,23 @@ export const formationInteractionsFor = ({ formations, formationId } = {}) => {
   });
 };
 
+export const interactionDirectionFor = (interaction) => {
+  if (!interaction || typeof interaction !== "object") return null;
+  if (interaction.outgoing && interaction.incoming) return "mutual";
+  if (interaction.outgoing) return "outgoing";
+  if (interaction.incoming) return "incoming";
+  return null;
+};
+
+export const adjacentFormationIdsFor = ({ roles, assignments, formationId } = {}) => {
+  if (!Array.isArray(roles) || !assignments || typeof assignments !== "object" || typeof formationId !== "string") return [];
+  const roleIndex = roles.findIndex((role) => role?.id && assignments[role.id] === formationId);
+  if (roleIndex < 0) return [];
+  return [roles[roleIndex - 1], roles[roleIndex + 1]]
+    .map((role) => role?.id ? assignments[role.id] : null)
+    .filter((neighborId) => typeof neighborId === "string" && neighborId.length > 0);
+};
+
 export const neighboringInteractionHints = ({ formations, formationId, neighborIds } = {}) => {
   const allowedNeighbors = new Set(textList(neighborIds));
   return formationInteractionsFor({ formations, formationId })
