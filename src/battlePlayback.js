@@ -6,8 +6,10 @@ const BEAT_PRIORITY = {
   response: 4,
   result: 5,
   mission: 6,
-  fate: 7,
-  complete: 8,
+  reinforcement: 7,
+  intercept: 8,
+  fate: 9,
+  complete: 10,
 };
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -87,6 +89,7 @@ export const buildBattlePlayback = ({
   events,
   comboTimes,
   formationFates = [],
+  reinforcementWave = null,
 }) => {
   const beats = [];
   const addBeat = (beat) => beats.push({
@@ -95,6 +98,7 @@ export const buildBattlePlayback = ({
     playerFormationIds: [],
     routeState: null,
     doctrinePhase: null,
+    reinforcementFocus: false,
     resolution: null,
     ...beat,
   });
@@ -112,7 +116,9 @@ export const buildBattlePlayback = ({
 
   const enemyEventTexts = new Set(profile.enemyClashes.map((clash) => clash.eventText));
   events
-    .filter((event) => !enemyEventTexts.has(event.text) && event.at < profile.completeAt)
+    .filter((event) => !enemyEventTexts.has(event.text)
+      && event.at < profile.completeAt
+      && !(profile.overrun > 0 && reinforcementWave && event.at === reinforcementWave.arrivalAt && event.text.includes(reinforcementWave.name)))
     .forEach((event, index) => {
       addBeat({
         id: `mission-${event.at}-${index}`,
@@ -194,10 +200,53 @@ export const buildBattlePlayback = ({
     });
   });
 
+  if (profile.overrun > 0 && reinforcementWave?.name && Number.isFinite(reinforcementWave.arrivalAt)) {
+    const exposedFates = formationFates.filter((formationFate) => formationFate?.fate && formationFate.fate !== "extracted");
+    const exposedIds = exposedFates.map((formationFate) => formationFate.formationId).filter(Boolean);
+    const exposedNames = exposedFates.map((formationFate) => formationFate.formation?.name).filter(Boolean);
+    const pursuitIndex = profile.enemyClashes.findIndex((clash) => !clash.disrupted && (clash.creates === "CUT OFF" || clash.pressure?.type === "PURSUIT"));
+    const approachLead = Math.max(8, Math.min(20, Math.floor((reinforcementWave.approachDuration ?? 30) / 2)));
+
+    addBeat({
+      id: "reinforcement-approach",
+      at: Math.max(0, reinforcementWave.arrivalAt - approachLead),
+      kind: "reinforcement",
+      eyebrow: "LATE ENEMY WAVE · EXTRACTION THREAT",
+      title: `${reinforcementWave.name} is still moving on extraction.`,
+      detail: "The main objective is won, but the opposing force is not destroyed. A surviving relief column is closing on the withdrawal route.",
+      playerFormationIds: exposedIds,
+      enemyFormationIndex: pursuitIndex >= 0 ? pursuitIndex : null,
+      enemyFormationIndices: pursuitIndex >= 0 ? [pursuitIndex] : [],
+      reinforcementFocus: true,
+      routeState: "wave-approach",
+    });
+
+    addBeat({
+      id: "extraction-intercept",
+      at: reinforcementWave.arrivalAt,
+      kind: "intercept",
+      eyebrow: "EXTRACTION INTERCEPT · ENEMY SURVIVORS",
+      title: `${reinforcementWave.name} reaches the gantry before the Warhost clears.`,
+      detail: `${profile.overrun} seconds remain in the intercept window${exposedNames.length > 0 ? `; ${exposedNames.join(", ")} are still exposed` : ""}.`,
+      playerFormationIds: exposedIds,
+      enemyFormationIndex: pursuitIndex >= 0 ? pursuitIndex : null,
+      enemyFormationIndices: pursuitIndex >= 0 ? [pursuitIndex] : [],
+      reinforcementFocus: true,
+      routeState: "intercept",
+    });
+  }
+
   formationFates
     .filter((formationFate) => formationFate?.fate && formationFate.fate !== "extracted")
     .forEach((formationFate) => {
       const name = formationFate.formation?.name ?? "Formation";
+      const extractionHistory = (formationFate.history ?? []).find((historyItem) => historyItem.source === "extraction");
+      const namedEnemyIndex = extractionHistory
+        ? profile.enemyClashes.findIndex((clash) => extractionHistory.cause?.toUpperCase().includes(clash.label?.toUpperCase()))
+        : -1;
+      const pursuitEnemyIndex = profile.enemyClashes.findIndex((clash) => !clash.disrupted && (clash.creates === "CUT OFF" || clash.pressure?.type === "PURSUIT"));
+      const responsibleEnemyIndex = namedEnemyIndex >= 0 ? namedEnemyIndex : pursuitEnemyIndex;
+      const responsibleEnemyLabel = profile.enemyClashes[responsibleEnemyIndex]?.label ?? extractionHistory?.cause;
       const titles = {
         damaged: `${name} takes lasting damage.`,
         missing: `${name} is cut off from the Warhost.`,
@@ -207,12 +256,22 @@ export const buildBattlePlayback = ({
         id: `formation-fate-${formationFate.formationId}`,
         at: formationFate.at,
         kind: "fate",
-        eyebrow: `FORMATION FATE · SLOT ${String(formationFate.orderIndex + 1).padStart(2, "0")}`,
+        eyebrow: extractionHistory
+          ? `PURSUIT RESULT · ${responsibleEnemyLabel}`
+          : `FORMATION FATE · SLOT ${String(formationFate.orderIndex + 1).padStart(2, "0")}`,
         title: titles[formationFate.fate] ?? `${name}: ${formationFate.battleLabel}.`,
         detail: formationFate.detail,
         playerFormationIds: [formationFate.formationId],
+        enemyFormationIndex: responsibleEnemyIndex >= 0 ? responsibleEnemyIndex : null,
+        enemyFormationIndices: responsibleEnemyIndex >= 0 ? [responsibleEnemyIndex] : [],
+        reinforcementFocus: Boolean(extractionHistory),
         routeState: `fate-${formationFate.fate}`,
         formationFate,
+        statusChanges: extractionHistory ? [{
+          formationId: formationFate.formationId,
+          formationName: name,
+          ...extractionHistory,
+        }] : [],
       });
     });
 

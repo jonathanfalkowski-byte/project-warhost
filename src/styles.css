@@ -512,6 +512,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .battlefield.playback-active .reinforcement-route,
 .battlefield.playback-active .reinforcement-intercept,
 .battlefield.playback-active .reinforcement-wave { opacity: .08; }
+.battlefield.playback-active .reinforcement-route.playback-focused { z-index: 13; height: 5px; opacity: 1 !important; border-top-style: solid; box-shadow: 0 0 24px rgba(241, 105, 62, .92); animation: enemyCounterRoute .85s ease-out both; }
+.battlefield.playback-active .reinforcement-intercept.playback-focused { z-index: 16; opacity: 1 !important; transform: translate(-50%, -50%) scale(1.18); animation: playbackCollisionPulse .85s ease-in-out infinite alternate; }
+.battlefield.playback-active .reinforcement-wave.playback-focused { z-index: 15; width: 78px; height: 78px; opacity: 1 !important; filter: none; }
+.battlefield.playback-active .reinforcement-wave.playback-focused img { border-width: 3px; box-shadow: 0 0 32px rgba(245, 101, 43, .92), 0 10px 18px rgba(0,0,0,.8); }
 .enemy-plan-segment.playback-muted, .enemy-plan-stop.playback-muted, .enemy-plan-formation.playback-muted { opacity: .08 !important; filter: grayscale(.75); }
 .enemy-plan-segment.playback-focused { z-index: 8; height: 5px; opacity: 1 !important; border-top-style: solid; box-shadow: 0 0 22px rgba(240, 113, 58, .95); }
 .enemy-plan-stop.playback-focused { z-index: 11; opacity: 1 !important; filter: none; transform: translate(-50%, -50%) scale(1.16); }
@@ -552,6 +556,8 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .battle-playback-director.enemy-intent { --playback-accent: #f08a52; }
 .battle-playback-director.doctrine { --playback-accent: #d2ad61; }
 .battle-playback-director.contact { --playback-accent: #f2bf5f; }
+.battle-playback-director.reinforcement { --playback-accent: #e99650; }
+.battle-playback-director.intercept { --playback-accent: #f06d48; }
 .battle-playback-director.result.route-trapped,
 .battle-playback-director.result.route-countered,
 .battle-playback-director.result.route-starved { --playback-accent: #9edb77; }

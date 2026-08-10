@@ -1908,6 +1908,7 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
     ? playbackBeat.enemyFormationIndices
     : Number.isInteger(playbackBeat?.enemyFormationIndex) ? [playbackBeat.enemyFormationIndex] : [];
   const doctrinePhase = playbackBeat?.doctrinePhase ?? "none";
+  const reinforcementPlaybackClass = playbackBeat?.reinforcementFocus ? "playback-focused" : "";
 
   return (
     <div className={`enemy-plan-layer phase-${phase} doctrine-${doctrinePhase}`} ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
@@ -1951,14 +1952,14 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
           <span>{profile.enemyCollision?.revealed ? profile.enemyCollision.title : "STOP 01/02 CONTACT WINDOW"}</span>
         </div>
       )}
-      <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"}`} style={fieldSegmentStyle(reinforcementWave.start, reinforcementWave.intercept, layerSize)}>
+      <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"} ${reinforcementPlaybackClass}`} style={fieldSegmentStyle(reinforcementWave.start, reinforcementWave.intercept, layerSize)}>
         <ArrowRight weight="bold" />
       </div>
-      <div className={`reinforcement-intercept ${clearsBeforeWave ? "avoided" : "threat"}`} style={{ left: `${reinforcementWave.intercept.x}%`, top: `${reinforcementWave.intercept.y}%` }}>
+      <div className={`reinforcement-intercept ${clearsBeforeWave ? "avoided" : "threat"} ${reinforcementPlaybackClass}`} style={{ left: `${reinforcementWave.intercept.x}%`, top: `${reinforcementWave.intercept.y}%` }}>
         <Crosshair weight="duotone" />
         <span>{!planReady ? `ENEMY WAVE · T+${fmtDuration(reinforcementWave.arrivalAt)}` : clearsBeforeWave ? "WARHOST CLEARS FIRST" : `${fmtDuration(profile.overrun)} INTERCEPT WINDOW`}</span>
       </div>
-      <div className={`enemy-plan-formation reinforcement-wave ${waveArrived ? "landed" : waveProgress > 0 ? "advancing" : "queued"} ${clearsBeforeWave ? "avoided" : ""}`} style={{ left: `${wavePosition.x}%`, top: `${wavePosition.y}%` }}>
+      <div className={`enemy-plan-formation reinforcement-wave ${waveArrived ? "landed" : waveProgress > 0 ? "advancing" : "queued"} ${clearsBeforeWave ? "avoided" : ""} ${reinforcementPlaybackClass}`} style={{ left: `${wavePosition.x}%`, top: `${wavePosition.y}%` }}>
         <img src="/assets/helioch-sentinels.png" alt={`${reinforcementWave.name} approaching ${operation.extractionTitle}`} />
         <span>{reinforcementWave.number}</span>
         <small>{waveArrived ? reinforcementWave.order : `WAVE · T+${fmtDuration(reinforcementWave.arrivalAt)}`}</small>
@@ -3177,6 +3178,7 @@ export function App() {
       events: operationEvents,
       comboTimes: comboWindowTimes(operationProfile),
       formationFates: operationFormationFates,
+      reinforcementWave: reinforcementWaveFor(operation),
     }),
     [formations, operation, operationEvents, operationFormationFates, operationProfile, playbook.id, tacticalHandoffs],
   );

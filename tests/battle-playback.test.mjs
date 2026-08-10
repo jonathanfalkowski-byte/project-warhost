@@ -83,6 +83,42 @@ test("formation losses become authored playback beats before operation resolutio
   assert.deepEqual(collisionResult.statusChanges.map(({ formationName, label }) => [formationName, label]), [["HARPOON RIG", "DAMAGED"]]);
 });
 
+test("late enemy survivors visibly approach, intercept, pursue, and cut off a formation", () => {
+  const input = fixture();
+  input.profile.completeAt = 398;
+  input.profile.extractedCount = 2;
+  input.profile.overrun = 38;
+  input.profile.enemyClashes.push({
+    id: "sever", actionAt: 330, label: "GANTRY SEVER", creates: "CUT OFF", pressure: { type: "PURSUIT" }, disrupted: false,
+    resultText: "THE PURSUIT BREAKS THROUGH", eventText: "Gantry Sever reaches extraction.", routeState: "passed",
+  });
+  input.events.push({ at: 360, text: "HELIOCH RELIEF reaches extraction." });
+  input.reinforcementWave = { name: "HELIOCH RELIEF", arrivalAt: 360, approachDuration: 45 };
+  input.formationFates = [{
+    formationId: "hauler", formation: { id: "hauler", name: "SALVAGE HAULER" }, orderIndex: 4, fate: "missing", battleLabel: "CUT OFF", at: 388,
+    detail: "Last contact during GANTRY SEVER.", history: [{ label: "CUT OFF", state: "cut-off", source: "extraction", at: 388, cause: "Extraction route severed" }],
+  }];
+
+  const beats = buildBattlePlayback(input);
+  const ids = beats.map((beat) => beat.id);
+  assert.ok(ids.indexOf("reinforcement-approach") < ids.indexOf("extraction-intercept"));
+  assert.ok(ids.indexOf("extraction-intercept") < ids.indexOf("formation-fate-hauler"));
+  assert.ok(ids.indexOf("formation-fate-hauler") < ids.indexOf("operation-resolved"));
+  assert.equal(beats.find((beat) => beat.id === "extraction-intercept").reinforcementFocus, true);
+  const pursuit = beats.find((beat) => beat.id === "formation-fate-hauler");
+  assert.equal(pursuit.enemyFormationIndex, 1);
+  assert.deepEqual(pursuit.statusChanges.map(({ formationName, label }) => [formationName, label]), [["SALVAGE HAULER", "CUT OFF"]]);
+});
+
+test("an early extraction does not invent an enemy intercept", () => {
+  const input = fixture();
+  input.profile.overrun = 0;
+  input.reinforcementWave = { name: "HELIOCH RELIEF", arrivalAt: 90, approachDuration: 45 };
+  const ids = buildBattlePlayback(input).map((beat) => beat.id);
+  assert.equal(ids.includes("reinforcement-approach"), false);
+  assert.equal(ids.includes("extraction-intercept"), false);
+});
+
 const doctrineFixture = (playbookId, triggered = true) => ({
   playbookId,
   profile: { doctrine: { triggered, result: triggered ? "ADVANTAGE ACTIVE" : "EXPOSURE ACTIVE" } },
