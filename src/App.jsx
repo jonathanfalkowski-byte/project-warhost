@@ -34,7 +34,13 @@ import { resolveAshenCollision } from "./enemyCollision.js";
 import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
 import { resolveExtractionOutcome } from "./extractionResolution.js";
 import { resolveDispositionMatchup } from "./missionDisposition.js";
-import { STRATEGY_TRIALS, strategyTrialFor, strategyTrialResult } from "./strategyExperiment.js";
+import {
+  BLIND_PREDICTIONS,
+  STRATEGY_TRIALS,
+  blindPredictionResult,
+  strategyTrialFor,
+  strategyTrialResult,
+} from "./strategyExperiment.js";
 import {
   applyCampaignConditions,
   applyWorkshopAction,
@@ -1506,31 +1512,51 @@ function MissionMatchupBrief({ operation }) {
   );
 }
 
-function StrategyTestPanel({ activeTrial, available, onLoad }) {
+function StrategyTestPanel({ activeTrial, available, blindActive, blindPrediction, onBlindPrediction, onLoad, onStartBlind }) {
   return (
-    <section className="strategy-test-panel" aria-label="Controlled strategy test">
-      <header><span>CONTROLLED STRATEGY TEST</span><small>SAME MISSION · SAME ENEMY</small></header>
-      <p>Run A, B, then C. At both breakpoints choose <b>EXECUTE PLAYBOOK</b>; overriding invalidates the comparison.</p>
-      <div className="strategy-trial-list">
-        {STRATEGY_TRIALS.map((trial) => (
-          <button
-            key={trial.id}
-            className={activeTrial?.id === trial.id ? "selected" : ""}
-            onClick={() => onLoad(trial.id)}
-            disabled={!available}
-            aria-pressed={activeTrial?.id === trial.id}
-          >
-            <strong>{trial.run}</strong>
-            <span><b>{trial.name}</b><small>{trial.expectedExtraction.min}–{trial.expectedExtraction.max} EXPECTED TO EXTRACT</small></span>
-          </button>
-        ))}
-      </div>
-      {activeTrial && <div className="strategy-trial-hypothesis"><b>RUN {activeTrial.run} LOADED</b><span>{activeTrial.hypothesis}</span><small>{activeTrial.signal}</small></div>}
+    <section className={`strategy-test-panel ${blindActive ? "blind-active" : ""}`} aria-label={blindActive ? "Blind command test" : "Controlled strategy test"}>
+      <header><span>{blindActive ? "BLIND COMMAND TEST" : "STRATEGY TEST LAB"}</span><small>SAME MISSION · SAME ENEMY</small></header>
+      {blindActive ? (
+        <>
+          <p>The answer is hidden. Build your own play, place every formation, choose the authored breakpoint orders, then predict the result.</p>
+          <div className="blind-prediction-block">
+            <span>PREDICT BEFORE COMMITMENT</span>
+            <div>
+              {BLIND_PREDICTIONS.map((prediction) => (
+                <button key={prediction.id} className={blindPrediction === prediction.id ? "selected" : ""} onClick={() => onBlindPrediction(prediction.id)} aria-pressed={blindPrediction === prediction.id}>
+                  <b>{prediction.label}</b><small>{prediction.detail}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+          <small className="blind-test-rule">Exact extraction and reinforcement forecasts remain sealed until execution.</small>
+        </>
+      ) : (
+        <>
+          <p>Run the presets again, or begin the real test with the answers hidden.</p>
+          <button className="start-blind-test" onClick={onStartBlind} disabled={!available}><Target weight="duotone" /><span><b>START BLIND COMMAND TEST</b><small>Build your own plan and predict its outcome.</small></span></button>
+          <div className="strategy-trial-list">
+            {STRATEGY_TRIALS.map((trial) => (
+              <button
+                key={trial.id}
+                className={activeTrial?.id === trial.id ? "selected" : ""}
+                onClick={() => onLoad(trial.id)}
+                disabled={!available}
+                aria-pressed={activeTrial?.id === trial.id}
+              >
+                <strong>{trial.run}</strong>
+                <span><b>{trial.name}</b><small>{trial.expectedExtraction.min}–{trial.expectedExtraction.max} EXPECTED</small></span>
+              </button>
+            ))}
+          </div>
+          {activeTrial && <div className="strategy-trial-hypothesis"><b>RUN {activeTrial.run} LOADED</b><span>{activeTrial.hypothesis}</span><small>{activeTrial.signal}</small></div>}
+        </>
+      )}
     </section>
   );
 }
 
-function FormationRoster({ formations, unavailableFormations = [], selected, onSelect, assignments, playbook, onPlaybook, operation, phase, strategyTrial, onLoadStrategyTrial, onFormationDragStart, readiness, refitsLocked, onRefit }) {
+function FormationRoster({ formations, unavailableFormations = [], selected, onSelect, assignments, playbook, onPlaybook, operation, phase, strategyTrial, blindTestActive, blindPrediction, onBlindPrediction, onLoadStrategyTrial, onStartBlindTest, onFormationDragStart, readiness, refitsLocked, onRefit }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -1541,7 +1567,7 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
       {(phase === "plan" || phase === "drill") && <MissionMatchupBrief operation={operation} />}
       {phase === "plan" && operation.id === "dead-circuit" && (
-        <StrategyTestPanel activeTrial={strategyTrial} available={formations.length === FORMATIONS.length} onLoad={onLoadStrategyTrial} />
+        <StrategyTestPanel activeTrial={strategyTrial} available={formations.length === FORMATIONS.length} blindActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={onBlindPrediction} onLoad={onLoadStrategyTrial} onStartBlind={onStartBlindTest} />
       )}
       <div className="doctrine-heading"><span>CHOOSE TOTAL-ARMY PLAY</span><Radio weight="duotone" /></div>
       <div className="playbook-list">
@@ -2357,12 +2383,13 @@ function BattlePlaybackDirector({ beat, beats, index, playing, onToggle, onStep,
   );
 }
 
-function EnemyPlanIntel({ battleTime, operation, phase, planReady, clashes, profile }) {
+function EnemyPlanIntel({ battleTime, operation, phase, planReady, blindTestActive, clashes, profile }) {
   const enemyPlan = enemyPlanFor(operation);
   const reinforcementWave = reinforcementWaveFor(operation);
   const collision = profile.enemyCollision;
   const collisionSource = FORMATIONS.find((formation) => formation.id === collision?.sourceId);
   const collisionReceiver = FORMATIONS.find((formation) => formation.id === collision?.receiverId);
+  const blindSealed = blindTestActive && (phase === "plan" || phase === "drill");
   return (
     <div className="intel-block enemy-plan-intel">
       <span className="panel-label">ENEMY PLAYBOOK · EXECUTES IN PARALLEL</span>
@@ -2378,7 +2405,7 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, clashes, prof
       <div className="enemy-chain">
         {clashes.map((clash, index) => {
           const resolved = (phase === "battle" || phase === "complete") && battleTime >= clash.actionAt;
-          const revealed = operation.id === "ashen-passage" ? Boolean(collision?.revealed) : planReady;
+          const revealed = !blindSealed && (operation.id === "ashen-passage" ? Boolean(collision?.revealed) : planReady);
           const state = !revealed ? "unread" : clash.routeState === "passed" ? "threat" : clash.routeState;
           return (
             <Fragment key={clash.id}>
@@ -2407,7 +2434,7 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, clashes, prof
           );
         })}
       </div>
-      <div className={`reinforcement-order ${planReady && profile.overrun === 0 ? "avoided" : "threat"}`}>
+      <div className={`reinforcement-order ${!blindSealed && planReady && profile.overrun === 0 ? "avoided" : "threat"}`}>
         <span className="enemy-step-number">{reinforcementWave.number}</span>
         <span className="enemy-step-copy">
           <em>ARRIVES T+{fmtDuration(reinforcementWave.arrivalAt)}</em>
@@ -2415,7 +2442,7 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, clashes, prof
           <small>{reinforcementWave.approach}</small>
         </span>
         <span className="enemy-step-result">
-          {!planReady ? "CONTINGENCY UNREAD" : profile.overrun > 0 ? `${reinforcementForecast(profile)} · ${profile.reinforcementLoss} RECOVERY LOST` : `${reinforcementForecast(profile)} · CONTACT AVOIDED`}
+          {blindSealed ? "FORECAST SEALED" : !planReady ? "CONTINGENCY UNREAD" : profile.overrun > 0 ? `${reinforcementForecast(profile)} · ${profile.reinforcementLoss} RECOVERY LOST` : `${reinforcementForecast(profile)} · CONTACT AVOIDED`}
         </span>
       </div>
     </div>
@@ -2447,7 +2474,8 @@ function MissionConditionSelector({ condition, locked, phase, onCondition }) {
   );
 }
 
-function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, rescueComplete, playbook, assignedCount, formationCount, integrity, profile }) {
+function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, blindTestActive, rescueComplete, playbook, assignedCount, formationCount, integrity, profile }) {
+  const blindSealed = blindTestActive && (phase === "plan" || phase === "drill");
   const forecast = profile.overrun > 0
     ? `${profile.extractedCount} / ${formationCount} EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
     : `${profile.extractedCount} / ${formationCount} EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
@@ -2456,7 +2484,7 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
       <MissionConditionSelector condition={condition} locked={operation.conditionLocked} phase={phase} onCondition={onCondition} />
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
-        <strong className={planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planReady ? forecast : `${assignedCount} / ${formationCount} AVAILABLE ASSIGNED`}</strong>
+        <strong className={blindSealed ? "sealed" : planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{blindSealed && planReady ? "FORECAST SEALED · PREDICT BEFORE COMMIT" : planReady ? forecast : `${assignedCount} / ${formationCount} AVAILABLE ASSIGNED`}</strong>
         <div className="campaign-integrity-readout">
           <span>WARHOST INTEGRITY</span>
           <IntegrityMeter value={integrity} />
@@ -2476,7 +2504,7 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
             <small>{profile.readiness.alignedCount} / {profile.readiness.staffedCount} STAFFED FORMATIONS TASK-ALIGNED{profile.readiness.protocolDelayReduction > 0 ? ` · REFIT ABSORBED ${fmtDuration(profile.readiness.protocolDelayReduction)} OF ${fmtDuration(profile.readiness.rawDelay)} IMPROVISED DELAY` : ""} · COMBO EFFECTS RESOLVE SEPARATELY</small>
           </div>
         )}
-        {planReady && (
+        {planReady && !blindSealed && (
           <div className={`extraction-breakdown ${profile.extractedCount >= operation.requiredExtraction ? "viable" : profile.extractedCount > 0 ? "costly" : "broken"}`}>
             <span>EXTRACTION BREAKDOWN</span>
             <b>{profile.reserveCapacity} CAPACITY − {profile.reinforcementLoss} WAVE − {profile.enemyRecoveryLoss} ROUTE = {profile.extractedCount} CLEAR</b>
@@ -2493,7 +2521,7 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
         )}
         {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Place formations on the authored tactical route.</p>}
       </div>
-      <EnemyPlanIntel battleTime={battleTime} operation={operation} phase={phase} planReady={planReady} clashes={profile.enemyClashes} profile={profile} />
+      <EnemyPlanIntel battleTime={battleTime} operation={operation} phase={phase} planReady={planReady} blindTestActive={blindTestActive} clashes={profile.enemyClashes} profile={profile} />
       <div className="intel-block victory-block">
         <span className="panel-label">VICTORY CONDITION</span>
         <Factory weight="duotone" />
@@ -2531,7 +2559,7 @@ function IntegrityMeter({ value, max = 3 }) {
   );
 }
 
-function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onReset, operation, planReady, branches, onBranch }) {
+function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onReset, operation, planReady, blindTestActive, blindPrediction, branches, onBranch }) {
   const breakpoints = breakpointsFor(operation);
   const breakpointImpacts = breakpointImpactsFor(operation);
   return (
@@ -2577,12 +2605,12 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
       <div className="primary-controls">
         {phase === "plan" || phase === "drill" ? (
           <>
-            <button className={`ghost-button ${drillComplete ? "complete" : ""}`} onClick={onDrill} disabled={phase === "drill" || !planReady}>
+            <button className={`ghost-button ${drillComplete ? "complete" : ""}`} onClick={onDrill} disabled={blindTestActive || phase === "drill" || !planReady}>
               {phase === "drill" ? <Pause weight="fill" /> : drillComplete ? <CheckCircle weight="fill" /> : <Play weight="fill" />}
-              <span><b>{phase === "drill" ? "RUNNING GHOST DRILL" : drillComplete ? "DRILL VERIFIED" : "RUN GHOST DRILL"}</b><small>Preview routes, triggers, and timing.</small></span>
+              <span><b>{blindTestActive ? "DRILL LOCKED" : phase === "drill" ? "RUNNING GHOST DRILL" : drillComplete ? "DRILL VERIFIED" : "RUN GHOST DRILL"}</b><small>{blindTestActive ? "Blind test keeps the outcome hidden." : "Preview routes, triggers, and timing."}</small></span>
             </button>
-            <button className="commit-button" onClick={onCommit} disabled={!planReady}>
-              <span><b>COMMIT PLAYBOOK</b><small>{planReady ? "Execute staffed roles and authored branches." : "Staff every available formation first."}</small></span>
+            <button className="commit-button" onClick={onCommit} disabled={!planReady || (blindTestActive && !blindPrediction)}>
+              <span><b>COMMIT PLAYBOOK</b><small>{!planReady ? "Staff every available formation first." : blindTestActive && !blindPrediction ? "Predict the result before commitment." : "Execute staffed roles and authored branches."}</small></span>
               <ArrowRight weight="bold" />
             </button>
           </>
@@ -2784,7 +2812,7 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
   );
 }
 
-function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, strategyTrial, won, onAction }) {
+function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, strategyTrial, blindTestActive, blindPrediction, won, onAction }) {
   const lostCount = formations.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
@@ -2814,8 +2842,11 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         ? `${operation.shortName} was lost—but the campaign continues.`
         : `${operation.shortName} was lost.`;
   const trialResult = strategyTrialResult(strategyTrial, profile.extractedCount);
-  const actionLabel = strategyTrial ? "RETURN TO STRATEGY TEST" : canContinue ? "ENTER SALVAGE WORKSHOP" : campaignDestroyed ? "BEGIN NEW CAMPAIGN" : "RETURN TO BATTLEFIELD";
-  const actionDetail = strategyTrial
+  const blindResult = blindPredictionResult({ predictionId: blindPrediction, extractedCount: profile.extractedCount, requiredExtraction: operation.requiredExtraction });
+  const actionLabel = blindTestActive ? "REPEAT BLIND TEST" : strategyTrial ? "RETURN TO STRATEGY TEST" : canContinue ? "ENTER SALVAGE WORKSHOP" : campaignDestroyed ? "BEGIN NEW CAMPAIGN" : "RETURN TO BATTLEFIELD";
+  const actionDetail = blindTestActive
+    ? "Reset Dead Circuit and author another plan without a forecast."
+    : strategyTrial
     ? "Reset Dead Circuit and load the next controlled plan."
     : canContinue
     ? won ? "Carry this detachment into the next operation." : "Withdraw, accept persistent losses, and continue the campaign."
@@ -2845,6 +2876,17 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
             <span>CONTROLLED RUN {strategyTrial.run} · {trialResult.label}</span>
             <b>{strategyTrial.name}: {trialResult.extracted} EXTRACTED</b>
             <p>Expected {strategyTrial.expectedExtraction.min}–{strategyTrial.expectedExtraction.max}. {strategyTrial.signal}</p>
+          </section>
+        )}
+        {blindTestActive && blindResult && (
+          <section className={`blind-test-result ${blindResult.accurate ? "accurate" : "surprised"}`}>
+            <span>BLIND COMMAND RESULT · {blindResult.accurate ? "PREDICTION ACCURATE" : "PREDICTION MISSED"}</span>
+            <div><b>PREDICTED {blindResult.prediction.label}</b><ArrowRight weight="bold" /><b>ACTUAL {blindResult.actual.label}</b></div>
+            <ul>
+              <li><strong>{profile.readiness.alignedCount}/{profile.readiness.staffedCount}</strong> formations matched their responsibility.</li>
+              <li><strong>{profile.effects.length}</strong> handoff combinations formed; <strong>{disruptedEnemyOrders}/{profile.enemyClashes.length}</strong> enemy orders were broken.</li>
+              <li>{profile.overrun > 0 ? <><strong>{fmtDuration(profile.overrun)}</strong> late to extraction; <strong>{profile.reinforcementLoss + profile.enemyRecoveryLoss}</strong> recovery capacity lost.</> : <><strong>{fmtDuration(profile.timeSaved)}</strong> ahead of the enemy wave.</>}</li>
+            </ul>
           </section>
         )}
         <section className="formation-fate-ledger" aria-label="Formation fates">
@@ -2906,6 +2948,8 @@ export function App() {
   const [pickerRoleId, setPickerRoleId] = useState(null);
   const [placementFeedback, setPlacementFeedback] = useState(null);
   const [strategyTrialId, setStrategyTrialId] = useState(null);
+  const [blindTestActive, setBlindTestActive] = useState(false);
+  const [blindPrediction, setBlindPrediction] = useState(null);
   const placementRevisionRef = useRef(0);
 
   const operation = OPERATIONS[operationIndex] ?? OPERATIONS[0];
@@ -3120,6 +3164,38 @@ export function App() {
     setShowCompletion(false);
     setPlacementFeedback(null);
     setStrategyTrialId(trial.id);
+    setBlindTestActive(false);
+    setBlindPrediction(null);
+  };
+
+  const startBlindTest = () => {
+    if (phase !== "plan" || operationIndex !== 0 || formations.length !== FORMATIONS.length) return;
+    setPlaybookId("trapline");
+    setConditionId("clear");
+    setRefits(defaultRefits());
+    setAssignments(emptyAssignments(PLAYBOOKS[0]));
+    setBranches(defaultBranches(OPERATIONS[0]));
+    setBattleBranches(defaultBranches(OPERATIONS[0]));
+    setSelected("harpoon");
+    setPickerRoleId(null);
+    setDrillStep(-1);
+    setDrillComplete(false);
+    setBattleTime(0);
+    setPlaybackIndex(0);
+    setPlaybackPlaying(false);
+    setDecision(null);
+    setResolvedDecisions([]);
+    setRescueComplete(false);
+    setShowCompletion(false);
+    setPlacementFeedback(null);
+    setStrategyTrialId(null);
+    setBlindTestActive(true);
+    setBlindPrediction(null);
+  };
+
+  const chooseBlindPrediction = (predictionId) => {
+    if (!blindTestActive || phase !== "plan" || !BLIND_PREDICTIONS.some((prediction) => prediction.id === predictionId)) return;
+    setBlindPrediction(predictionId);
   };
 
   const changePlaybook = (nextId) => {
@@ -3136,6 +3212,7 @@ export function App() {
     setDrillStep(-1);
     setDrillComplete(false);
     setStrategyTrialId(null);
+    if (blindTestActive) setBlindPrediction(null);
   };
 
   const changeCondition = (nextId) => {
@@ -3146,6 +3223,7 @@ export function App() {
     setDrillStep(-1);
     setDrillComplete(false);
     setStrategyTrialId(null);
+    if (blindTestActive) setBlindPrediction(null);
   };
 
   const changeRefit = (formationId, refitId) => {
@@ -3184,7 +3262,7 @@ export function App() {
         formationName: `${baseFormation.name} · ${nextRefit.name}`,
         beforeLinks: previousLinks,
         afterLinks: nextLinks,
-        forecast: `${nextProfile.extractedCount} / ${formations.length} EXTRACT · ${reinforcementForecast(nextProfile)}`,
+        forecast: blindTestActive ? "FORECAST SEALED · COMMIT TO REVEAL" : `${nextProfile.extractedCount} / ${formations.length} EXTRACT · ${reinforcementForecast(nextProfile)}`,
         title: weakened ? "REFIT BREAKS CHAIN" : improved ? "REFIT STRENGTHENS CHAIN" : "REFIT REWIRES CHAIN",
         tone: weakened ? "weakened" : improved ? "strengthened" : "rewired",
       });
@@ -3198,6 +3276,7 @@ export function App() {
     setDrillStep(-1);
     setDrillComplete(false);
     setStrategyTrialId(null);
+    if (blindTestActive) setBlindPrediction(null);
   };
 
   const assignFormationToRole = (roleId, formationId) => {
@@ -3237,7 +3316,7 @@ export function App() {
     const tone = nextProtocolCount > previousProtocolCount ? "strengthened" : nextProtocolCount < previousProtocolCount ? "weakened" : nextReady && !previousReady ? "strengthened" : weakened ? "weakened" : improved ? "strengthened" : "rewired";
     const title = nextProtocolCount > previousProtocolCount ? "REFIT PROTOCOL ONLINE" : nextProtocolCount < previousProtocolCount ? "REFIT PROTOCOL DORMANT" : nextReady && !previousReady ? "PLAN ONLINE" : tone === "weakened" ? "CHAIN BROKEN" : tone === "strengthened" ? "CHAIN STRENGTHENED" : "CHAIN REWIRED";
     const forecast = nextReady
-      ? `${nextProfile.extractedCount} / ${formations.length} EXTRACT · ${reinforcementForecast(nextProfile)}`
+      ? blindTestActive ? "FORECAST SEALED · COMMIT TO REVEAL" : `${nextProfile.extractedCount} / ${formations.length} EXTRACT · ${reinforcementForecast(nextProfile)}`
       : `${Object.values(nextAssignments).filter(Boolean).length} / ${formations.length} FORMATIONS PLACED`;
 
     placementRevisionRef.current += 1;
@@ -3258,6 +3337,7 @@ export function App() {
     setPickerRoleId(null);
     setDrillComplete(false);
     setStrategyTrialId(null);
+    if (blindTestActive) setBlindPrediction(null);
   };
 
   const chooseFormationForRole = (formationId) => {
@@ -3283,6 +3363,7 @@ export function App() {
     setBranches((current) => ({ ...current, [breakpointId]: optionId }));
     setDrillComplete(false);
     setStrategyTrialId(null);
+    if (blindTestActive) setBlindPrediction(null);
   };
 
   const resolveDecision = (choice) => {
@@ -3335,7 +3416,7 @@ export function App() {
   };
 
   const commitMission = () => {
-    if (!planReady) return;
+    if (!planReady || (blindTestActive && !blindPrediction)) return;
     setPhase("battle");
     setBattleBranches({ ...branches });
     setBattleTime(0);
@@ -3420,6 +3501,8 @@ export function App() {
     setPickerRoleId(null);
     setPlacementFeedback(null);
     setStrategyTrialId(null);
+    setBlindTestActive(false);
+    setBlindPrediction(null);
   };
 
   const resetMission = () => {
@@ -3450,20 +3533,27 @@ export function App() {
     setPickerRoleId(null);
     setPlacementFeedback(null);
     setStrategyTrialId(null);
+    setBlindTestActive(false);
+    setBlindPrediction(null);
+  };
+
+  const repeatBlindTest = () => {
+    resetMission();
+    setBlindTestActive(true);
   };
 
   return (
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} onLoadStrategyTrial={loadStrategyTrial} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
         <Battlefield formations={formations} formationFates={operationFormationFates} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
-        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
+        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} blindTestActive={blindTestActive} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
-      <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
+      <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} blindTestActive={blindTestActive} blindPrediction={blindPrediction} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
-      {showCompletion && <CompletionOverlay formations={formations} formationFates={operationFormationFates} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} strategyTrial={strategyTrial} won={operationWon} onAction={strategyTrial ? resetMission : handleCompletionAction} />}
+      {showCompletion && <CompletionOverlay formations={formations} formationFates={operationFormationFates} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} won={operationWon} onAction={blindTestActive ? repeatBlindTest : strategyTrial ? resetMission : handleCompletionAction} />}
       {showWorkshop && workshopBaseline && <SalvageWorkshop baseline={workshopBaseline} choice={salvageChoice} formations={workshopFormations} integrity={warhostIntegrity} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopAction} onLaunch={launchNextOperation} />}
     </main>
   );

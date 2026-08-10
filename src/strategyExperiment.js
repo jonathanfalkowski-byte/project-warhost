@@ -57,3 +57,32 @@ export const strategyTrialResult = (trial, extractedCount) => {
     label: withinExpected ? "EXPECTED BAND" : "OUTSIDE EXPECTED BAND",
   };
 };
+
+export const BLIND_PREDICTIONS = Object.freeze([
+  Object.freeze({ id: "victory", label: "VICTORY", detail: "Meet the mission objective and extraction requirement." }),
+  Object.freeze({ id: "withdrawal", label: "WITHDRAWAL", detail: "Complete the primary objective but miss extraction." }),
+  Object.freeze({ id: "collapse", label: "COLLAPSE", detail: "No formation clears extraction." }),
+]);
+
+const boundedCount = (value, fallback = 0) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.min(20, Math.max(0, Math.floor(numeric))) : fallback;
+};
+
+export const blindOutcomeFor = ({ extractedCount = 0, requiredExtraction = 3 } = {}) => {
+  const extracted = boundedCount(extractedCount);
+  const required = Math.max(1, boundedCount(requiredExtraction, 3));
+  return extracted >= required ? "victory" : extracted > 0 ? "withdrawal" : "collapse";
+};
+
+export const blindPredictionResult = ({ predictionId, extractedCount, requiredExtraction } = {}) => {
+  const prediction = BLIND_PREDICTIONS.find((item) => item.id === predictionId) ?? null;
+  if (!prediction) return null;
+  const outcomeId = blindOutcomeFor({ extractedCount, requiredExtraction });
+  const actual = BLIND_PREDICTIONS.find((item) => item.id === outcomeId);
+  return {
+    prediction,
+    actual,
+    accurate: prediction.id === actual.id,
+  };
+};
