@@ -2057,7 +2057,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
   );
 }
 
-function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, inspected, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onInspectFormation, onSelectFormation, outputs, phase, playbook, profile, readiness, refitProtocols, staffExerciseIndex }) {
+function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, inspected, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onInspectFormation, onSelectFormation, onStaffExercise, outputs, phase, playbook, profile, readiness, refitProtocols, staffExerciseIndex }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
