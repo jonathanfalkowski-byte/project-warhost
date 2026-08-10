@@ -39,7 +39,7 @@ const fixture = () => ({
     receiverId: "railjack",
     maneuver: { name: "GRAVITIC SNARE", passes: "DISPLACED", result: "FORWARD HOLD" },
   }],
-  formations: [{ id: "harpoon", name: "HARPOON RIG" }, { id: "railjack", name: "RAILJACK" }],
+  formations: [{ id: "harpoon", name: "GRAV-SNARE TANK" }, { id: "railjack", name: "BASTION BATTLE TANK" }],
   events: [{ at: 30, text: "Forward role has contact." }, { at: 45, text: "The Veil Engines are trapped." }],
   comboTimes: [35],
 });
@@ -80,7 +80,7 @@ test("formation losses become authored playback beats before operation resolutio
   assert.match(fateBeats[1].title, /destroyed/i);
   assert.equal(beats.at(-1).kind, "complete");
   const collisionResult = beats.find((beat) => beat.id === "enemy-result-veil");
-  assert.deepEqual(collisionResult.statusChanges.map(({ formationName, label }) => [formationName, label]), [["HARPOON RIG", "DAMAGED"]]);
+  assert.deepEqual(collisionResult.statusChanges.map(({ formationName, label }) => [formationName, label]), [["GRAV-SNARE TANK", "DAMAGED"]]);
 });
 
 test("late enemy survivors visibly approach, intercept, pursue, and cut off a formation", () => {
@@ -95,7 +95,7 @@ test("late enemy survivors visibly approach, intercept, pursue, and cut off a fo
   input.events.push({ at: 360, text: "HELIOCH RELIEF reaches extraction." });
   input.reinforcementWave = { name: "HELIOCH RELIEF", arrivalAt: 360, approachDuration: 45 };
   input.formationFates = [{
-    formationId: "hauler", formation: { id: "hauler", name: "SALVAGE HAULER" }, orderIndex: 4, fate: "missing", battleLabel: "CUT OFF", at: 388,
+    formationId: "hauler", formation: { id: "hauler", name: "ARMOURED RECOVERY CARRIER" }, orderIndex: 4, fate: "missing", battleLabel: "CUT OFF", at: 388,
     detail: "Last contact during GANTRY SEVER.", history: [{ label: "CUT OFF", state: "cut-off", source: "extraction", at: 388, cause: "Extraction route severed" }],
   }];
 
@@ -107,7 +107,7 @@ test("late enemy survivors visibly approach, intercept, pursue, and cut off a fo
   assert.equal(beats.find((beat) => beat.id === "extraction-intercept").reinforcementFocus, true);
   const pursuit = beats.find((beat) => beat.id === "formation-fate-hauler");
   assert.equal(pursuit.enemyFormationIndex, 1);
-  assert.deepEqual(pursuit.statusChanges.map(({ formationName, label }) => [formationName, label]), [["SALVAGE HAULER", "CUT OFF"]]);
+  assert.deepEqual(pursuit.statusChanges.map(({ formationName, label }) => [formationName, label]), [["ARMOURED RECOVERY CARRIER", "CUT OFF"]]);
 });
 
 test("an early extraction does not invent an enemy intercept", () => {

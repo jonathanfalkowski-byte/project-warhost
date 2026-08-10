@@ -10,10 +10,10 @@ import {
 } from "../src/formationInteractions.js";
 
 const formations = [
-  { id: "harpoon", name: "HARPOON RIG", capabilities: ["CONTROL", "MOBILITY"], creates: "DISPLACED", uses: ["SCREENED"] },
-  { id: "furnace", name: "FURNACE CREW", capabilities: ["DENIAL", "AREA"], creates: "OVERHEATED", uses: ["DISPLACED", "SCREENED"] },
-  { id: "breaker", name: "BREAKER EXO", capabilities: ["BREACH", "SHOCK"], creates: "BREACHED", uses: ["DISPLACED", "OVERHEATED"] },
-  { id: "railjack", name: "RAILJACK", capabilities: ["HOLD", "COVER"], creates: "SCREENED", uses: ["BREACHED"] },
+  { id: "harpoon", name: "GRAV-SNARE TANK", capabilities: ["CONTROL", "MOBILITY"], creates: "DISPLACED", uses: ["SCREENED"] },
+  { id: "furnace", name: "INCINERATOR SQUAD", capabilities: ["DENIAL", "AREA"], creates: "OVERHEATED", uses: ["DISPLACED", "SCREENED"] },
+  { id: "breaker", name: "BREACHER WALKER", capabilities: ["BREACH", "SHOCK"], creates: "BREACHED", uses: ["DISPLACED", "OVERHEATED"] },
+  { id: "railjack", name: "BASTION BATTLE TANK", capabilities: ["HOLD", "COVER"], creates: "SCREENED", uses: ["BREACHED"] },
 ];
 
 test("one formation can expose multiple compatible partners without ranking them", () => {
@@ -31,7 +31,7 @@ test("responsibility matching reports exact capability overlap", () => {
 test("neighbor hints include only currently adjacent formations", () => {
   const hints = neighboringInteractionHints({ formations, formationId: "harpoon", neighborIds: ["furnace"] });
   assert.equal(hints.length, 1);
-  assert.match(hints[0].text, /FURNACE CREW can react/);
+  assert.match(hints[0].text, /INCINERATOR SQUAD can react/);
 });
 
 test("interaction direction is classified relative to the inspected formation", () => {
