@@ -2052,11 +2052,15 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
   );
 }
 
-function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, onChooseRole, onAssignFormation, onStaffExercise, outputs, phase, playbook, profile, readiness, refitProtocols, staffExerciseIndex }) {
+function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, onChooseRole, onAssignFormation, onSelectFormation, outputs, phase, playbook, profile, readiness, refitProtocols, selected, staffExerciseIndex }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
   const doctrine = profile.doctrine;
+  const selectedFormation = formations.find((formation) => formation.id === selected) ?? null;
+  const selectedInteractions = formationInteractionsFor({ formations, formationId: selected });
+  const interactionByFormationId = new Map(selectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
+  const inspectingInteractions = (phase === "plan" || phase === "drill") && Boolean(selectedFormation);
 
   if (phase === "battle" || phase === "complete") {
     return (
@@ -2124,6 +2128,25 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
         <small>EXPOSURE · {doctrine.exposure}</small>
         <em>DOCTRINE RESULT UNRESOLVED</em>
       </div>
+      {inspectingInteractions && (
+        <section className="formation-interaction-inspector" aria-live="polite" aria-label={`${selectedFormation.name} potential formation interactions`}>
+          <header>
+            <span><Radio weight="fill" /> SELECTED FORMATION</span>
+            <b>{selectedFormation.name}</b>
+            <small>CREATES <strong>{selectedFormation.creates}</strong> · CAN REACT TO <strong>{selectedFormation.uses.join(" / ")}</strong></small>
+          </header>
+          <div className="formation-interaction-partners">
+            {selectedInteractions.length > 0 ? selectedInteractions.map((interaction) => (
+              <button key={interaction.partnerId} onClick={() => onSelectFormation(interaction.partnerId)}>
+                <b>{interaction.partnerName}</b>
+                {interaction.outgoing && <small><ArrowRight weight="bold" /> {selectedFormation.name} creates <strong>{interaction.outgoing.condition}</strong>; {interaction.partnerName} reacts</small>}
+                {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.partnerName} creates <strong>{interaction.incoming.condition}</strong>; {selectedFormation.name} reacts</small>}
+              </button>
+            )) : <p>No direct keyword interaction with the current refits. This formation can still perform a responsibility on its own.</p>}
+          </div>
+          <em>These are possible links, not recommendations. You decide which adjacency and responsibility are worth using.</em>
+        </section>
+      )}
       <div className="route-terminals" aria-hidden="true"><span>FORMATION LANES</span><span>COMBO ORDER</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
@@ -2132,10 +2155,18 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           const refitProtocol = refitProtocols[role.id];
           const nextRole = playbook.roles[index + 1];
           const nextFormation = nextRole ? formations.find((item) => item.id === assignments[nextRole.id]) : null;
+          const interaction = formation ? interactionByFormationId.get(formation.id) : null;
+          const interactionClass = !inspectingInteractions || !formation
+            ? ""
+            : formation.id === selected
+              ? "interaction-selected"
+              : interaction
+                ? "interaction-compatible"
+                : "interaction-muted";
           return (
             <Fragment key={role.id}>
               <button
-                className={`playbook-slot planning-concealed ${formation ? "filled" : "empty"} ${dropTargetRoleId === role.id ? "drop-target" : ""}`}
+                className={`playbook-slot planning-concealed ${formation ? "filled" : "empty"} ${dropTargetRoleId === role.id ? "drop-target" : ""} ${interactionClass}`}
                 onClick={() => onChooseRole(role.id)}
                 onDragEnter={(event) => { event.preventDefault(); setDropTargetRoleId(role.id); }}
                 onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
@@ -2155,6 +2186,12 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                 {formation ? (
                   <>
                     <span className="slot-formation"><img src={formation.asset} alt="" /><span><b>{formation.name}</b><small>{formation.activeRefit.name}</small></span></span>
+                    {formation.id === selected && <span className="slot-interaction selected"><Radio weight="fill" /> SELECTED · CREATES {formation.creates}</span>}
+                    {interaction && (
+                      <span className="slot-interaction compatible">
+                        <Radio weight="fill" /> INTERACTS WITH {selectedFormation.name} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).join(" / ")}
+                      </span>
+                    )}
                     {refitProtocol && (
                       <span className="slot-protocol concealed">
                         <b>REFIT INTERFACE UNRESOLVED</b>
@@ -2217,9 +2254,13 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
     branches,
   });
   const roleActionTimes = [profile.alphaAt, profile.betaAt, profile.reactorExposeAt, profile.reactorAt, profile.extractionAt];
+  const selectedFormation = formations.find((formation) => formation.id === selected) ?? null;
+  const selectedInteractions = formationInteractionsFor({ formations, formationId: selected });
+  const interactionByFormationId = new Map(selectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
+  const inspectingInteractions = (phase === "plan" || phase === "drill") && Boolean(selectedFormation);
 
   return (
-    <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""}`} aria-label={`${operation.name} mission map`}>
+    <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""} ${inspectingInteractions ? "interaction-inspecting" : ""}`} aria-label={`${operation.name} mission map`}>
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
@@ -2249,6 +2290,14 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
         const formationFate = resolvedFormationFates.get(formation.id) ?? null;
         const statusDisplay = formationStatusDisplay({ consequence, formationFate });
         const authoredRoute = authoredRoutes.find((route) => route.formationId === formation.id);
+        const interaction = interactionByFormationId.get(formation.id) ?? null;
+        const interactionClass = !inspectingInteractions
+          ? ""
+          : formation.id === selected
+            ? "interaction-selected"
+            : interaction
+              ? "interaction-compatible"
+              : "interaction-muted";
         const routePosition = playbackActive && authoredRoute
           ? positionAlongAuthoredRoute({
               points: authoredRoute.points,
@@ -2262,7 +2311,7 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
             draggable={phase === "plan"}
@@ -2272,6 +2321,7 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
+            {interaction && <span className="map-formation-interaction"><Radio weight="fill" /> LINKS WITH {selectedFormation.name}<small>{[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).join(" / ")}</small></span>}
             {statusDisplay && <span className="map-formation-state"><b>{statusDisplay.label}</b><small>{statusDisplay.detail}</small></span>}
           </button>
         );
@@ -2294,7 +2344,7 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
       )}
 
       {playbackActive && <BattleStateLegend />}
-      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onStaffExercise={onStaffExercise} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} />
+      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onSelectFormation={onSelect} onStaffExercise={onStaffExercise} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} selected={selected} staffExerciseIndex={staffExerciseIndex} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
