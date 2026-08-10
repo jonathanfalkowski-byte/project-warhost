@@ -65,6 +65,7 @@ import {
 } from "./fieldRoutes.js";
 import { PLAYBOOK_DOCTRINES, resolvePlaybookDoctrine } from "./playbookDoctrine.js";
 import { resolveTacticalEngagement } from "./tacticalResolution.js";
+import { strategyCausalityFor } from "./strategyCausality.js";
 
 const FORMATIONS = [
   {
@@ -2937,6 +2938,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         : `${operation.shortName} was lost.`;
   const trialResult = strategyTrialResult(strategyTrial, profile.extractedCount);
   const blindResult = blindPredictionResult({ predictionId: blindPrediction, extractedCount: profile.extractedCount, requiredExtraction: operation.requiredExtraction });
+  const strategyCausality = strategyCausalityFor({ profile, requiredExtraction: operation.requiredExtraction });
   const actionLabel = blindTestActive ? "REPEAT BLIND TEST" : strategyTrial ? "RETURN TO STRATEGY TEST" : canContinue ? "ENTER SALVAGE WORKSHOP" : campaignDestroyed ? "BEGIN NEW CAMPAIGN" : "RETURN TO BATTLEFIELD";
   const actionDetail = blindTestActive
     ? "Reset Dead Circuit and author another plan without a forecast."
@@ -2965,6 +2967,23 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
           <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
+        <section className="strategy-causality" aria-label="Why this result happened">
+          <header>
+            <span>WHY THIS RESULT HAPPENED</span>
+            <small>REVEALED AFTER COMMITMENT</small>
+          </header>
+          <div className="strategy-causality-chain">
+            {strategyCausality.map((item, index) => (
+              <div className={`strategy-cause ${item.tone}`} key={item.id}>
+                <span className="strategy-cause-step">{item.step}</span>
+                <span className="strategy-cause-label">{item.label}</span>
+                <b>{item.value}</b>
+                <p>{item.detail}</p>
+                {index < strategyCausality.length - 1 && <ArrowRight className="strategy-cause-arrow" weight="bold" aria-hidden="true" />}
+              </div>
+            ))}
+          </div>
+        </section>
         {strategyTrial && trialResult && (
           <section className="strategy-trial-result template-result">
             <span>{strategyTrial.name} STARTING PLAN · RESULT REVEALED</span>
@@ -3007,7 +3026,10 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
             ))}
           </div>
         </section>
-        <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {fieldStateResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+        <details className="completion-detail-log">
+          <summary>FULL OPERATION LOG</summary>
+          <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {fieldStateResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+        </details>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{actionLabel}</b><small>{actionDetail}</small></span><ArrowRight /></button>
       </div>
     </div>
