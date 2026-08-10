@@ -34,6 +34,7 @@ import { resolveAshenCollision } from "./enemyCollision.js";
 import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
 import { resolveExtractionOutcome } from "./extractionResolution.js";
 import { resolveDispositionMatchup } from "./missionDisposition.js";
+import { claimStaffExercise, planningResultRevealed } from "./planningIntel.js";
 import {
   BLIND_PREDICTIONS,
   STRATEGY_TRIALS,
@@ -1423,11 +1424,6 @@ function AppHeader({ phase, battleTime, operation, operationIndex, profile }) {
 function FormationDossier({ formation, assignedRole, assignedIndex, readiness, phase, refitsLocked, onRefit }) {
   if (!formation) return null;
   const Icon = formation.icon;
-  const observations = readiness ? [
-    readiness.taskAligned ? "TASK ALIGNED" : `IMPROVISED / +${fmtDuration(readiness.taskDelay)}`,
-    readiness.inboundReaction ? "INBOUND REACTION" : "NO INBOUND REACTION",
-    readiness.outboundLink ? "FEEDS NEXT STOP" : "NO OUTBOUND REACTION",
-  ] : [];
 
   return (
     <aside className="formation-dossier panel-surface" aria-label={`${formation.name} formation dossier`}>
@@ -1479,12 +1475,12 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness, p
         <div>{formation.uses.map((condition) => <em key={condition}>{condition}</em>)}</div>
       </div>
       {assignedRole && readiness ? (
-        <div className="dossier-placement">
-          <div><span>OBSERVED AT STOP {String(assignedIndex + 1).padStart(2, "0")}</span><b>{readiness.score}% <em>{readiness.label}</em></b><small>{assignedRole.label}</small></div>
-          <div className="dossier-observations">{observations.map((observation) => <em key={observation}>{observation}</em>)}</div>
+        <div className="dossier-placement concealed">
+          <div><span>ASSIGNED TO STOP {String(assignedIndex + 1).padStart(2, "0")}</span><b>OUTCOME SEALED</b><small>{assignedRole.label}</small></div>
+          <div className="dossier-observations"><em>COMPARE CAPABILITIES</em><em>CHECK CREATES</em><em>CHECK REACTIONS</em></div>
         </div>
       ) : (
-        <div className="dossier-unplaced"><b>PLACE TO MEASURE READINESS</b><small>Task fit and neighboring reactions are revealed only after assignment.</small></div>
+        <div className="dossier-unplaced"><b>ASSIGN BY DOCTRINE</b><small>Use the responsibility, capabilities, creates, and reactions above. Results reveal under contact.</small></div>
       )}
     </aside>
   );
@@ -1974,56 +1970,47 @@ function DoctrineCollisionOverlay({ beat, operation, playbook }) {
   );
 }
 
-function TacticalHandoffBoard({ feedback, formations, handoffs, profile }) {
-  const discovered = handoffs.filter((handoff) => handoff.maneuver);
-  const fullyStaffed = handoffs.every((handoff) => handoff.sourceId && handoff.receiverId);
-  const longestCascade = handoffs.reduce((state, handoff) => {
-    const current = handoff.maneuver ? state.current + 1 : 0;
-    return { current, longest: Math.max(state.longest, current) };
-  }, { current: 0, longest: 0 }).longest;
-  const cascadeLabel = longestCascade === discovered.length
-    ? `${longestCascade} COMBO CHAIN`
-    : `${discovered.length} SEPARATE COMBOS`;
-  const FeedbackIcon = feedback?.tone === "weakened" ? Warning : Lightning;
+function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffExerciseIndex, onStaffExercise }) {
+  const discovered = [];
+  const fullyStaffed = false;
   const timing = comboWindowTimes(profile);
 
   return (
     <div className="handoff-board" aria-live="polite">
       <div className="handoff-heading">
-        <span>COMBO WINDOWS</span>
-        <small>Automatic: one formation creates an opening; the next reacts before it closes.</small>
+        <span>HANDOFF WINDOWS</span>
+        <small>Outcomes resolve under contact. One Staff Exercise may inspect a single neighboring pair.</small>
       </div>
       {feedback ? (
-        <div className={`cascade-readout placement-impact ${feedback.tone}`} key={feedback.revision} role="status">
-          <span><FeedbackIcon weight="fill" /> {feedback.title}</span>
-          <b>{feedback.formationName} → STOP {String(feedback.targetIndex + 1).padStart(2, "0")} · later combo windows recalculated</b>
+        <div className="cascade-readout placement-impact rewired" key={feedback.revision} role="status">
+          <span><Radio weight="fill" /> ASSIGNMENT RECORDED</span>
+          <b>{feedback.formationName} → STOP {String(feedback.targetIndex + 1).padStart(2, "0")} · command assignment recorded</b>
           <div className="placement-impact-metrics">
-            <strong>{feedback.beforeLinks} → {feedback.afterLinks}<small>COMBOS</small></strong>
-            <strong>{feedback.forecast}<small>UPDATED MISSION OUTLOOK</small></strong>
+            <strong>SEALED<small>HANDOFF RESULTS</small></strong>
+            <strong>COMMIT TO REVEAL<small>MISSION OUTCOME</small></strong>
           </div>
         </div>
       ) : (
         <div className={`cascade-readout ${discovered.length > 0 ? "active" : fullyStaffed ? "broken" : "unresolved"}`}>
-          <span><Lightning weight="fill" /> {discovered.length > 0 ? cascadeLabel : fullyStaffed ? "NO COMBOS ARMED" : "COMBO WINDOWS UNKNOWN"}</span>
-          <b>{discovered.length > 0 ? "These reactions fire automatically during the mission." : fullyStaffed ? "The current formations act independently." : "Staff two neighboring stops to reveal their trigger and response."}</b>
-          <small>{discovered.length > 0 ? "Move any formation to change the later windows." : "Nothing activates manually during combat."}</small>
+          <span><Radio weight="fill" /> COMMAND PLAN SEALED</span>
+          <b>Assignments change the battle, but this screen no longer grades them.</b>
+          <small>Read each formation's rules, then decide which responsibility it should carry.</small>
         </div>
       )}
       <div className="handoff-grid">
-        {handoffs.map((handoff) => {
+        {handoffs.map((handoff, handoffIndex) => {
           const staffed = handoff.sourceId && handoff.receiverId;
-          const changed = Boolean(feedback && staffed && handoff.from >= feedback.affectedFrom);
           const source = formations.find((formation) => formation.id === handoff.sourceId);
           const receiver = formations.find((formation) => formation.id === handoff.receiverId);
           const windowAt = timing[handoff.from];
+          const revealed = planningResultRevealed({ phase: "plan", handoffIndex, staffExerciseIndex });
           return (
             <div
-              className={`handoff-card ${handoff.maneuver ? "discovered" : staffed ? "independent" : "unresolved"} ${changed ? handoff.maneuver ? "cascade-powered" : "cascade-broken" : ""}`}
-              key={`${handoff.id}-${changed ? feedback.revision : "static"}`}
-              style={changed ? { "--cascade-delay": `${(handoff.from - feedback.affectedFrom + 1) * 110}ms` } : undefined}
+              className={`handoff-card ${revealed ? handoff.maneuver ? "discovered" : "independent" : "unresolved"}`}
+              key={handoff.id}
             >
               <span className="combo-window-time">T+{fmtDuration(windowAt)} · AFTER {String(handoff.from + 1).padStart(2, "0")} / BEFORE {String(handoff.to + 1).padStart(2, "0")}</span>
-              {handoff.maneuver ? (
+              {revealed && handoff.maneuver ? (
                 <>
                   <div className="combo-window-flow">
                     <span><b>{source.name}</b><small>CREATES {handoff.maneuver.passes}</small></span>
@@ -2034,8 +2021,10 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile }) {
                 </>
               ) : (
                 <>
-                  <b>{staffed ? "NO REACTION IN THIS WINDOW" : "WINDOW NOT REVEALED"}</b>
-                  <small>{staffed ? `${source.name} creates ${handoff.incomingCondition}; ${receiver.name} cannot use it.` : "Staff both stops. The combo check happens automatically at this time."}</small>
+                  <b>{revealed ? staffed ? "NO AUTOMATIC REACTION" : "WINDOW UNSTAFFED" : staffed ? "HANDOFF OUTCOME SEALED" : "STAFF BOTH STOPS"}</b>
+                  <small>{revealed && staffed ? `${source.name} creates ${handoff.incomingCondition}; ${receiver.name} cannot use it.` : staffed ? `${source.name} to ${receiver.name}; result unknown.` : "A handoff requires formations on both sides."}</small>
+                  {!revealed && staffed && staffExerciseIndex === null && <button className="staff-exercise-button" onClick={() => onStaffExercise(handoffIndex)}><Radio weight="fill" /> RUN STAFF EXERCISE</button>}
+                  {!revealed && staffed && staffExerciseIndex !== null && <em className="staff-exercise-spent">{staffExerciseIndex === -1 ? "EXERCISE SPENT · PLAN CHANGED" : "STAFF EXERCISE SPENT"}</em>}
                 </>
               )}
             </div>
@@ -2046,7 +2035,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile }) {
   );
 }
 
-function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, onChooseRole, onAssignFormation, outputs, phase, playbook, profile, readiness, refitProtocols }) {
+function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, onChooseRole, onAssignFormation, onStaffExercise, outputs, phase, playbook, profile, readiness, refitProtocols, staffExerciseIndex }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
@@ -2111,12 +2100,12 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           {formations.length < playbook.roles.length ? ` · ${playbook.roles.length - formations.length} STOP EMPTY` : ""}
         </strong>
       </div>
-      <p>Drag a visible formation from staging into a stop. Neighboring stops are checked in order for an automatic trigger → response combo.</p>
-      <div className={`playbook-doctrine ${doctrine.triggered ? "triggered" : "exposed"}`}>
+      <p>Assign the army by responsibility. Static rules remain visible; task fit, reactions, and mission results resolve after commitment.</p>
+      <div className="playbook-doctrine concealed">
         <span>PLAYBOOK DOCTRINE · {doctrine.name}</span>
         <b>{doctrine.strength}</b>
         <small>EXPOSURE · {doctrine.exposure}</small>
-        <em>{doctrine.result}</em>
+        <em>DOCTRINE RESULT UNRESOLVED</em>
       </div>
       <div className="route-terminals" aria-hidden="true"><span>FORMATION LANES</span><span>COMBO ORDER</span></div>
       <div className="playbook-route">
@@ -2124,21 +2113,12 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           const roleDemands = roleDemandsFor(role, index, condition);
           const formation = formations.find((item) => item.id === assignments[role.id]);
           const refitProtocol = refitProtocols[role.id];
-          const output = outputs[role.id];
           const nextRole = playbook.roles[index + 1];
           const nextFormation = nextRole ? formations.find((item) => item.id === assignments[nextRole.id]) : null;
-          const handoff = handoffs[index];
-          const linked = Boolean(handoff?.maneuver);
-          const changed = Boolean(feedback?.changedIndices.includes(index));
-          const downstream = Boolean(feedback && index >= feedback.affectedFrom && formation);
-          const cascadeState = changed ? "cascade-moved" : downstream ? output?.incoming ? "cascade-powered" : "cascade-broken" : "";
-          const cascadeDelay = feedback && downstream ? { "--cascade-delay": `${(index - feedback.affectedFrom) * 110}ms` } : undefined;
-          const changedLeg = Boolean(feedback && index >= feedback.affectedFrom && formation && nextFormation);
           return (
-            <Fragment key={`${role.id}-${downstream ? feedback.revision : "static"}`}>
+            <Fragment key={role.id}>
               <button
-                className={`playbook-slot ${formation ? "filled" : "empty"} ${dropTargetRoleId === role.id ? "drop-target" : ""} ${cascadeState}`}
-                style={cascadeDelay}
+                className={`playbook-slot planning-concealed ${formation ? "filled" : "empty"} ${dropTargetRoleId === role.id ? "drop-target" : ""}`}
                 onClick={() => onChooseRole(role.id)}
                 onDragEnter={(event) => { event.preventDefault(); setDropTargetRoleId(role.id); }}
                 onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
@@ -2159,26 +2139,26 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                   <>
                     <span className="slot-formation"><img src={formation.asset} alt="" /><span><b>{formation.name}</b><small>{formation.activeRefit.name}</small></span></span>
                     {refitProtocol && (
-                      <span className={`slot-protocol ${refitProtocol.active ? "active" : "dormant"}`} title={refitProtocol.active ? refitProtocol.text : "No field interface found at this stop."}>
-                        <b>{refitProtocol.active ? `REFIT PROTOCOL · ${refitProtocol.name}` : "REFIT PROTOCOL DORMANT"}</b>
-                        <small>{refitProtocol.active ? protocolImpactText(refitProtocol.impact) : "NO FIELD INTERFACE AT THIS STOP"}</small>
+                      <span className="slot-protocol concealed">
+                        <b>REFIT INTERFACE UNRESOLVED</b>
+                        <small>FIELD INTERACTION REVEALS UNDER CONTACT</small>
                       </span>
                     )}
-                    <span className={`slot-result ${output.incoming ? "transformed" : ""}`}>
-                      <span className="slot-output"><b>{output.result}</b><small>{output.incoming ? "COMBO RESULT" : "CREATES"}</small></span>
-                      <span className={`slot-readiness readiness-${readiness[role.id].label.toLowerCase()}`} title="Observed after placement; task fit and neighboring combo links affect readiness."><b>{readiness[role.id].score}%</b><small>{readiness[role.id].label}</small></span>
+                    <span className="slot-result concealed">
+                      <span className="slot-output"><b>OUTCOME SEALED</b><small>RESOLVES UNDER CONTACT</small></span>
+                      <span className="slot-readiness"><b>?</b><small>TASK FIT</small></span>
                     </span>
                   </>
                 ) : (
                   <span className="slot-empty"><Plus weight="bold" /><b>DROP UNIT</b><small>OR CLICK</small></span>
                 )}
               </button>
-              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${linked ? "linked" : ""} ${changedLeg ? linked ? "cascade-powered" : "cascade-broken" : ""}`} style={changedLeg ? { "--cascade-delay": `${(index - feedback.affectedFrom + 1) * 110}ms` } : undefined} aria-hidden="true" title={linked ? `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}` : formation && nextFormation ? "No automatic reaction in this combo window" : "Staff both stops to reveal this combo window"}><Lightning weight="fill" /></span>}
+              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""}`} aria-hidden="true"><Radio weight="fill" /></span>}
             </Fragment>
           );
         })}
       </div>
-      <TacticalHandoffBoard feedback={feedback} formations={formations} handoffs={handoffs} profile={profile} />
+      <TacticalHandoffBoard feedback={feedback} formations={formations} handoffs={handoffs} profile={profile} staffExerciseIndex={staffExerciseIndex} onStaffExercise={onStaffExercise} />
     </div>
   );
 }
@@ -2195,7 +2175,7 @@ function BattleStateLegend() {
   );
 }
 
-function Battlefield({ formations, formationFates, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onFormationDragStart, readiness, refitProtocols, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
+function Battlefield({ formations, formationFates, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onFormationDragStart, onStaffExercise, readiness, refitProtocols, staffExerciseIndex, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
   const alphaState = battleTime >= profile.alphaAt ? "secured" : "active";
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
   const reactorState = battleTime >= profile.reactorAt ? "secured" : "threat";
@@ -2297,7 +2277,7 @@ function Battlefield({ formations, formationFates, selected, onSelect, deploymen
       )}
 
       {playbackActive && <BattleStateLegend />}
-      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} />
+      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onStaffExercise={onStaffExercise} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} />
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -2389,7 +2369,7 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, blindTestActi
   const collision = profile.enemyCollision;
   const collisionSource = FORMATIONS.find((formation) => formation.id === collision?.sourceId);
   const collisionReceiver = FORMATIONS.find((formation) => formation.id === collision?.receiverId);
-  const blindSealed = blindTestActive && (phase === "plan" || phase === "drill");
+  const planningSealed = phase === "plan" || phase === "drill";
   return (
     <div className="intel-block enemy-plan-intel">
       <span className="panel-label">ENEMY PLAYBOOK · EXECUTES IN PARALLEL</span>
@@ -2397,15 +2377,15 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, blindTestActi
       {operation.id === "ashen-passage" && (
         <div className={`enemy-collision-readout ${collision?.outcome ?? "unread"}`} aria-live="polite">
           <span><Crosshair weight="duotone" /> PLAN COLLISION · STOP 01/02</span>
-          <b>{collision?.title ?? "COLLISION WINDOW UNRESOLVED"}</b>
-          <small>{collision?.summary ?? "Staff Stop 01 and Stop 02 to reveal how the two plans collide."}</small>
-          {collision?.revealed && <em>{collisionSource?.name} → {collisionReceiver?.name}{collision.actorName ? ` · ${collision.actorName}` : " · NO AUTOMATIC REACTION"}</em>}
+          <b>{planningSealed ? "COLLISION WINDOW SEALED" : collision?.title ?? "COLLISION WINDOW UNRESOLVED"}</b>
+          <small>{planningSealed ? "The opposing plans collide here; the outcome resolves during execution." : collision?.summary ?? "Staff Stop 01 and Stop 02 to reveal how the two plans collide."}</small>
+          {!planningSealed && collision?.revealed && <em>{collisionSource?.name} → {collisionReceiver?.name}{collision.actorName ? ` · ${collision.actorName}` : " · NO AUTOMATIC REACTION"}</em>}
         </div>
       )}
       <div className="enemy-chain">
         {clashes.map((clash, index) => {
           const resolved = (phase === "battle" || phase === "complete") && battleTime >= clash.actionAt;
-          const revealed = !blindSealed && (operation.id === "ashen-passage" ? Boolean(collision?.revealed) : planReady);
+          const revealed = resolved;
           const state = !revealed ? "unread" : clash.routeState === "passed" ? "threat" : clash.routeState;
           return (
             <Fragment key={clash.id}>
@@ -2434,7 +2414,7 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, blindTestActi
           );
         })}
       </div>
-      <div className={`reinforcement-order ${!blindSealed && planReady && profile.overrun === 0 ? "avoided" : "threat"}`}>
+      <div className={`reinforcement-order ${!planningSealed && planReady && profile.overrun === 0 ? "avoided" : "threat"}`}>
         <span className="enemy-step-number">{reinforcementWave.number}</span>
         <span className="enemy-step-copy">
           <em>ARRIVES T+{fmtDuration(reinforcementWave.arrivalAt)}</em>
@@ -2442,7 +2422,7 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, blindTestActi
           <small>{reinforcementWave.approach}</small>
         </span>
         <span className="enemy-step-result">
-          {blindSealed ? "FORECAST SEALED" : !planReady ? "CONTINGENCY UNREAD" : profile.overrun > 0 ? `${reinforcementForecast(profile)} · ${profile.reinforcementLoss} RECOVERY LOST` : `${reinforcementForecast(profile)} · CONTACT AVOIDED`}
+          {planningSealed ? "FORECAST SEALED" : !planReady ? "CONTINGENCY UNREAD" : profile.overrun > 0 ? `${reinforcementForecast(profile)} · ${profile.reinforcementLoss} RECOVERY LOST` : `${reinforcementForecast(profile)} · CONTACT AVOIDED`}
         </span>
       </div>
     </div>
@@ -2475,7 +2455,7 @@ function MissionConditionSelector({ condition, locked, phase, onCondition }) {
 }
 
 function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, blindTestActive, rescueComplete, playbook, assignedCount, formationCount, integrity, profile }) {
-  const blindSealed = blindTestActive && (phase === "plan" || phase === "drill");
+  const planningSealed = phase === "plan" || phase === "drill";
   const forecast = profile.overrun > 0
     ? `${profile.extractedCount} / ${formationCount} EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
     : `${profile.extractedCount} / ${formationCount} EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
@@ -2484,7 +2464,7 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
       <MissionConditionSelector condition={condition} locked={operation.conditionLocked} phase={phase} onCondition={onCondition} />
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
-        <strong className={blindSealed ? "sealed" : planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{blindSealed && planReady ? "FORECAST SEALED · PREDICT BEFORE COMMIT" : planReady ? forecast : `${assignedCount} / ${formationCount} AVAILABLE ASSIGNED`}</strong>
+        <strong className={planningSealed ? "sealed" : planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planningSealed && planReady ? "OUTCOME SEALED · COMMIT TO REVEAL" : planReady ? forecast : `${assignedCount} / ${formationCount} AVAILABLE ASSIGNED`}</strong>
         <div className="campaign-integrity-readout">
           <span>WARHOST INTEGRITY</span>
           <IntegrityMeter value={integrity} />
@@ -2492,26 +2472,26 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
         </div>
         {formationCount < FORMATIONS.length && <p className="campaign-shortfall"><Warning weight="fill" /> {FORMATIONS.length - formationCount} FORMATION MISSING · LEAVE AN AUTHORED STOP EMPTY</p>}
         <p><b>{playbook.name}:</b> {playbook.intent}</p>
-        <div className={`doctrine-outlook ${profile.doctrine.triggered ? "triggered" : "exposed"}`}>
+        <div className={`doctrine-outlook ${planningSealed ? "sealed" : profile.doctrine.triggered ? "triggered" : "exposed"}`}>
           <span>TACTICAL DOCTRINE · {profile.doctrine.name}</span>
-          <b>{profile.doctrine.result}</b>
-          <small>{profile.doctrine.triggered ? "The selected playbook's advantage is active." : "The selected playbook's exposure remains active."}</small>
+          <b>{planningSealed ? "RESULT UNRESOLVED" : profile.doctrine.result}</b>
+          <small>{planningSealed ? "The playbook will be tested against the enemy plan during execution." : profile.doctrine.triggered ? "The selected playbook's advantage is active." : "The selected playbook's exposure remains active."}</small>
         </div>
         {profile.readiness.staffedCount > 0 && (
-          <div className={`readiness-impact ${profile.readiness.delay > 0 ? "penalty" : "aligned"}`}>
+          <div className={`readiness-impact ${planningSealed ? "sealed" : profile.readiness.delay > 0 ? "penalty" : "aligned"}`}>
             <span>FORMATION READINESS</span>
-            <b>{profile.readiness.average}% · {profile.readiness.delay > 0 ? `+${fmtDuration(profile.readiness.delay)} EXECUTION DELAY` : "NO TASK-FIT DELAY"}</b>
-            <small>{profile.readiness.alignedCount} / {profile.readiness.staffedCount} STAFFED FORMATIONS TASK-ALIGNED{profile.readiness.protocolDelayReduction > 0 ? ` · REFIT ABSORBED ${fmtDuration(profile.readiness.protocolDelayReduction)} OF ${fmtDuration(profile.readiness.rawDelay)} IMPROVISED DELAY` : ""} · COMBO EFFECTS RESOLVE SEPARATELY</small>
+            <b>{planningSealed ? "TASK FIT UNRESOLVED" : `${profile.readiness.average}% · ${profile.readiness.delay > 0 ? `+${fmtDuration(profile.readiness.delay)} EXECUTION DELAY` : "NO TASK-FIT DELAY"}`}</b>
+            <small>{planningSealed ? "INSPECT EACH FORMATION'S CAPABILITIES AGAINST ITS ASSIGNED RESPONSIBILITY." : `${profile.readiness.alignedCount} / ${profile.readiness.staffedCount} STAFFED FORMATIONS TASK-ALIGNED · COMBO EFFECTS RESOLVE SEPARATELY`}</small>
           </div>
         )}
-        {planReady && !blindSealed && (
+        {planReady && !planningSealed && (
           <div className={`extraction-breakdown ${profile.extractedCount >= operation.requiredExtraction ? "viable" : profile.extractedCount > 0 ? "costly" : "broken"}`}>
             <span>EXTRACTION BREAKDOWN</span>
             <b>{profile.reserveCapacity} CAPACITY − {profile.reinforcementLoss} WAVE − {profile.enemyRecoveryLoss} ROUTE = {profile.extractedCount} CLEAR</b>
             <small>THE ENEMY WAVE REMOVES ONE RECOVERY SLOT PER COMPLETE 30 SECONDS OF CONTACT.</small>
           </div>
         )}
-        {profile.protocols.length > 0 && (
+        {!planningSealed && profile.protocols.length > 0 && (
           <div className="refit-protocol-impact">
             <span>ASHEN FIELD PROTOCOL{profile.protocols.length > 1 ? "S" : ""} ONLINE</span>
             {profile.protocols.map((protocol) => <b key={protocol.formationId}>{protocol.name} · {protocol.formationName}</b>)}
@@ -2687,7 +2667,7 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
       <div className="decision-panel formation-picker-panel">
         <p className="eyebrow">STAFF ACTION STOP</p>
         <h2 id="formation-picker-title">Who executes {role.label}?</h2>
-        <p>{role.brief} This condition demands <b>{roleDemands.join(" / ")}</b>. Choose the formation; readiness and any adjacent tactical handoff are revealed after placement.</p>
+        <p>{role.brief} This condition demands <b>{roleDemands.join(" / ")}</b>. Choose from the rules below; readiness and handoff results stay sealed until execution.</p>
         <div className="formation-picker-list">
           {orderedFormations.map((formation) => {
             const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
@@ -2950,6 +2930,7 @@ export function App() {
   const [strategyTrialId, setStrategyTrialId] = useState(null);
   const [blindTestActive, setBlindTestActive] = useState(false);
   const [blindPrediction, setBlindPrediction] = useState(null);
+  const [staffExerciseIndex, setStaffExerciseIndex] = useState(null);
   const placementRevisionRef = useRef(0);
 
   const operation = OPERATIONS[operationIndex] ?? OPERATIONS[0];
@@ -3067,20 +3048,12 @@ export function App() {
     () => [
       `Condition ${condition.name}: ${condition.effect}`,
       `${formations.length} installed refits locked; no loadout changes after commitment`,
-      ...operationProfile.protocols.map((protocol) => `${protocol.name} online: ${protocol.text}`),
       `Loading ${playbook.name} geometry`,
-      ...playbook.stages.map((stage) => `${stage.label} timing and support arcs confirmed`),
-      operationProfile.readiness.delay > 0
-        ? `${operationProfile.readiness.improvisedCount} improvised assignments add ${operationProfile.readiness.delay} seconds to extraction timing`
-        : `All ${operationProfile.readiness.staffedCount} formations are task-aligned; no readiness delay`,
-      ...(tacticalHandoffs.some((handoff) => handoff.maneuver)
-        ? tacticalHandoffs.filter((handoff) => handoff.maneuver).map((handoff) => `${handoff.maneuver.name}: ${handoff.maneuver.passes} becomes ${handoff.maneuver.result}. ${handoff.maneuver.impact.text}`)
-        : [`All ${assignedCount} formations act independently; no automatic combo windows discovered`]),
-      ...operationProfile.enemyClashes.map((clash) => `Enemy ${clash.label}: ${clash.resultText}`),
-      ...operationProfile.branchEffects.map((branch) => `${branch.option.label}: ${branch.impact.text}`),
-      operationProfile.overrun > 0
-        ? `${operationProfile.extractedCount} formations forecast to extract ${operationProfile.overrun} seconds after the enemy wave reaches ${operation.extractionTitle}`
-        : `${operationProfile.extractedCount} formations forecast to clear ${operationProfile.timeSaved} seconds before the enemy wave`,
+      ...playbook.stages.map((stage) => `${stage.label} responsibility acknowledged`),
+      `${assignedCount} formations assigned; derived task fit remains sealed`,
+      `${tacticalHandoffs.length} handoff windows registered; automatic reactions remain sealed`,
+      `${operationProfile.enemyClashes.length} enemy orders identified; collision outcomes remain sealed`,
+      `Command drill complete. Commit the play to reveal the result.`,
     ],
     [assignedCount, condition, formations.length, operation, operationProfile, playbook, tacticalHandoffs],
   );
@@ -3166,6 +3139,7 @@ export function App() {
     setStrategyTrialId(trial.id);
     setBlindTestActive(false);
     setBlindPrediction(null);
+    setStaffExerciseIndex(null);
   };
 
   const startBlindTest = () => {
@@ -3191,11 +3165,21 @@ export function App() {
     setStrategyTrialId(null);
     setBlindTestActive(true);
     setBlindPrediction(null);
+    setStaffExerciseIndex(null);
   };
 
   const chooseBlindPrediction = (predictionId) => {
     if (!blindTestActive || phase !== "plan" || !BLIND_PREDICTIONS.some((prediction) => prediction.id === predictionId)) return;
     setBlindPrediction(predictionId);
+  };
+
+  const runStaffExercise = (handoffIndex) => {
+    if (phase !== "plan") return;
+    setStaffExerciseIndex((currentIndex) => claimStaffExercise({
+      currentIndex,
+      requestedIndex: handoffIndex,
+      handoffCount: tacticalHandoffs.length,
+    }));
   };
 
   const changePlaybook = (nextId) => {
@@ -3212,6 +3196,7 @@ export function App() {
     setDrillStep(-1);
     setDrillComplete(false);
     setStrategyTrialId(null);
+    setStaffExerciseIndex(null);
     if (blindTestActive) setBlindPrediction(null);
   };
 
@@ -3223,6 +3208,7 @@ export function App() {
     setDrillStep(-1);
     setDrillComplete(false);
     setStrategyTrialId(null);
+    if (staffExerciseIndex !== null) setStaffExerciseIndex(-1);
     if (blindTestActive) setBlindPrediction(null);
   };
 
@@ -3276,6 +3262,7 @@ export function App() {
     setDrillStep(-1);
     setDrillComplete(false);
     setStrategyTrialId(null);
+    if (staffExerciseIndex !== null) setStaffExerciseIndex(-1);
     if (blindTestActive) setBlindPrediction(null);
   };
 
@@ -3337,6 +3324,7 @@ export function App() {
     setPickerRoleId(null);
     setDrillComplete(false);
     setStrategyTrialId(null);
+    if (staffExerciseIndex !== null) setStaffExerciseIndex(-1);
     if (blindTestActive) setBlindPrediction(null);
   };
 
@@ -3503,6 +3491,7 @@ export function App() {
     setStrategyTrialId(null);
     setBlindTestActive(false);
     setBlindPrediction(null);
+    setStaffExerciseIndex(null);
   };
 
   const resetMission = () => {
@@ -3535,6 +3524,7 @@ export function App() {
     setStrategyTrialId(null);
     setBlindTestActive(false);
     setBlindPrediction(null);
+    setStaffExerciseIndex(null);
   };
 
   const repeatBlindTest = () => {
@@ -3547,7 +3537,7 @@ export function App() {
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
         <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
-        <Battlefield formations={formations} formationFates={operationFormationFates} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
+        <Battlefield formations={formations} formationFates={operationFormationFates} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} blindTestActive={blindTestActive} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} blindTestActive={blindTestActive} blindPrediction={blindPrediction} branches={activeBranches} onBranch={chooseBranch} />

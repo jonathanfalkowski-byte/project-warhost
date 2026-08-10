@@ -123,6 +123,9 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .dossier-observations em { border-color: #46643a; background: #172514; color: #91c873; }
 .dossier-unplaced { display: grid; gap: 3px; border-color: #477b92; background: #102027; }
 .dossier-unplaced b { color: #68c9ef; }
+.dossier-placement.concealed { border-color: #477b92; background: #102027; }
+.dossier-placement.concealed span, .dossier-placement.concealed b { color: #78bfd9; }
+.dossier-placement.concealed .dossier-observations em { border-color: #385968; background: #12232a; color: #86aebc; }
 .playbook-list { padding: 6px; display: grid; gap: 4px; }
 .mission-matchup-brief { margin: 6px; padding: 8px; border: 1px solid #4a5044; background: linear-gradient(135deg, rgba(18, 39, 48, .97), rgba(29, 21, 13, .97)); }
 .mission-matchup-brief > span { display: block; color: #8aa2aa; font-family: "Barlow Condensed"; font-size: 8px; font-weight: 700; letter-spacing: .1em; }
@@ -575,6 +578,8 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playbook-doctrine > em { grid-column: 2 / 4; color: #d9c689; font-size: 8px; font-style: normal; letter-spacing: .06em; }
 .playbook-doctrine.triggered { border-color: #698f53; background: linear-gradient(90deg, #172318, #101716); }
 .playbook-doctrine.triggered > span, .playbook-doctrine.triggered > em { color: #9bcf78; }
+.playbook-doctrine.concealed { border-color: #3f6170; background: linear-gradient(90deg, #102027, #101616); }
+.playbook-doctrine.concealed > span, .playbook-doctrine.concealed > em { color: #7bbbd3; }
 .route-terminals { margin: 0 2px 4px; display: flex; justify-content: space-between; color: #5d7f8d; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .12em; }
 .playbook-route { display: grid; grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr); align-items: stretch; }
 .route-leg { position: relative; display: grid; place-items: center; color: #4b7486; }
@@ -621,6 +626,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .slot-readiness b { color: #9ac985; font-size: 12px; line-height: 1; }
 .slot-readiness small { max-width: 58px; color: #7f9c74; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot-readiness.readiness-strained b { color: #d1835f; }
+.playbook-slot.planning-concealed .slot-result { border-color: #38535e; }
+.playbook-slot.planning-concealed .slot-output b, .playbook-slot.planning-concealed .slot-readiness b { color: #78a9ba; text-shadow: none; }
+.slot-protocol.concealed { border-left-color: #426779; background: #102027; }
+.slot-protocol.concealed b, .slot-protocol.concealed small { color: #76a7b9; }
 .handoff-board { margin-top: 10px; padding-top: 8px; border-top: 1px solid #273c43; }
 .handoff-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; font-family: "Barlow Condensed"; }
 .handoff-heading > span { color: #8fb8c8; font-size: 10px; letter-spacing: .11em; }
@@ -663,6 +672,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .handoff-card.cascade-powered { animation: comboCardPower .78s ease-out var(--cascade-delay, 0ms); }
 .handoff-card.cascade-broken { animation: comboCardBreak .78s ease-out var(--cascade-delay, 0ms); }
 .handoff-card .combo-window-time { color: #7ca8b7; font-size: 7px; font-weight: 600; letter-spacing: .08em; }
+.staff-exercise-button { margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 4px 5px; border: 1px solid #4c8499; background: #10242c; color: #78c7e5; font-family: "Barlow Condensed"; font-size: 8px; font-weight: 700; letter-spacing: .08em; cursor: pointer; }
+.staff-exercise-button:hover, .staff-exercise-button:focus-visible { border-color: #72c7e8; background: #15313c; }
+.staff-exercise-button svg { width: 10px; height: 10px; }
+.staff-exercise-spent { margin-top: 4px; color: #72858b; font-size: 7px; font-style: normal; letter-spacing: .08em; }
 .combo-window-flow { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr); align-items: center; gap: 3px; }
 .combo-window-flow > svg { width: 11px; color: #8dcc69; }
 .combo-window-flow > span { min-width: 0; display: grid; gap: 1px; }
