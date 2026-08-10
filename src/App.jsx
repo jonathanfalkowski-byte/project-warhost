@@ -34,6 +34,7 @@ import { resolveAshenCollision } from "./enemyCollision.js";
 import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
 import { resolveExtractionOutcome } from "./extractionResolution.js";
 import { resolveDispositionMatchup } from "./missionDisposition.js";
+import { STRATEGY_TRIALS, strategyTrialFor, strategyTrialResult } from "./strategyExperiment.js";
 import {
   applyCampaignConditions,
   applyWorkshopAction,
@@ -1505,7 +1506,31 @@ function MissionMatchupBrief({ operation }) {
   );
 }
 
-function FormationRoster({ formations, unavailableFormations = [], selected, onSelect, assignments, playbook, onPlaybook, operation, phase, onFormationDragStart, readiness, refitsLocked, onRefit }) {
+function StrategyTestPanel({ activeTrial, available, onLoad }) {
+  return (
+    <section className="strategy-test-panel" aria-label="Controlled strategy test">
+      <header><span>CONTROLLED STRATEGY TEST</span><small>SAME MISSION · SAME ENEMY</small></header>
+      <p>Run A, B, then C. At both breakpoints choose <b>EXECUTE PLAYBOOK</b>; overriding invalidates the comparison.</p>
+      <div className="strategy-trial-list">
+        {STRATEGY_TRIALS.map((trial) => (
+          <button
+            key={trial.id}
+            className={activeTrial?.id === trial.id ? "selected" : ""}
+            onClick={() => onLoad(trial.id)}
+            disabled={!available}
+            aria-pressed={activeTrial?.id === trial.id}
+          >
+            <strong>{trial.run}</strong>
+            <span><b>{trial.name}</b><small>{trial.expectedExtraction.min}–{trial.expectedExtraction.max} EXPECTED TO EXTRACT</small></span>
+          </button>
+        ))}
+      </div>
+      {activeTrial && <div className="strategy-trial-hypothesis"><b>RUN {activeTrial.run} LOADED</b><span>{activeTrial.hypothesis}</span><small>{activeTrial.signal}</small></div>}
+    </section>
+  );
+}
+
+function FormationRoster({ formations, unavailableFormations = [], selected, onSelect, assignments, playbook, onPlaybook, operation, phase, strategyTrial, onLoadStrategyTrial, onFormationDragStart, readiness, refitsLocked, onRefit }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -1515,6 +1540,9 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
   return (
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
       {(phase === "plan" || phase === "drill") && <MissionMatchupBrief operation={operation} />}
+      {phase === "plan" && operation.id === "dead-circuit" && (
+        <StrategyTestPanel activeTrial={strategyTrial} available={formations.length === FORMATIONS.length} onLoad={onLoadStrategyTrial} />
+      )}
       <div className="doctrine-heading"><span>CHOOSE TOTAL-ARMY PLAY</span><Radio weight="duotone" /></div>
       <div className="playbook-list">
         {PLAYBOOKS.map((baseItem) => {
@@ -2756,7 +2784,7 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
   );
 }
 
-function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, won, onAction }) {
+function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, strategyTrial, won, onAction }) {
   const lostCount = formations.length - profile.extractedCount;
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
@@ -2785,8 +2813,11 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
       : canContinue
         ? `${operation.shortName} was lost—but the campaign continues.`
         : `${operation.shortName} was lost.`;
-  const actionLabel = canContinue ? "ENTER SALVAGE WORKSHOP" : campaignDestroyed ? "BEGIN NEW CAMPAIGN" : "RETURN TO BATTLEFIELD";
-  const actionDetail = canContinue
+  const trialResult = strategyTrialResult(strategyTrial, profile.extractedCount);
+  const actionLabel = strategyTrial ? "RETURN TO STRATEGY TEST" : canContinue ? "ENTER SALVAGE WORKSHOP" : campaignDestroyed ? "BEGIN NEW CAMPAIGN" : "RETURN TO BATTLEFIELD";
+  const actionDetail = strategyTrial
+    ? "Reset Dead Circuit and load the next controlled plan."
+    : canContinue
     ? won ? "Carry this detachment into the next operation." : "Withdraw, accept persistent losses, and continue the campaign."
     : campaignDestroyed ? "Warhost Integrity reached zero. This run is over." : "Inspect the completed operation state.";
   const operationResult = won
@@ -2809,6 +2840,13 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
           <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
+        {strategyTrial && trialResult && (
+          <section className={`strategy-trial-result ${trialResult.withinExpected ? "confirmed" : "unexpected"}`}>
+            <span>CONTROLLED RUN {strategyTrial.run} · {trialResult.label}</span>
+            <b>{strategyTrial.name}: {trialResult.extracted} EXTRACTED</b>
+            <p>Expected {strategyTrial.expectedExtraction.min}–{strategyTrial.expectedExtraction.max}. {strategyTrial.signal}</p>
+          </section>
+        )}
         <section className="formation-fate-ledger" aria-label="Formation fates">
           <header><span>FORMATION FATES · TACTICAL SLOT ORDER</span><small>{campaignDestroyed ? "The campaign is over; surviving formations cannot continue as a Warhost." : "Named outcomes at operation end."}</small></header>
           <div className="formation-fate-list">
@@ -2867,9 +2905,11 @@ export function App() {
   const [salvageChoice, setSalvageChoice] = useState(null);
   const [pickerRoleId, setPickerRoleId] = useState(null);
   const [placementFeedback, setPlacementFeedback] = useState(null);
+  const [strategyTrialId, setStrategyTrialId] = useState(null);
   const placementRevisionRef = useRef(0);
 
   const operation = OPERATIONS[operationIndex] ?? OPERATIONS[0];
+  const strategyTrial = strategyTrialFor(strategyTrialId);
   const playbook = useMemo(
     () => playbookForOperation(PLAYBOOKS.find((item) => item.id === playbookId) ?? PLAYBOOKS[0], operation),
     [operation, playbookId],
@@ -3053,6 +3093,35 @@ export function App() {
     return () => window.clearTimeout(timeout);
   }, [currentPlaybackBeat, decision, phase]);
 
+  const loadStrategyTrial = (trialId) => {
+    if (phase !== "plan" || operationIndex !== 0 || formations.length !== FORMATIONS.length) return;
+    const trial = strategyTrialFor(trialId);
+    const trialPlaybook = PLAYBOOKS.find((item) => item.id === trial?.playbookId);
+    const formationIds = new Set(formations.map((formation) => formation.id));
+    const assignmentIds = Object.values(trial?.assignments ?? {});
+    if (!trial || !trialPlaybook || assignmentIds.length !== formations.length || assignmentIds.some((formationId) => !formationIds.has(formationId))) return;
+
+    setPlaybookId(trial.playbookId);
+    setConditionId(trial.conditionId);
+    setRefits(defaultRefits());
+    setAssignments({ ...trial.assignments });
+    setBranches({ ...trial.branches });
+    setBattleBranches({ ...trial.branches });
+    setSelected(trial.assignments[trialPlaybook.roles[0].id]);
+    setPickerRoleId(null);
+    setDrillStep(-1);
+    setDrillComplete(false);
+    setBattleTime(0);
+    setPlaybackIndex(0);
+    setPlaybackPlaying(false);
+    setDecision(null);
+    setResolvedDecisions([]);
+    setRescueComplete(false);
+    setShowCompletion(false);
+    setPlacementFeedback(null);
+    setStrategyTrialId(trial.id);
+  };
+
   const changePlaybook = (nextId) => {
     if (phase !== "plan") return;
     const next = PLAYBOOKS.find((item) => item.id === nextId);
@@ -3066,6 +3135,7 @@ export function App() {
     setPlacementFeedback(null);
     setDrillStep(-1);
     setDrillComplete(false);
+    setStrategyTrialId(null);
   };
 
   const changeCondition = (nextId) => {
@@ -3075,6 +3145,7 @@ export function App() {
     setPlacementFeedback(null);
     setDrillStep(-1);
     setDrillComplete(false);
+    setStrategyTrialId(null);
   };
 
   const changeRefit = (formationId, refitId) => {
@@ -3126,6 +3197,7 @@ export function App() {
     setPickerRoleId(null);
     setDrillStep(-1);
     setDrillComplete(false);
+    setStrategyTrialId(null);
   };
 
   const assignFormationToRole = (roleId, formationId) => {
@@ -3185,6 +3257,7 @@ export function App() {
     setSelected(formationId);
     setPickerRoleId(null);
     setDrillComplete(false);
+    setStrategyTrialId(null);
   };
 
   const chooseFormationForRole = (formationId) => {
@@ -3209,6 +3282,7 @@ export function App() {
     if (!breakpoint?.options.some((option) => option.id === optionId)) return;
     setBranches((current) => ({ ...current, [breakpointId]: optionId }));
     setDrillComplete(false);
+    setStrategyTrialId(null);
   };
 
   const resolveDecision = (choice) => {
@@ -3221,6 +3295,7 @@ export function App() {
       : plannedOption;
     if (choice === "override" && seals > 0) {
       setSeals((current) => current - 1);
+      setStrategyTrialId(null);
     }
     setBattleBranches((current) => ({ ...current, [decision]: chosenOption }));
     if (decision === "rescue") setRescueComplete(Boolean(breakpointImpacts[decision][chosenOption].rescue));
@@ -3344,6 +3419,7 @@ export function App() {
     setSalvageChoice(null);
     setPickerRoleId(null);
     setPlacementFeedback(null);
+    setStrategyTrialId(null);
   };
 
   const resetMission = () => {
@@ -3373,20 +3449,21 @@ export function App() {
     setSalvageChoice(null);
     setPickerRoleId(null);
     setPlacementFeedback(null);
+    setStrategyTrialId(null);
   };
 
   return (
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} onLoadStrategyTrial={loadStrategyTrial} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
         <Battlefield formations={formations} formationFates={operationFormationFates} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
-      {showCompletion && <CompletionOverlay formations={formations} formationFates={operationFormationFates} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} won={operationWon} onAction={handleCompletionAction} />}
+      {showCompletion && <CompletionOverlay formations={formations} formationFates={operationFormationFates} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} strategyTrial={strategyTrial} won={operationWon} onAction={strategyTrial ? resetMission : handleCompletionAction} />}
       {showWorkshop && workshopBaseline && <SalvageWorkshop baseline={workshopBaseline} choice={salvageChoice} formations={workshopFormations} integrity={warhostIntegrity} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopAction} onLaunch={launchNextOperation} />}
     </main>
   );

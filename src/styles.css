@@ -140,6 +140,24 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .mission-matchup-brief .player-order b { color: #62c8ef; }
 .mission-matchup-brief .enemy-order { border-left: 3px solid #d8753e; background: #281711; }
 .mission-matchup-brief .enemy-order b { color: #e99350; }
+.strategy-test-panel { margin: 6px; padding: 8px; border: 1px solid #546545; background: #101814; }
+.strategy-test-panel header { display: flex; justify-content: space-between; gap: 6px; color: #9bcf78; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.strategy-test-panel header small { color: #728078; font-size: 7px; }
+.strategy-test-panel > p { margin: 6px 0; color: #9ba49f; font-size: 8px; line-height: 1.3; }
+.strategy-test-panel > p b { color: #d9e3dd; }
+.strategy-trial-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.strategy-trial-list button { min-width: 0; padding: 5px 3px; display: grid; grid-template-columns: 18px 1fr; align-items: center; gap: 3px; border: 1px solid #39443e; background: #121a17; color: #9da7a2; text-align: left; cursor: pointer; }
+.strategy-trial-list button > strong { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid #68756e; color: #d4ddd8; font-family: "Barlow Condensed"; font-size: 11px; }
+.strategy-trial-list button span { min-width: 0; display: grid; gap: 1px; }
+.strategy-trial-list button b { overflow: hidden; color: #bac4bf; font-family: "Barlow Condensed"; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.strategy-trial-list button small { color: #717b76; font-family: "Barlow Condensed"; font-size: 6px; line-height: 1.1; }
+.strategy-trial-list button.selected { border-color: #8ac862; background: #19261a; box-shadow: inset 0 0 12px rgba(123, 191, 81, .08); }
+.strategy-trial-list button.selected > strong, .strategy-trial-list button.selected b { color: #9ee277; border-color: #80bd5d; }
+.strategy-trial-list button:disabled { cursor: not-allowed; opacity: .35; }
+.strategy-trial-hypothesis { margin-top: 5px; padding: 6px; display: grid; gap: 2px; border-left: 3px solid #84c661; background: #172219; }
+.strategy-trial-hypothesis b { color: #9ee277; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .06em; }
+.strategy-trial-hypothesis span, .strategy-trial-hypothesis small { color: #aeb9b3; font-size: 8px; line-height: 1.25; }
+.strategy-trial-hypothesis small { color: #7f8e86; }
 .playbook-row { width: 100%; min-height: 52px; padding: 7px 9px; display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 8px; border: 1px solid #313a36; background: #111615; text-align: left; cursor: pointer; }
 .playbook-row > svg { width: 24px; height: 24px; color: #858c89; }
 .playbook-row span { display: grid; }
@@ -909,6 +927,14 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .formation-fate.destroyed > strong { color: #ff7657; }
 .debrief-button { min-height: 68px; width: 100%; }
 .completion-note { margin: -10px 0 18px !important; font-size: 11px !important; }
+.strategy-trial-result { margin: 10px 0 18px; padding: 12px; display: grid; gap: 4px; border: 1px solid #6d7c64; border-left-width: 4px; background: #151d17; text-align: left; }
+.strategy-trial-result > span { color: #8fac7d; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .09em; }
+.strategy-trial-result > b { color: #dce7df; font-family: "Barlow Condensed"; font-size: 18px; }
+.strategy-trial-result > p { margin: 0; color: #9aa69f; font-size: 11px; }
+.strategy-trial-result.confirmed { border-color: #7cbd59; background: #142018; }
+.strategy-trial-result.confirmed > span { color: #98dc72; }
+.strategy-trial-result.unexpected { border-color: #e29643; background: #251b11; }
+.strategy-trial-result.unexpected > span { color: #f0a24a; }
 .completion-panel.defeat { border-color: #9b4b35; }
 .completion-panel.defeat .completion-icon, .completion-panel.defeat .eyebrow { color: #ef7a56; }
 .completion-panel.defeat .victory-banner { border-color: #9b4b35; background: #36170f; color: #ff8c66; }
