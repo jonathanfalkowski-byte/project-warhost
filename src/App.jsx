@@ -2004,12 +2004,12 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
     <div className="handoff-board" aria-live="polite">
       <div className="handoff-heading">
         <span>HANDOFF WINDOWS</span>
-        <small>Outcomes resolve under contact. One Staff Exercise may inspect a single neighboring pair.</small>
+        <small>Inspect one neighboring pair with a Staff Exercise.</small>
       </div>
       {feedback ? (
         <div className="cascade-readout placement-impact rewired" key={feedback.revision} role="status">
           <span><Radio weight="fill" /> ASSIGNMENT RECORDED</span>
-          <b>{feedback.formationName} → STOP {String(feedback.targetIndex + 1).padStart(2, "0")} · command assignment recorded</b>
+          <b>{feedback.formationName} → STOP {String(feedback.targetIndex + 1).padStart(2, "0")}</b>
           <div className="placement-impact-metrics">
             <strong>SEALED<small>HANDOFF RESULTS</small></strong>
             <strong>COMMIT TO REVEAL<small>MISSION OUTCOME</small></strong>
@@ -2046,7 +2046,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
                 </>
               ) : (
                 <>
-                  <b>{revealed ? staffed ? "NO AUTOMATIC REACTION" : "WINDOW UNSTAFFED" : staffed ? "HANDOFF OUTCOME SEALED" : "STAFF BOTH STOPS"}</b>
+                  <b>{revealed ? staffed ? "NO AUTOMATIC REACTION" : "WINDOW UNSTAFFED" : staffed ? "RESULT SEALED" : "STAFF BOTH STOPS"}</b>
                   <small>{revealed && staffed ? `${source.name} creates ${handoff.incomingCondition}; ${receiver.name} cannot use it.` : staffed ? `${source.name} to ${receiver.name}; result unknown.` : "A handoff requires formations on both sides."}</small>
                   {!revealed && staffed && staffExerciseIndex === null && <button className="staff-exercise-button" onClick={() => onStaffExercise(handoffIndex)}><Radio weight="fill" /> RUN STAFF EXERCISE</button>}
                   {!revealed && staffed && staffExerciseIndex !== null && <em className="staff-exercise-spent">{staffExerciseIndex === -1 ? "EXERCISE SPENT · PLAN CHANGED" : "STAFF EXERCISE SPENT"}</em>}
@@ -2132,7 +2132,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           {formations.length < playbook.roles.length ? ` · ${playbook.roles.length - formations.length} STOP EMPTY` : ""}
         </strong>
       </div>
-      <p>Assign the army by responsibility. Static rules remain visible; task fit, reactions, and mission results resolve after commitment.</p>
+      <p>Assign each formation a responsibility. Rules stay visible; results remain sealed until commitment.</p>
       <div className="playbook-doctrine concealed">
         <span>PLAYBOOK DOCTRINE · {doctrine.name}</span>
         <b>{doctrine.strength}</b>
@@ -2223,8 +2223,8 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                       </span>
                     )}
                     <span className="slot-result concealed">
-                      <span className="slot-output"><b>OUTCOME SEALED</b><small>RESOLVES UNDER CONTACT</small></span>
-                      <span className="slot-readiness"><b>?</b><small>TASK FIT</small></span>
+                      <span className="slot-output"><b>RESULT SEALED</b></span>
+                      <span className="slot-readiness"><b>?</b><small>FIT</small></span>
                     </span>
                   </>
                 ) : (
