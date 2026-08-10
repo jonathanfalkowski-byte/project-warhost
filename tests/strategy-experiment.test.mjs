@@ -8,33 +8,43 @@ import {
   blindPredictionResult,
   strategyTrialFor,
   strategyTrialResult,
+  strategyTrialsForPlaybook,
 } from "../src/strategyExperiment.js";
 
 const FORMATION_IDS = new Set(["harpoon", "furnace", "breaker", "railjack", "hauler"]);
-const ROLE_IDS = new Set(["pull", "burn", "break", "anchor", "recover"]);
+const ROLE_IDS = {
+  trapline: new Set(["pull", "burn", "break", "anchor", "recover"]),
+  spear: new Set(["screen", "point", "punch", "suppress", "recover"]),
+  pressure: new Set(["alpha", "beta", "deny", "reactor", "recover"]),
+};
 
-test("controlled trials use the same mission inputs and every formation exactly once", () => {
+test("every playbook has aggressive, balanced, and cautious templates", () => {
+  assert.equal(STRATEGY_TRIALS.length, 9);
+  Object.keys(ROLE_IDS).forEach((playbookId) => {
+    const templates = strategyTrialsForPlaybook(playbookId);
+    assert.equal(templates.length, 3);
+    assert.deepEqual(templates.map((item) => item.posture), ["aggressive", "balanced", "cautious"]);
+  });
+});
+
+test("every template uses valid roles and every formation exactly once", () => {
   STRATEGY_TRIALS.forEach((trial) => {
-    assert.equal(trial.playbookId, "trapline");
-    assert.equal(trial.conditionId, "clear");
-    assert.deepEqual(new Set(Object.keys(trial.assignments)), ROLE_IDS);
+    assert.deepEqual(new Set(Object.keys(trial.assignments)), ROLE_IDS[trial.playbookId]);
     assert.deepEqual(new Set(Object.values(trial.assignments)), FORMATION_IDS);
     assert.deepEqual(new Set(Object.keys(trial.branches)), new Set(["beta", "rescue"]));
     assert.ok(["tempo", "protect"].includes(trial.branches.beta));
     assert.ok(["clock", "recover"].includes(trial.branches.rescue));
+    assert.ok(trial.priority.length > 10);
+    assert.ok(trial.sacrifice.length > 10);
   });
 });
 
-test("controlled trials define ordered extraction bands", () => {
-  const [disjointed, cautious, coordinated] = STRATEGY_TRIALS;
-  assert.ok(disjointed.expectedExtraction.max < cautious.expectedExtraction.min);
-  assert.ok(cautious.expectedExtraction.max < coordinated.expectedExtraction.min);
-});
-
-test("trial lookup and result classification fail closed", () => {
+test("template lookup and filtering fail closed", () => {
   assert.equal(strategyTrialFor("unknown"), null);
-  const trial = strategyTrialFor("coordinated");
-  assert.equal(strategyTrialResult(trial, 4).withinExpected, true);
+  assert.deepEqual(strategyTrialsForPlaybook("unknown"), []);
+  assert.deepEqual(strategyTrialsForPlaybook(null), []);
+  const trial = strategyTrialFor("spear-balanced");
+  assert.equal(strategyTrialResult(trial, 4).extracted, 4);
   assert.equal(strategyTrialResult(trial, 99).extracted, 20);
   assert.equal(strategyTrialResult(null, 4), null);
 });

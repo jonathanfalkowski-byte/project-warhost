@@ -1,48 +1,111 @@
-const freezeTrial = (trial) => Object.freeze({
-  ...trial,
-  assignments: Object.freeze({ ...trial.assignments }),
-  branches: Object.freeze({ ...trial.branches }),
-  expectedExtraction: Object.freeze({ ...trial.expectedExtraction }),
+const freezeTemplate = (template) => Object.freeze({
+  ...template,
+  assignments: Object.freeze({ ...template.assignments }),
+  branches: Object.freeze({ ...template.branches }),
+});
+
+const template = (playbookId, posture, run, assignments, branches, priority, sacrifice) => freezeTemplate({
+  id: `${playbookId}-${posture}`,
+  playbookId,
+  posture,
+  run,
+  name: posture.toUpperCase(),
+  conditionId: "clear",
+  assignments,
+  branches,
+  priority,
+  sacrifice,
+  hypothesis: `${priority} ${sacrifice}`,
+  signal: "A competent editable starting plan; experienced commanders can find stronger interactions.",
 });
 
 export const STRATEGY_TRIALS = Object.freeze([
-  freezeTrial({
-    id: "disjointed",
-    run: "A",
-    name: "DISJOINTED FORCE",
-    hypothesis: "Wrong formations in the right plan should collapse under enemy pressure.",
-    playbookId: "trapline",
-    conditionId: "clear",
-    assignments: { pull: "hauler", burn: "breaker", break: "railjack", anchor: "furnace", recover: "harpoon" },
-    branches: { beta: "tempo", rescue: "clock" },
-    expectedExtraction: { min: 0, max: 1 },
-    signal: "Look for improvised-task delay, enemy overruns, and campaign-threatening losses.",
-  }),
-  freezeTrial({
-    id: "cautious",
-    run: "B",
-    name: "CAUTIOUS FORCE",
-    hypothesis: "Correct responsibilities with slow protective orders should survive, but lose the mission clock.",
-    playbookId: "trapline",
-    conditionId: "clear",
-    assignments: { pull: "harpoon", burn: "railjack", break: "breaker", anchor: "furnace", recover: "hauler" },
-    branches: { beta: "protect", rescue: "recover" },
-    expectedExtraction: { min: 2, max: 3 },
-    signal: "Look for task alignment and protection, but fewer handoffs and a late extraction.",
-  }),
-  freezeTrial({
-    id: "coordinated",
-    run: "C",
-    name: "COORDINATED FORCE",
-    hypothesis: "Correct responsibilities and a complete handoff chain should break enemy orders and clear extraction.",
-    playbookId: "trapline",
-    conditionId: "clear",
-    assignments: { pull: "harpoon", burn: "furnace", break: "breaker", anchor: "railjack", recover: "hauler" },
-    branches: { beta: "tempo", rescue: "clock" },
-    expectedExtraction: { min: 4, max: 5 },
-    signal: "Look for four handoffs, broken enemy orders, and a successful extraction.",
-  }),
+  template(
+    "trapline",
+    "aggressive",
+    "A",
+    { pull: "breaker", burn: "furnace", break: "harpoon", anchor: "railjack", recover: "hauler" },
+    { beta: "tempo", rescue: "clock" },
+    "Pushes the sabotage column forward immediately.",
+    "Sacrifices handoff depth and recovery protection.",
+  ),
+  template(
+    "trapline",
+    "balanced",
+    "B",
+    { pull: "harpoon", burn: "railjack", break: "breaker", anchor: "furnace", recover: "hauler" },
+    { beta: "tempo", rescue: "recover" },
+    "Maintains useful coverage across every stage of the rolling operation.",
+    "Sacrifices maximum speed and the strongest possible chain.",
+  ),
+  template(
+    "trapline",
+    "cautious",
+    "C",
+    { pull: "breaker", burn: "railjack", break: "harpoon", anchor: "furnace", recover: "hauler" },
+    { beta: "protect", rescue: "recover" },
+    "Protects secured ground and preserves the withdrawal route.",
+    "Sacrifices mission tempo and can concede the extraction clock.",
+  ),
+  template(
+    "spear",
+    "aggressive",
+    "A",
+    { screen: "furnace", point: "harpoon", punch: "breaker", suppress: "railjack", recover: "hauler" },
+    { beta: "tempo", rescue: "clock" },
+    "Drives the advance guard and assault element directly at the decisive objective.",
+    "Sacrifices a dedicated opening screen for speed.",
+  ),
+  template(
+    "spear",
+    "balanced",
+    "B",
+    { screen: "railjack", point: "harpoon", punch: "breaker", suppress: "furnace", recover: "hauler" },
+    { beta: "tempo", rescue: "recover" },
+    "Supports the central strike with screening, suppression, and recovery.",
+    "Sacrifices specialization at either extreme.",
+  ),
+  template(
+    "spear",
+    "cautious",
+    "C",
+    { screen: "railjack", point: "breaker", punch: "harpoon", suppress: "furnace", recover: "hauler" },
+    { beta: "protect", rescue: "recover" },
+    "Builds the assault behind armor and keeps the rear element protected.",
+    "Sacrifices a clean breakthrough sequence and arrives later.",
+  ),
+  template(
+    "pressure",
+    "aggressive",
+    "A",
+    { alpha: "harpoon", beta: "breaker", deny: "furnace", reactor: "railjack", recover: "hauler" },
+    { beta: "tempo", rescue: "clock" },
+    "Commits hard to both control objectives before converging.",
+    "Sacrifices a purpose-built reactor element for simultaneous pressure.",
+  ),
+  template(
+    "pressure",
+    "balanced",
+    "B",
+    { alpha: "railjack", beta: "breaker", deny: "furnace", reactor: "harpoon", recover: "hauler" },
+    { beta: "tempo", rescue: "recover" },
+    "Keeps both axes functional while retaining a credible convergence force.",
+    "Sacrifices the fastest route on either individual axis.",
+  ),
+  template(
+    "pressure",
+    "cautious",
+    "C",
+    { alpha: "railjack", beta: "harpoon", deny: "furnace", reactor: "breaker", recover: "hauler" },
+    { beta: "protect", rescue: "recover" },
+    "Secures one axis with armor before reinforcing the second and converging.",
+    "Sacrifices simultaneous objective tempo.",
+  ),
 ]);
+
+export const strategyTrialsForPlaybook = (playbookId) => typeof playbookId === "string"
+  ? STRATEGY_TRIALS.filter((trial) => trial.playbookId === playbookId)
+  : [];
 
 export const strategyTrialFor = (trialId) => STRATEGY_TRIALS.find((trial) => trial.id === trialId) ?? null;
 
@@ -50,12 +113,7 @@ export const strategyTrialResult = (trial, extractedCount) => {
   if (!trial) return null;
   const numeric = Number(extractedCount);
   const extracted = Number.isFinite(numeric) ? Math.min(20, Math.max(0, Math.floor(numeric))) : 0;
-  const withinExpected = extracted >= trial.expectedExtraction.min && extracted <= trial.expectedExtraction.max;
-  return {
-    extracted,
-    withinExpected,
-    label: withinExpected ? "EXPECTED BAND" : "OUTSIDE EXPECTED BAND",
-  };
+  return { extracted, label: "EDITABLE TEMPLATE" };
 };
 
 export const BLIND_PREDICTIONS = Object.freeze([
@@ -80,9 +138,5 @@ export const blindPredictionResult = ({ predictionId, extractedCount, requiredEx
   if (!prediction) return null;
   const outcomeId = blindOutcomeFor({ extractedCount, requiredExtraction });
   const actual = BLIND_PREDICTIONS.find((item) => item.id === outcomeId);
-  return {
-    prediction,
-    actual,
-    accurate: prediction.id === actual.id,
-  };
+  return { prediction, actual, accurate: prediction.id === actual.id };
 };

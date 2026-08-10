@@ -35,12 +35,13 @@ import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConse
 import { resolveExtractionOutcome } from "./extractionResolution.js";
 import { resolveDispositionMatchup } from "./missionDisposition.js";
 import { claimStaffExercise, planningResultRevealed } from "./planningIntel.js";
+import { capabilityMatchesFor, formationInteractionsFor, neighboringInteractionHints } from "./formationInteractions.js";
 import {
   BLIND_PREDICTIONS,
-  STRATEGY_TRIALS,
   blindPredictionResult,
   strategyTrialFor,
   strategyTrialResult,
+  strategyTrialsForPlaybook,
 } from "./strategyExperiment.js";
 import {
   applyCampaignConditions,
@@ -1421,7 +1422,7 @@ function AppHeader({ phase, battleTime, operation, operationIndex, profile }) {
   );
 }
 
-function FormationDossier({ formation, assignedRole, assignedIndex, readiness, phase, refitsLocked, onRefit }) {
+function FormationDossier({ formation, interactions, assignedRole, assignedIndex, readiness, phase, refitsLocked, onRefit }) {
   if (!formation) return null;
   const Icon = formation.icon;
 
@@ -1474,6 +1475,17 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness, p
         <span>CAN REACT TO</span>
         <div>{formation.uses.map((condition) => <em key={condition}>{condition}</em>)}</div>
       </div>
+      <div className="dossier-links">
+        <span>POTENTIAL FORMATION LINKS</span>
+        {interactions.length > 0 ? interactions.map((interaction) => (
+          <div key={interaction.partnerId}>
+            <b>{interaction.partnerName}</b>
+            {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.incoming.text}</small>}
+            {interaction.outgoing && <small><ArrowRight weight="bold" /> {interaction.outgoing.text}</small>}
+          </div>
+        )) : <p>No direct keyword interaction with the current refits. It may still fit a responsibility.</p>}
+        <em>Compatibility shows a possible handoff, not the best placement or a guaranteed result.</em>
+      </div>
       {assignedRole && readiness ? (
         <div className="dossier-placement concealed">
           <div><span>ASSIGNED TO STOP {String(assignedIndex + 1).padStart(2, "0")}</span><b>OUTCOME SEALED</b><small>{assignedRole.label}</small></div>
@@ -1508,10 +1520,11 @@ function MissionMatchupBrief({ operation }) {
   );
 }
 
-function StrategyTestPanel({ activeTrial, available, blindActive, blindPrediction, onBlindPrediction, onLoad, onStartBlind }) {
+function StrategyTestPanel({ activeTrial, available, blindActive, blindPrediction, onBlindPrediction, onLoad, onStartBlind, playbook }) {
+  const templates = strategyTrialsForPlaybook(playbook.id);
   return (
-    <section className={`strategy-test-panel ${blindActive ? "blind-active" : ""}`} aria-label={blindActive ? "Blind command test" : "Controlled strategy test"}>
-      <header><span>{blindActive ? "BLIND COMMAND TEST" : "STRATEGY TEST LAB"}</span><small>SAME MISSION · SAME ENEMY</small></header>
+    <section className={`strategy-test-panel ${blindActive ? "blind-active" : ""}`} aria-label={blindActive ? "Blind command test" : "Command assistance"}>
+      <header><span>{blindActive ? "BLIND COMMAND TEST" : "COMMAND ASSISTANCE"}</span><small>{blindActive ? "OUTCOME SEALED" : `${playbook.name} · EDITABLE STARTS`}</small></header>
       {blindActive ? (
         <>
           <p>The answer is hidden. Build your own play, place every formation, choose the authored breakpoint orders, then predict the result.</p>
@@ -1529,10 +1542,10 @@ function StrategyTestPanel({ activeTrial, available, blindActive, blindPredictio
         </>
       ) : (
         <>
-          <p>Run the presets again, or begin the real test with the answers hidden.</p>
+          <p>Choose a competent starting posture for <b>{playbook.name}</b>, then edit any formation, refit, or breakpoint. Templates contain deliberate compromises and are never the optimal answer.</p>
           <button className="start-blind-test" onClick={onStartBlind} disabled={!available}><Target weight="duotone" /><span><b>START BLIND COMMAND TEST</b><small>Build your own plan and predict its outcome.</small></span></button>
           <div className="strategy-trial-list">
-            {STRATEGY_TRIALS.map((trial) => (
+            {templates.map((trial) => (
               <button
                 key={trial.id}
                 className={activeTrial?.id === trial.id ? "selected" : ""}
@@ -1541,11 +1554,11 @@ function StrategyTestPanel({ activeTrial, available, blindActive, blindPredictio
                 aria-pressed={activeTrial?.id === trial.id}
               >
                 <strong>{trial.run}</strong>
-                <span><b>{trial.name}</b><small>{trial.expectedExtraction.min}–{trial.expectedExtraction.max} EXPECTED</small></span>
+                <span><b>{trial.name}</b><small>{trial.posture === "aggressive" ? "FAST · EXPOSED" : trial.posture === "cautious" ? "PROTECTED · SLOW" : "FLEXIBLE · GENERAL"}</small></span>
               </button>
             ))}
           </div>
-          {activeTrial && <div className="strategy-trial-hypothesis"><b>RUN {activeTrial.run} LOADED</b><span>{activeTrial.hypothesis}</span><small>{activeTrial.signal}</small></div>}
+          {activeTrial?.playbookId === playbook.id && <div className="strategy-trial-hypothesis"><b>{activeTrial.name} STARTING PLAN LOADED · EDIT FREELY</b><span>{activeTrial.priority}</span><small>TRADEOFF · {activeTrial.sacrifice}</small></div>}
         </>
       )}
     </section>
@@ -1559,12 +1572,11 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
   const selectedFormation = formations.find((formation) => formation.id === selected);
   const selectedRole = roleByFormation[selected];
   const selectedRoleIndex = selectedRole ? playbook.roles.findIndex((role) => role.id === selectedRole.id) : -1;
+  const selectedInteractions = formationInteractionsFor({ formations, formationId: selected });
+  const compatibleFormationIds = new Set(selectedInteractions.map((interaction) => interaction.partnerId));
   return (
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
       {(phase === "plan" || phase === "drill") && <MissionMatchupBrief operation={operation} />}
-      {phase === "plan" && operation.id === "dead-circuit" && (
-        <StrategyTestPanel activeTrial={strategyTrial} available={formations.length === FORMATIONS.length} blindActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={onBlindPrediction} onLoad={onLoadStrategyTrial} onStartBlind={onStartBlindTest} />
-      )}
       <div className="doctrine-heading"><span>CHOOSE TOTAL-ARMY PLAY</span><Radio weight="duotone" /></div>
       <div className="playbook-list">
         {PLAYBOOKS.map((baseItem) => {
@@ -1584,6 +1596,9 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
           );
         })}
       </div>
+      {phase === "plan" && operation.id === "dead-circuit" && (
+        <StrategyTestPanel activeTrial={strategyTrial} available={formations.length === FORMATIONS.length} blindActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={onBlindPrediction} onLoad={onLoadStrategyTrial} onStartBlind={onStartBlindTest} playbook={playbook} />
+      )}
       <div className="rail-heading">
         <span>SELECT FORMATION</span>
         <span>VIEW ON FIELD</span>
@@ -1592,12 +1607,13 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
         {formations.map((formation) => {
           const Icon = formation.icon;
           const active = selected === formation.id;
+          const compatible = compatibleFormationIds.has(formation.id);
           const assignedRole = roleByFormation[formation.id];
           const assignedIndex = assignedRole ? playbook.roles.findIndex((role) => role.id === assignedRole.id) : -1;
           return (
             <button
               key={formation.id}
-              className={`formation-row ${active ? "selected" : ""} ${assignedRole ? "assigned" : "available"}`}
+              className={`formation-row ${active ? "selected" : ""} ${compatible ? "compatible" : ""} ${assignedRole ? "assigned" : "available"}`}
               onClick={() => onSelect(formation.id)}
               draggable={phase === "plan"}
               onDragStart={(event) => onFormationDragStart(event, formation.id)}
@@ -1612,6 +1628,7 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
                 <b>{formation.name}</b>
                 <small><Icon weight="duotone" /> {formation.role}</small>
                 <em>{assignedRole ? `STOP ${String(assignedIndex + 1).padStart(2, "0")} · ${assignedRole.label}` : "AVAILABLE · DRAG TO STOP"}</em>
+                {compatible && <em className="formation-interaction-hint"><Radio weight="fill" /> POTENTIAL LINK WITH {selectedFormation?.name}</em>}
                 {formation.campaignCondition && <em className="formation-campaign-state">{formation.campaignCondition.label} · {formation.disabledCapability} OFFLINE</em>}
               </span>
             </button>
@@ -1625,7 +1642,7 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
           </div>
         ))}
       </div>
-      <FormationDossier formation={selectedFormation} assignedRole={selectedRole} assignedIndex={selectedRoleIndex} readiness={selectedRole ? readiness[selectedRole.id] : null} phase={phase} refitsLocked={refitsLocked} onRefit={onRefit} />
+      <FormationDossier formation={selectedFormation} interactions={selectedInteractions} assignedRole={selectedRole} assignedIndex={selectedRoleIndex} readiness={selectedRole ? readiness[selectedRole.id] : null} phase={phase} refitsLocked={refitsLocked} onRefit={onRefit} />
     </section>
   );
 }
@@ -2648,6 +2665,10 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
   const assignedFormationId = assignments[role.id];
   const roleIndex = playbook.roles.findIndex((item) => item.id === role.id);
   const roleDemands = roleDemandsFor(role, roleIndex, condition);
+  const neighboringFormationIds = [
+    playbook.roles[roleIndex - 1] ? assignments[playbook.roles[roleIndex - 1].id] : null,
+    playbook.roles[roleIndex + 1] ? assignments[playbook.roles[roleIndex + 1].id] : null,
+  ].filter(Boolean);
   const formationStartOrder = new Map(formations.map((formation, index) => [formation.id, index]));
   const formationSlotOrder = new Map(
     playbook.roles
@@ -2673,15 +2694,23 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
             const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
             const currentRoleIndex = currentRole ? playbook.roles.findIndex((item) => item.id === currentRole.id) : -1;
             const current = assignedFormationId === formation.id;
+            const matchedCapabilities = capabilityMatchesFor({ formation, demands: roleDemands });
+            const neighborHints = neighboringInteractionHints({
+              formations,
+              formationId: formation.id,
+              neighborIds: neighboringFormationIds.filter((formationId) => formationId !== formation.id),
+            });
             return (
-              <button key={formation.id} className={current ? "current" : ""} onClick={() => onChoose(formation.id)}>
+              <button key={formation.id} className={`${current ? "current" : ""} ${matchedCapabilities.length > 0 ? "role-capable" : ""}`} onClick={() => onChoose(formation.id)}>
                 <FormationPortrait formation={formation} compact />
                 <span className="picker-formation-copy">
                   <b>{formation.name}</b>
                   <span className="formation-refit-line">REFIT {formation.activeRefit.name}</span>
                   <span className="formation-capability-line">CAPABILITIES {formation.capabilities.join(" / ")}</span>
+                  <span className={`responsibility-match ${matchedCapabilities.length > 0 ? "matched" : "unmatched"}`}>{matchedCapabilities.length > 0 ? `CAN PERFORM · ${matchedCapabilities.join(" / ")}` : "NO DIRECT RESPONSIBILITY MATCH"}</span>
                   <small>{formation.role} · {formation.purpose}</small>
                   <span className="tactic-vocabulary"><em>CREATES {formation.creates}</em><em>USES {formation.uses.join(" · ")}</em></span>
+                  {neighborHints.length > 0 && <span className="neighbor-interaction-hints">{neighborHints.map((hint, index) => <em key={`${hint.direction}-${hint.condition}-${index}`}><Radio weight="fill" /> {hint.text}</em>)}</span>}
                   <em className={currentRole ? "assigned" : "available"}>{currentRole ? `ASSIGNED · STOP ${String(currentRoleIndex + 1).padStart(2, "0")} ${currentRole.label}` : "AVAILABLE"}</em>
                 </span>
                 {current ? <CheckCircle weight="fill" /> : <ArrowRight weight="bold" />}
@@ -2852,10 +2881,10 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
         {strategyTrial && trialResult && (
-          <section className={`strategy-trial-result ${trialResult.withinExpected ? "confirmed" : "unexpected"}`}>
-            <span>CONTROLLED RUN {strategyTrial.run} · {trialResult.label}</span>
-            <b>{strategyTrial.name}: {trialResult.extracted} EXTRACTED</b>
-            <p>Expected {strategyTrial.expectedExtraction.min}–{strategyTrial.expectedExtraction.max}. {strategyTrial.signal}</p>
+          <section className="strategy-trial-result template-result">
+            <span>{strategyTrial.name} STARTING PLAN · RESULT REVEALED</span>
+            <b>{trialResult.extracted} FORMATIONS EXTRACTED</b>
+            <p>{strategyTrial.priority} Tradeoff: {strategyTrial.sacrifice} Templates are editable aids, not predicted outcomes.</p>
           </section>
         )}
         {blindTestActive && blindResult && (
@@ -3144,10 +3173,10 @@ export function App() {
 
   const startBlindTest = () => {
     if (phase !== "plan" || operationIndex !== 0 || formations.length !== FORMATIONS.length) return;
-    setPlaybookId("trapline");
+    setPlaybookId(playbook.id);
     setConditionId("clear");
     setRefits(defaultRefits());
-    setAssignments(emptyAssignments(PLAYBOOKS[0]));
+    setAssignments(emptyAssignments(playbook));
     setBranches(defaultBranches(OPERATIONS[0]));
     setBattleBranches(defaultBranches(OPERATIONS[0]));
     setSelected("harpoon");
@@ -3207,7 +3236,6 @@ export function App() {
     setPlacementFeedback(null);
     setDrillStep(-1);
     setDrillComplete(false);
-    setStrategyTrialId(null);
     if (staffExerciseIndex !== null) setStaffExerciseIndex(-1);
     if (blindTestActive) setBlindPrediction(null);
   };
@@ -3261,7 +3289,6 @@ export function App() {
     setPickerRoleId(null);
     setDrillStep(-1);
     setDrillComplete(false);
-    setStrategyTrialId(null);
     if (staffExerciseIndex !== null) setStaffExerciseIndex(-1);
     if (blindTestActive) setBlindPrediction(null);
   };
@@ -3323,7 +3350,6 @@ export function App() {
     setSelected(formationId);
     setPickerRoleId(null);
     setDrillComplete(false);
-    setStrategyTrialId(null);
     if (staffExerciseIndex !== null) setStaffExerciseIndex(-1);
     if (blindTestActive) setBlindPrediction(null);
   };
@@ -3350,7 +3376,6 @@ export function App() {
     if (!breakpoint?.options.some((option) => option.id === optionId)) return;
     setBranches((current) => ({ ...current, [breakpointId]: optionId }));
     setDrillComplete(false);
-    setStrategyTrialId(null);
     if (blindTestActive) setBlindPrediction(null);
   };
 
@@ -3364,7 +3389,6 @@ export function App() {
       : plannedOption;
     if (choice === "override" && seals > 0) {
       setSeals((current) => current - 1);
-      setStrategyTrialId(null);
     }
     setBattleBranches((current) => ({ ...current, [decision]: chosenOption }));
     if (decision === "rescue") setRescueComplete(Boolean(breakpointImpacts[decision][chosenOption].rescue));
