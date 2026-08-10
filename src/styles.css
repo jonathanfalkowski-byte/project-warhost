@@ -124,6 +124,22 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .dossier-unplaced { display: grid; gap: 3px; border-color: #477b92; background: #102027; }
 .dossier-unplaced b { color: #68c9ef; }
 .playbook-list { padding: 6px; display: grid; gap: 4px; }
+.mission-matchup-brief { margin: 6px; padding: 8px; border: 1px solid #4a5044; background: linear-gradient(135deg, rgba(18, 39, 48, .97), rgba(29, 21, 13, .97)); }
+.mission-matchup-brief > span { display: block; color: #8aa2aa; font-family: "Barlow Condensed"; font-size: 8px; font-weight: 700; letter-spacing: .1em; }
+.disposition-versus { margin-top: 6px; display: grid; grid-template-columns: 1fr 24px 1fr; align-items: center; gap: 4px; }
+.disposition-versus > div { display: grid; gap: 1px; padding: 5px; border: 1px solid #32677b; background: #10242d; }
+.disposition-versus > div:last-child { border-color: #7f512d; background: #281910; text-align: right; }
+.disposition-versus small { color: #718991; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .08em; }
+.disposition-versus b { color: #61c8ef; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .06em; }
+.disposition-versus > div:last-child b { color: #ed9b4f; }
+.disposition-versus em { color: #8c928e; font-family: "Barlow Condensed"; font-size: 9px; font-style: normal; text-align: center; }
+.mission-matchup-brief h2 { margin: 7px 0 5px; color: #e4e8e5; font-family: "Barlow Condensed"; font-size: 17px; letter-spacing: .06em; }
+.mission-matchup-brief p { margin: 3px 0; padding: 5px; display: grid; gap: 2px; color: #9aa6a1; font-size: 8px; line-height: 1.25; }
+.mission-matchup-brief p b { font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .08em; }
+.mission-matchup-brief .player-order { border-left: 3px solid #4ab5e0; background: #102129; }
+.mission-matchup-brief .player-order b { color: #62c8ef; }
+.mission-matchup-brief .enemy-order { border-left: 3px solid #d8753e; background: #281711; }
+.mission-matchup-brief .enemy-order b { color: #e99350; }
 .playbook-row { width: 100%; min-height: 52px; padding: 7px 9px; display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 8px; border: 1px solid #313a36; background: #111615; text-align: left; cursor: pointer; }
 .playbook-row > svg { width: 24px; height: 24px; color: #858c89; }
 .playbook-row span { display: grid; }
@@ -408,6 +424,13 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .battlefield.playback-active .kill-zone,
 .battlefield.playback-active .combo-path { opacity: .2; transition: opacity .35s ease; }
 
+.enemy-plan-layer.phase-plan .enemy-plan-segment,
+.enemy-plan-layer.phase-plan .enemy-plan-stop,
+.enemy-plan-layer.phase-plan .enemy-plan-formation:not(.reinforcement-wave),
+.enemy-plan-layer.phase-plan .enemy-collision-marker { opacity: 0 !important; pointer-events: none; }
+.battlefield.playback-active .reinforcement-route,
+.battlefield.playback-active .reinforcement-intercept,
+.battlefield.playback-active .reinforcement-wave { opacity: .08; }
 .enemy-plan-segment.playback-muted, .enemy-plan-stop.playback-muted, .enemy-plan-formation.playback-muted { opacity: .08 !important; filter: grayscale(.75); }
 .enemy-plan-segment.playback-focused { z-index: 8; height: 5px; opacity: 1 !important; border-top-style: solid; box-shadow: 0 0 22px rgba(240, 113, 58, .95); }
 .enemy-plan-stop.playback-focused { z-index: 11; opacity: 1 !important; filter: none; transform: translate(-50%, -50%) scale(1.16); }
@@ -620,7 +643,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .combo-panel p { margin: 5px 0 8px; font-size: 11px; color: #aeb3b0; }
 .combo-panel.broken { border-color: #8b3b2a; }
 .combo-panel.broken .panel-label { color: #e36d51; }
-.combo-steps { display: grid; grid-template-columns: 1fr 16px 1fr 16px 1fr; align-items: center; gap: 2px; }
+.combo-steps { display: grid; grid-template-columns: 1fr 14px 1fr 14px 1fr 14px 1fr; align-items: center; gap: 2px; }
 .combo-steps > svg { width: 14px; color: #777; }
 .combo-steps > div { min-width: 0; display: grid; justify-items: start; padding: 5px; border-top: 1px solid #34403c; color: #8c9591; }
 .combo-steps > div > svg { width: 22px; height: 22px; color: #638397; }

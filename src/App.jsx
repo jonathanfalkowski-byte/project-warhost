@@ -33,6 +33,7 @@ import {
 import { resolveAshenCollision } from "./enemyCollision.js";
 import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
 import { resolveExtractionOutcome } from "./extractionResolution.js";
+import { resolveDispositionMatchup } from "./missionDisposition.js";
 import {
   applyCampaignConditions,
   applyWorkshopAction,
@@ -185,59 +186,62 @@ const STAGING_NODES = {
 const PLAYBOOKS = [
   {
     id: "trapline",
-    name: "TRAPLINE",
-    summary: "Displace, deny, then breach.",
-    intent: "Open Alpha by forcing the defender through overlapping fires.",
+    name: "ROLLING SABOTAGE",
+    summary: "Seize, hand off, sabotage, withdraw.",
+    intent: "Advance the whole Warhost through both control nodes, transfer security behind the lead, sabotage the primary asset, and reform for extraction.",
     icon: Anchor,
     stages: [
-      { label: "PULL", detail: "Displace blocker.", icon: Anchor },
-      { label: "BURN", detail: "Deny response.", icon: Fire, warm: true },
-      { label: "BREAK", detail: "Collapse hold.", icon: Hammer },
+      { label: "SEIZE", detail: "Open first objective.", icon: Anchor },
+      { label: "HAND OFF", detail: "Pass secured ground.", icon: Shield },
+      { label: "SABOTAGE", detail: "Disable primary asset.", icon: Hammer, warm: true },
+      { label: "WITHDRAW", detail: "Reform at extraction.", icon: Truck },
     ],
     roles: [
-      { id: "pull", label: "PULL / DISPLACER", brief: "Draw Alpha into the kill zone.", node: "alphaApproach", demands: ["CONTROL", "SHOCK"] },
-      { id: "burn", label: "BURN / DENIER", brief: "Seal the hostile response lane.", node: "fireLine", demands: ["DENIAL", "COVER"] },
-      { id: "break", label: "BREAK / BREACHER", brief: "Exploit the opened route.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
-      { id: "anchor", label: "ANCHOR", brief: "Hold the captured control node.", node: "anchorLine", demands: ["HOLD", "DENIAL"] },
-      { id: "recover", label: "RECOVERY", brief: "Preserve extraction capacity.", node: "recoveryLine", demands: ["RECOVERY", "SUPPORT"] },
+      { id: "pull", label: "LEAD ELEMENT", brief: "Seize the first control node and open the army route.", node: "alphaApproach", demands: ["CONTROL", "SHOCK"] },
+      { id: "burn", label: "RELAY GUARD", brief: "Take responsibility for secured ground as the lead advances.", node: "fireLine", demands: ["DENIAL", "COVER"] },
+      { id: "break", label: "SABOTAGE ELEMENT", brief: "Pass through the opened route and disable the primary asset.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
+      { id: "anchor", label: "CORRIDOR SECURITY", brief: "Hold the route connecting the army to extraction.", node: "anchorLine", demands: ["HOLD", "DENIAL"] },
+      { id: "recover", label: "RECOVERY ELEMENT", brief: "Recover priority personnel and reform the army at extraction.", node: "recoveryLine", demands: ["RECOVERY", "SUPPORT"] },
     ],
   },
   {
     id: "spear",
-    name: "ARMORED SPEAR",
-    summary: "Screen, punch through, exploit.",
-    intent: "Concentrate protection around one decisive reactor thrust.",
+    name: "DECISIVE ASSAULT",
+    summary: "Screen, concentrate, strike, secure.",
+    intent: "Screen the advance, mass the Warhost against the decisive objective, destroy its defenses, and secure the withdrawal corridor.",
     icon: Shield,
     stages: [
-      { label: "SCREEN", detail: "Absorb contact.", icon: Shield },
-      { label: "PUNCH", detail: "Rupture Beta.", icon: Hammer, warm: true },
-      { label: "EXPLOIT", detail: "Drive on reactor.", icon: Lightning },
+      { label: "SCREEN", detail: "Protect concentration.", icon: Shield },
+      { label: "CONCENTRATE", detail: "Mass at decisive point.", icon: Crosshair },
+      { label: "STRIKE", detail: "Destroy objective defense.", icon: Hammer, warm: true },
+      { label: "SECURE", detail: "Hold withdrawal route.", icon: Anchor },
     ],
     roles: [
-      { id: "screen", label: "SCREEN", brief: "Take first contact at Alpha.", node: "alphaApproach", demands: ["COVER", "SHOCK"] },
-      { id: "point", label: "POINT", brief: "Mark the narrow transit lane.", node: "highWalk", demands: ["MOBILITY", "SHOCK"] },
-      { id: "punch", label: "PUNCH / BREACHER", brief: "Crack Beta and the reactor shell.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
-      { id: "suppress", label: "SUPPRESSION", brief: "Deny flanking reinforcements.", node: "fireLine", demands: ["DENIAL", "COVER"] },
-      { id: "recover", label: "RECOVERY", brief: "Follow the armored corridor.", node: "recoveryLine", demands: ["RECOVERY", "SUPPORT"] },
+      { id: "screen", label: "SCREENING ELEMENT", brief: "Protect the army while it concentrates for the assault.", node: "alphaApproach", demands: ["COVER", "SHOCK"] },
+      { id: "point", label: "ADVANCE GUARD", brief: "Secure the narrow approach to the decisive objective.", node: "highWalk", demands: ["MOBILITY", "SHOCK"] },
+      { id: "punch", label: "ASSAULT ELEMENT", brief: "Break the objective defense and strike the primary asset.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
+      { id: "suppress", label: "FLANK SECURITY", brief: "Prevent enemy reinforcements from reaching the assault.", node: "fireLine", demands: ["DENIAL", "COVER"] },
+      { id: "recover", label: "REAR ELEMENT", brief: "Recover the assault force through the secured corridor.", node: "recoveryLine", demands: ["RECOVERY", "SUPPORT"] },
     ],
   },
   {
     id: "pressure",
-    name: "DIVIDED PRESSURE",
-    summary: "Pin both nodes, converge on reactor.",
-    intent: "Split the defense at Alpha and Beta, then reunite for the sabotage.",
+    name: "TWIN SEIZURE",
+    summary: "Divide, capture, converge, extract.",
+    intent: "Divide the Warhost between simultaneous control objectives, prevent mutual support, then converge on the primary asset and extraction.",
     icon: Crosshair,
     stages: [
-      { label: "PIN", detail: "Fix both guards.", icon: Target },
-      { label: "SPLIT", detail: "Open two lanes.", icon: Crosshair, warm: true },
-      { label: "CONVERGE", detail: "Collapse on reactor.", icon: Factory },
+      { label: "DIVIDE", detail: "Form two objective groups.", icon: Crosshair },
+      { label: "CAPTURE", detail: "Seize both controls.", icon: Target },
+      { label: "CONVERGE", detail: "Reunite on primary.", icon: Factory, warm: true },
+      { label: "EXTRACT", detail: "Recover the split force.", icon: Truck },
     ],
     roles: [
-      { id: "alpha", label: "ALPHA PIN", brief: "Hold the known defenders in place.", node: "alphaApproach", demands: ["HOLD", "CONTROL"] },
-      { id: "beta", label: "BETA RAID", brief: "Pressure the uncertain control node.", node: "betaLane", demands: ["MOBILITY", "SHOCK"] },
-      { id: "deny", label: "LANE DENIAL", brief: "Prevent either defense from reinforcing.", node: "fireLine", demands: ["DENIAL", "COVER"] },
-      { id: "reactor", label: "REACTOR TEAM", brief: "Converge through the opening and sabotage.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
-      { id: "recover", label: "EXTRACTION", brief: "Collect the split force at the gantry.", node: "recoveryLine", demands: ["RECOVERY", "HOLD"] },
+      { id: "alpha", label: "WEST OBJECTIVE GROUP", brief: "Seize and maintain the western control objective.", node: "alphaApproach", demands: ["HOLD", "CONTROL"] },
+      { id: "beta", label: "EAST OBJECTIVE GROUP", brief: "Seize the eastern control objective in parallel.", node: "betaLane", demands: ["MOBILITY", "SHOCK"] },
+      { id: "deny", label: "INTERDICTION ELEMENT", brief: "Prevent enemy movement between the two objective fights.", node: "fireLine", demands: ["DENIAL", "COVER"] },
+      { id: "reactor", label: "CONVERGENCE ELEMENT", brief: "Unite both groups at the primary objective.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
+      { id: "recover", label: "EXTRACTION ELEMENT", brief: "Collect the reunited army and clear the battlefield.", node: "recoveryLine", demands: ["RECOVERY", "HOLD"] },
     ],
   },
 ];
@@ -281,6 +285,13 @@ const OPERATIONS = [
     conditionId: "clear",
     conditionLocked: false,
     requiredExtraction: 3,
+    matchup: {
+      playerDisposition: "disruption",
+      enemyDisposition: "safeguard",
+      title: "BREAK THE CIRCUIT",
+      playerObjective: "Seize both control nodes, sabotage the Reactor Spine, and extract the Warhost.",
+      enemyObjective: "Protect the Reactor Spine, reinforce threatened controls, and sever the extraction gantry.",
+    },
     orders: ["SEIZE BOTH NODES", "SABOTAGE REACTOR", "EXTRACT 3+ FORMATIONS"],
     victory: "Sabotage Reactor Spine and extract at least 3 formations.",
     primaryTitle: "REACTOR SPINE",
@@ -309,6 +320,13 @@ const OPERATIONS = [
     conditionId: "blackout",
     conditionLocked: true,
     requiredExtraction: 4,
+    matchup: {
+      playerDisposition: "safeguard",
+      enemyDisposition: "dominion",
+      title: "HOLD THE LAST ROUTE",
+      playerObjective: "Open both Ember Gates, hold the Signal Furnace, and evacuate through the Void Lift.",
+      enemyObjective: "Occupy the Ember Gates, silence the relay, and claim the Void Lift approach.",
+    },
     orders: ["OPEN BOTH EMBER GATES", "HOLD SIGNAL FURNACE", "EXTRACT 4+ FORMATIONS"],
     victory: "Hold the Signal Furnace relay and extract at least 4 formations.",
     primaryTitle: "SIGNAL FURNACE",
@@ -333,16 +351,25 @@ const OPERATIONS = [
 
 const ASHEN_PASSAGE_PLAYBOOK_COPY = {
   trapline: {
-    intent: "Open Ember Gate West by forcing veil units through overlapping fires.",
-    briefs: ["Draw the western screen into the lit kill zone.", "Seal the hostile ash lane.", "Exploit the opened relay route.", "Hold the Signal Furnace uplink.", "Preserve Void Lift capacity."],
+    name: "ROLLING EVACUATION",
+    summary: "Open, hand off, hold, evacuate.",
+    intent: "Advance the whole Warhost through both Ember Gates, transfer security behind the lead, hold the relay, and reform at the Void Lift.",
+    stageLabels: ["OPEN", "HAND OFF", "HOLD", "EVACUATE"],
+    briefs: ["Open the western gate and establish the army route.", "Take responsibility for the opened gate as the lead advances.", "Secure the Signal Furnace and maintain the evacuation uplink.", "Hold the corridor connecting the army to the Void Lift.", "Recover the relay crew and reform the army for evacuation."],
   },
   spear: {
-    intent: "Concentrate protection around one decisive drive to the Signal Furnace.",
-    briefs: ["Take first contact at Ember Gate West.", "Mark the smoke-obscured transit lane.", "Crack the eastern gate and relay guard.", "Deny the north-shaft reserve.", "Follow the protected route to Void Lift."],
+    name: "FURNACE ASSAULT",
+    summary: "Screen, concentrate, secure, escort.",
+    intent: "Screen the approach, concentrate at the Signal Furnace, secure the relay, and escort the Warhost through the Void Lift corridor.",
+    stageLabels: ["SCREEN", "CONCENTRATE", "SECURE", "ESCORT"],
+    briefs: ["Protect the army while it concentrates through the western gate.", "Secure the smoke-obscured approach to the relay.", "Break the eastern gate defense and secure the Signal Furnace.", "Prevent the north-shaft reserve from reaching the relay.", "Escort the assault force through the protected Void Lift corridor."],
   },
   pressure: {
-    intent: "Split the veil at both Ember Gates, then reunite around the relay.",
-    briefs: ["Hold the western gate screen in place.", "Pressure the uncertain eastern gate.", "Prevent either screen from reinforcing.", "Converge through the smoke and hold the relay.", "Collect the split force at Void Lift."],
+    name: "TWIN GATE",
+    summary: "Divide, open, converge, evacuate.",
+    intent: "Divide the Warhost between both Ember Gates, prevent mutual support, then converge on the Signal Furnace and Void Lift.",
+    stageLabels: ["DIVIDE", "OPEN", "CONVERGE", "EVACUATE"],
+    briefs: ["Open and maintain the western Ember Gate.", "Open the eastern Ember Gate in parallel.", "Prevent either gate defense from reinforcing the other.", "Reunite both groups at the Signal Furnace relay.", "Collect the reunited army at the Void Lift."],
   },
 };
 
@@ -385,7 +412,10 @@ const playbookForOperation = (playbook, operation) => {
   if (!copy) return playbook;
   return {
     ...playbook,
+    name: copy.name ?? playbook.name,
+    summary: copy.summary ?? playbook.summary,
     intent: copy.intent,
+    stages: playbook.stages.map((stage, index) => ({ ...stage, label: copy.stageLabels?.[index] ?? stage.label })),
     roles: playbook.roles.map((role, index) => ({ ...role, brief: copy.briefs[index] ?? role.brief })),
   };
 };
@@ -1453,7 +1483,29 @@ function FormationDossier({ formation, assignedRole, assignedIndex, readiness, p
   );
 }
 
-function FormationRoster({ formations, unavailableFormations = [], selected, onSelect, assignments, playbook, onPlaybook, phase, onFormationDragStart, readiness, refitsLocked, onRefit }) {
+function MissionMatchupBrief({ operation }) {
+  const matchup = resolveDispositionMatchup({
+    playerDisposition: operation.matchup?.playerDisposition,
+    enemyDisposition: operation.matchup?.enemyDisposition,
+    mission: operation.matchup,
+  });
+  if (!matchup) return null;
+  return (
+    <section className="mission-matchup-brief" aria-label="Disposition mission matchup">
+      <span>MISSION GENERATED BY DISPOSITIONS</span>
+      <div className="disposition-versus">
+        <div><small>YOUR FORCE</small><b>{matchup.player.name}</b></div>
+        <em>VS</em>
+        <div><small>ENEMY FORCE</small><b>{matchup.enemy.name}</b></div>
+      </div>
+      <h2>{matchup.title}</h2>
+      <p className="player-order"><b>YOUR ORDER</b>{matchup.playerObjective}</p>
+      <p className="enemy-order"><b>ENEMY ORDER</b>{matchup.enemyObjective}</p>
+    </section>
+  );
+}
+
+function FormationRoster({ formations, unavailableFormations = [], selected, onSelect, assignments, playbook, onPlaybook, operation, phase, onFormationDragStart, readiness, refitsLocked, onRefit }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -1462,11 +1514,12 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
   const selectedRoleIndex = selectedRole ? playbook.roles.findIndex((role) => role.id === selectedRole.id) : -1;
   return (
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
-      <div className="doctrine-heading"><span>TACTICAL PLAYBOOK</span><Radio weight="duotone" /></div>
+      {(phase === "plan" || phase === "drill") && <MissionMatchupBrief operation={operation} />}
+      <div className="doctrine-heading"><span>CHOOSE TOTAL-ARMY PLAY</span><Radio weight="duotone" /></div>
       <div className="playbook-list">
-        {PLAYBOOKS.map((item) => {
+        {PLAYBOOKS.map((baseItem) => {
+          const item = playbookForOperation(baseItem, operation);
           const Icon = item.icon;
-          const doctrine = PLAYBOOK_DOCTRINES[item.id];
           return (
             <button
               key={item.id}
@@ -1476,7 +1529,7 @@ function FormationRoster({ formations, unavailableFormations = [], selected, onS
               aria-pressed={playbook.id === item.id}
             >
               <Icon weight="duotone" />
-              <span><b>{item.name}</b><small>{item.summary}</small><em>{doctrine.name}</em></span>
+              <span><b>{item.name}</b><small>{item.summary}</small><em>{item.stages.map((stage) => stage.label).join(" → ")}</em></span>
             </button>
           );
         })}
@@ -1781,13 +1834,17 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
   const doctrinePhase = playbackBeat?.doctrinePhase ?? "none";
 
   return (
-    <div className={`enemy-plan-layer doctrine-${doctrinePhase}`} ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
+    <div className={`enemy-plan-layer phase-${phase} doctrine-${doctrinePhase}`} ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
       {enemyPlan.formations.map((formation, index) => {
         const clash = clashes[index];
         const inBattle = phase === "battle" || phase === "complete";
         const playbackHasEnemyFocus = focusedEnemyIndices.length > 0;
         const playbackFocused = focusedEnemyIndices.includes(index);
-        const playbackClass = playbackHasEnemyFocus ? playbackFocused ? "playback-focused" : "playback-muted" : "";
+        const playbackClass = inBattle
+          ? playbackHasEnemyFocus
+            ? playbackFocused ? "playback-focused" : "playback-muted"
+            : "playback-muted"
+          : "";
         const counterRevealClass = playbackFocused && (doctrinePhase === "enemy-counter" || doctrinePhase === "outcome") ? "doctrine-counter-reveal" : "";
         const progress = inBattle ? Math.min(1, battleTime / formation.actionAt) : 0;
         const route = routeForClash(formation, clash, index);
@@ -3322,7 +3379,7 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
         <Battlefield formations={formations} formationFates={operationFormationFates} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitProtocols={refitProtocols} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
