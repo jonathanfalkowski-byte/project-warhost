@@ -10,8 +10,8 @@ const EMPTY_IMPACT = Object.freeze({
 export const PLAYBOOK_DOCTRINES = Object.freeze({
   trapline: Object.freeze({
     name: "OVERLAPPING FIRES",
-    strength: "An armed first handoff catches the enemy between formations and preserves one recovery slot.",
-    exposure: "Without that opening handoff, the force waits on a trap that never closes and loses 00:15.",
+    strength: "An armed opening combo catches the enemy between formations and preserves one recovery slot.",
+    exposure: "Without that opening combo, the force waits on a trap that never closes and loses 00:15.",
   }),
   spear: Object.freeze({
     name: "DECISIVE THRUST",
@@ -21,7 +21,7 @@ export const PLAYBOOK_DOCTRINES = Object.freeze({
   pressure: Object.freeze({
     name: "TWO-AXIS ASSAULT",
     strength: "Split pressure resolves Alpha and Beta 00:15 sooner each.",
-    exposure: "Fewer than two automatic handoffs leaves the force separated and adds 00:15 to regroup.",
+    exposure: "Fewer than two automatic combos leave the force separated and add 00:15 to regroup.",
   }),
 });
 
@@ -42,7 +42,7 @@ export const resolvePlaybookDoctrine = (playbookId, handoffs = []) => {
       triggered,
       impact: { ...EMPTY_IMPACT, missionDelay: triggered ? 0 : 15, protects: triggered ? 1 : 0 },
       result: triggered
-        ? "FIRST HANDOFF ARMED · ONE RECOVERY SLOT PRESERVED"
+        ? "OPENING COMBO ARMED · ONE RECOVERY SLOT PRESERVED"
         : "TRAP NEVER CLOSED · +00:15 MISSION DELAY",
     };
   }

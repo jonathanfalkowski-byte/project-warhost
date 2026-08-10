@@ -27,7 +27,7 @@ export const STRATEGY_TRIALS = Object.freeze([
     { pull: "breaker", burn: "furnace", break: "harpoon", anchor: "railjack", recover: "hauler" },
     { beta: "tempo", rescue: "clock" },
     "Pushes the sabotage column forward immediately.",
-    "Sacrifices handoff depth and recovery protection.",
+    "Sacrifices combo depth and recovery protection.",
   ),
   template(
     "trapline",

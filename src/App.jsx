@@ -125,7 +125,7 @@ const FORMATIONS = [
   {
     id: "railjack",
     number: "4",
-    name: "BASTION BATTLE TANK",
+    name: "BASTION TANK",
     role: "HOLD",
     endurance: { armor: 4, cohesion: 5, mobility: 2 },
     capabilities: ["HOLD", "COVER"],
@@ -143,7 +143,7 @@ const FORMATIONS = [
   {
     id: "hauler",
     number: "5",
-    name: "ARMOURED RECOVERY CARRIER",
+    name: "RECOVERY CARRIER",
     role: "EXTRACT",
     endurance: { armor: 3, cohesion: 4, mobility: 4 },
     capabilities: ["RECOVERY", "SUPPORT"],
@@ -1485,7 +1485,7 @@ function FormationDossier({ formation, interactions, assignedRole, assignedIndex
             {interaction.outgoing && <small><ArrowRight weight="bold" /> {interaction.outgoing.text}</small>}
           </div>
         )) : <p>No direct keyword interaction with the current refits. It may still fit a responsibility.</p>}
-        <em>Compatibility shows a possible handoff, not the best placement or a guaranteed result.</em>
+        <em>Compatibility shows a possible combo link, not the best placement or a guaranteed result.</em>
       </div>
       {assignedRole && readiness ? (
         <div className="dossier-placement concealed">
@@ -2005,7 +2005,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
   return (
     <div className="handoff-board" aria-live="polite">
       <div className="handoff-heading">
-        <span>HANDOFF WINDOWS</span>
+        <span>COMBO WINDOWS</span>
         <small>Inspect one neighboring pair with a Staff Exercise.</small>
       </div>
       {feedback ? (
@@ -2013,7 +2013,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
           <span><Radio weight="fill" /> ASSIGNMENT RECORDED</span>
           <b>{feedback.formationName} → STOP {String(feedback.targetIndex + 1).padStart(2, "0")}</b>
           <div className="placement-impact-metrics">
-            <strong>SEALED<small>HANDOFF RESULTS</small></strong>
+            <strong>SEALED<small>COMBO RESULTS</small></strong>
             <strong>COMMIT TO REVEAL<small>MISSION OUTCOME</small></strong>
           </div>
         </div>
@@ -2049,7 +2049,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
               ) : (
                 <>
                   <b>{revealed ? staffed ? "NO AUTOMATIC REACTION" : "WINDOW UNSTAFFED" : staffed ? "RESULT SEALED" : "STAFF BOTH STOPS"}</b>
-                  <small>{revealed && staffed ? `${source.name} creates ${handoff.incomingCondition}; ${receiver.name} cannot use it.` : staffed ? `${source.name} to ${receiver.name}; result unknown.` : "A handoff requires formations on both sides."}</small>
+                  <small>{revealed && staffed ? `${source.name} creates ${handoff.incomingCondition}; ${receiver.name} cannot use it.` : staffed ? `${source.name} to ${receiver.name}; result unknown.` : "A combo window requires formations on both sides."}</small>
                   {!revealed && staffed && staffExerciseIndex === null && <button className="staff-exercise-button" onClick={() => onStaffExercise(handoffIndex)}><Radio weight="fill" /> RUN STAFF EXERCISE</button>}
                   {!revealed && staffed && staffExerciseIndex !== null && <em className="staff-exercise-spent">{staffExerciseIndex === -1 ? "EXERCISE SPENT · PLAN CHANGED" : "STAFF EXERCISE SPENT"}</em>}
                 </>
@@ -2157,9 +2157,9 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                 {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.partnerName} creates <strong>{interaction.incoming.condition}</strong>; {inspectedFormation.name} reacts</small>}
               </button>
             )) : <p>No direct keyword interaction with the current refits. This formation can still perform a responsibility on its own.</p>}
-            {inspectedAssigned && activeInteractions.length === 0 && <p className="independent-state">OPERATING INDEPENDENTLY - no adjacent handoff is armed. This is valid if the responsibility matters more than a combo.</p>}
+            {inspectedAssigned && activeInteractions.length === 0 && <p className="independent-state">OPERATING INDEPENDENTLY - no adjacent combo is armed. This is valid if the responsibility matters more than a combo.</p>}
           </div>
-          <em>Color shows direction, not quality. Only neighboring staffed stops form an active handoff; the board does not rank placements.</em>
+          <em>Color shows direction, not quality. Only neighboring staffed stops form an active combo; the board does not rank placements.</em>
         </section>
       )}
       <div className="route-terminals" aria-hidden="true"><span>FORMATION LANES</span><span>COMBO ORDER</span></div>
@@ -2215,7 +2215,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                     {formation.id === inspected && <span className="slot-interaction selected"><Radio weight="fill" /> INSPECTING · CREATES {formation.creates}</span>}
                     {interaction && (
                       <span className={`slot-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}>
-                        <Radio weight="fill" /> {activeInteraction ? "ACTIVE ADJACENT HANDOFF" : "POTENTIAL IF ADJACENT"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).join(" / ")}
+                        <Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).join(" / ")}
                       </span>
                     )}
                     {refitProtocol && (
@@ -2358,7 +2358,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
-            {interaction && <span className={`map-formation-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}><Radio weight="fill" /> {activeInteraction ? "ACTIVE ADJACENT HANDOFF" : "POTENTIAL IF ADJACENT"}<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).join(" / ")}</small></span>}
+            {interaction && <span className={`map-formation-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}><Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"}<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).join(" / ")}</small></span>}
             {statusDisplay && <span className="map-formation-state"><b>{statusDisplay.label}</b><small>{statusDisplay.detail}</small></span>}
           </button>
         );
@@ -2775,7 +2775,7 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
       <div className="decision-panel formation-picker-panel">
         <p className="eyebrow">STAFF ACTION STOP</p>
         <h2 id="formation-picker-title">Who executes {role.label}?</h2>
-        <p>{role.brief} This condition demands <b>{roleDemands.join(" / ")}</b>. Choose from the rules below; readiness and handoff results stay sealed until execution.</p>
+        <p>{role.brief} This condition demands <b>{roleDemands.join(" / ")}</b>. Choose from the rules below; readiness and combo results stay sealed until execution.</p>
         <div className="formation-picker-list">
           {orderedFormations.map((formation) => {
             const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
@@ -2910,6 +2910,8 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
 
 function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, strategyTrial, blindTestActive, blindPrediction, won, onAction }) {
   const lostCount = formations.length - profile.extractedCount;
+  const recoveryCarrierFate = formationFates.find(({ formation }) => formation.id === "hauler");
+  const carrierCutOffAfterRescue = rescued && recoveryCarrierFate?.history?.some(({ state }) => state === "cut-off");
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
   const reinforcementWave = reinforcementWaveFor(operation);
@@ -2964,7 +2966,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         <div className="after-action-grid">
           <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
+          <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{carrierCutOffAfterRescue && <small>Recovery Carrier was cut off afterward.</small>}{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
@@ -2998,7 +3000,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
             <div><b>PREDICTED {blindResult.prediction.label}</b><ArrowRight weight="bold" /><b>ACTUAL {blindResult.actual.label}</b></div>
             <ul>
               <li><strong>{profile.readiness.alignedCount}/{profile.readiness.staffedCount}</strong> formations matched their responsibility.</li>
-              <li><strong>{profile.effects.length}</strong> handoff combinations formed; <strong>{disruptedEnemyOrders}/{profile.enemyClashes.length}</strong> enemy orders were broken.</li>
+              <li><strong>{profile.effects.length}</strong> combo chains formed; <strong>{disruptedEnemyOrders}/{profile.enemyClashes.length}</strong> enemy orders were broken.</li>
               <li>{profile.overrun > 0 ? <><strong>{fmtDuration(profile.overrun)}</strong> late to extraction; <strong>{profile.reinforcementLoss + profile.enemyRecoveryLoss}</strong> recovery capacity lost.</> : <><strong>{fmtDuration(profile.timeSaved)}</strong> ahead of the enemy wave.</>}</li>
             </ul>
           </section>
@@ -3191,7 +3193,7 @@ export function App() {
       `Loading ${playbook.name} geometry`,
       ...playbook.stages.map((stage) => `${stage.label} responsibility acknowledged`),
       `${assignedCount} formations assigned; derived task fit remains sealed`,
-      `${tacticalHandoffs.length} handoff windows registered; automatic reactions remain sealed`,
+      `${tacticalHandoffs.length} combo windows registered; automatic reactions remain sealed`,
       `${operationProfile.enemyClashes.length} enemy orders identified; collision outcomes remain sealed`,
       `Command drill complete. Commit the play to reveal the result.`,
     ],

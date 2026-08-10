@@ -35,7 +35,7 @@ export const strategyCausalityFor = ({ profile = {}, requiredExtraction = 0 } = 
         : staffedCount > 0 ? "Every staffed formation matched its assigned task." : "No staffed formations were recorded.",
     },
     {
-      id: "handoffs", step: "02", label: "ACTIVE HANDOFFS",
+      id: "handoffs", step: "02", label: "COMBO CHAINS",
       value: `${handoffs.length} ${plural(handoffs.length, "CHAIN", "CHAINS")} FORMED`,
       tone: handoffs.length > 0 ? "support" : "cost",
       detail: handoffNames.length > 0 ? handoffNames.join(" / ") : "No neighboring trigger-response chain activated.",

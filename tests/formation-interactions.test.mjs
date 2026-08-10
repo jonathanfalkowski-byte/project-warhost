@@ -13,7 +13,7 @@ const formations = [
   { id: "harpoon", name: "GRAV-SNARE TANK", capabilities: ["CONTROL", "MOBILITY"], creates: "DISPLACED", uses: ["SCREENED"] },
   { id: "furnace", name: "INCINERATOR SQUAD", capabilities: ["DENIAL", "AREA"], creates: "OVERHEATED", uses: ["DISPLACED", "SCREENED"] },
   { id: "breaker", name: "BREACHER WALKER", capabilities: ["BREACH", "SHOCK"], creates: "BREACHED", uses: ["DISPLACED", "OVERHEATED"] },
-  { id: "railjack", name: "BASTION BATTLE TANK", capabilities: ["HOLD", "COVER"], creates: "SCREENED", uses: ["BREACHED"] },
+  { id: "railjack", name: "BASTION TANK", capabilities: ["HOLD", "COVER"], creates: "SCREENED", uses: ["BREACHED"] },
 ];
 
 test("one formation can expose multiple compatible partners without ranking them", () => {

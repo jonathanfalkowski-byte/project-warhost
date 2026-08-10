@@ -17,7 +17,7 @@ const profile = ({ extractedCount = 4, improvisedCount = 0, handoffs = 2, disrup
 
 test("causal debrief explains a successful plan without ranking placements", () => {
   const rows = strategyCausalityFor({ profile: profile(), requiredExtraction: 3 });
-  assert.deepEqual(rows.map((row) => row.label), ["RESPONSIBILITY FIT", "ACTIVE HANDOFFS", "PLAYBOOK DOCTRINE", "ENEMY PLAN", "MISSION RESULT"]);
+  assert.deepEqual(rows.map((row) => row.label), ["RESPONSIBILITY FIT", "COMBO CHAINS", "PLAYBOOK DOCTRINE", "ENEMY PLAN", "MISSION RESULT"]);
   assert.equal(rows[0].value, "5/5 ALIGNED");
   assert.equal(rows[1].value, "2 CHAINS FORMED");
   assert.equal(rows[3].value, "2/3 ORDERS BROKEN");

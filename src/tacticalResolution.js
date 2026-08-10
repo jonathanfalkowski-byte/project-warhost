@@ -97,7 +97,7 @@ export const resolveTacticalEngagement = ({
     { id: "capability", label: `CAPABILITY ${matchedCapabilities.length}/${requiredCapabilities.length}`, score: capabilityScore },
     { id: "readiness", label: `READINESS ${averageReadiness}%`, score: readinessScore },
     { id: "coordination", label: validActors.length >= 2 ? "COORDINATED PAIR" : "SINGLE FORMATION", score: coordinationScore },
-    { id: "handoff", label: maneuver?.name ? `HANDOFF · ${maneuver.name}` : "NO HANDOFF", score: handoffScore },
+    { id: "handoff", label: maneuver?.name ? `COMBO · ${maneuver.name}` : "NO COMBO", score: handoffScore },
     { id: "protocol", label: protocol?.name ? `REFIT · ${protocol.name}` : "NO FIELD REFIT", score: protocolScore },
     { id: "counter", label: counterActorName ? `HARD COUNTER · ${counterActorName}` : "NO HARD COUNTER", score: hardCounterScore },
   ];
