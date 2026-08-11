@@ -2165,10 +2165,15 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
         <small>EXPOSURE · {doctrine.exposure}</small>
         <em>DOCTRINE RESULT UNRESOLVED</em>
       </div>
+      <details className="secondary-combo-drawer">
+        <summary>
+          <span><Radio weight="fill" /> OPTIONAL COMBO BONUSES</span>
+          <small>Inspect neighboring formation links after route jobs are covered.</small>
+        </summary>
       {inspectingInteractions && (
         <section className="formation-interaction-inspector" aria-live="polite" aria-label={`${inspectedFormation.name} potential formation interactions`}>
           <header>
-            <span><Radio weight="fill" /> SECONDARY BONUS · SELECTED FORMATION</span>
+            <span><Radio weight="fill" /> SELECTED FORMATION</span>
             <b>{inspectedFormation.name}</b>
             <small>CREATES <strong>{inspectedFormation.creates}</strong> · CAN REACT TO <strong>{inspectedFormation.uses.join(" / ")}</strong></small>
             <div className="interaction-legend"><span className="source">CYAN: INSPECTED</span><span className="outgoing">YELLOW: IT FEEDS THEM</span><span className="incoming">PURPLE: THEY FEED IT</span></div>
@@ -2186,6 +2191,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           <em>Color shows direction, not quality. Only neighboring staffed stops form an active combo; the board does not rank placements.</em>
         </section>
       )}
+      </details>
       <div className="route-terminals" aria-hidden="true"><span>PRIMARY · ROUTE RESPONSIBILITIES</span><span>SECONDARY · ADJACENT BONUSES</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
@@ -2271,7 +2277,13 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           );
         })}
       </div>
-      <TacticalHandoffBoard feedback={feedback} formations={formations} handoffs={handoffs} profile={profile} staffExerciseIndex={staffExerciseIndex} onStaffExercise={onStaffExercise} />
+      <details className="secondary-combo-drawer combo-window-drawer">
+        <summary>
+          <span><Lightning weight="fill" /> OPTIONAL COMBO WINDOWS</span>
+          <small>Test neighboring pairs only after every route responsibility is staffed.</small>
+        </summary>
+        <TacticalHandoffBoard feedback={feedback} formations={formations} handoffs={handoffs} profile={profile} staffExerciseIndex={staffExerciseIndex} onStaffExercise={onStaffExercise} />
+      </details>
     </div>
   );
 }
@@ -2377,6 +2389,8 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
         const formationFate = resolvedFormationFates.get(formation.id) ?? null;
         const statusDisplay = formationStatusDisplay({ consequence, formationFate });
         const authoredRoute = authoredRoutes.find((route) => route.formationId === formation.id);
+        const assignedRole = playbook.roles.find((role) => assignments[role.id] === formation.id) ?? null;
+        const routeReadiness = assignedRole ? readiness[assignedRole.id] : null;
         const interaction = interactionByFormationId.get(formation.id) ?? null;
         const interactionDirection = interactionDirectionFor(interaction);
         const activeInteraction = Boolean(interaction && adjacentFormationIds.has(formation.id));
@@ -2402,7 +2416,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${collisionFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${routeReadiness ? routeReadiness.taskAligned ? "route-aligned" : "route-improvised" : ""} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${collisionFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
             onMouseEnter={() => onInspect(formation.id)}
@@ -2416,6 +2430,12 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
+            {routeReadiness && (phase === "plan" || phase === "drill") && (
+              <span className={`map-route-fit ${routeReadiness.taskAligned ? "aligned" : "improvised"}`}>
+                <b>{routeReadiness.taskAligned ? "ROUTE FIT" : `ROUTE MISMATCH · +00:${String(IMPROVISED_TASK_DELAY).padStart(2, "0")}`}</b>
+                <small>{routeReadiness.roleLabel}</small>
+              </span>
+            )}
             {interaction && <span className={`map-formation-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}><Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"}<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}</small></span>}
             {statusDisplay && <span className="map-formation-state"><b>{statusDisplay.label}</b><small>{statusDisplay.detail}</small></span>}
           </button>

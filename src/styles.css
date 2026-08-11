@@ -439,6 +439,13 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .map-formation-interaction.mutual { border-color: #e9dfad; background: linear-gradient(90deg, rgba(38,31,9,.97), rgba(34,22,51,.97)); color: #efe7bd; }
 .map-formation-number { position: absolute; left: -8px; top: -8px; width: 22px; height: 22px; display: grid; place-items: center; background: #1c5370; color: #bdeaff; border: 1px solid #6ab8dc; font-family: "Barlow Condensed"; font-weight: 700; }
 .map-formation-label { position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%); padding: 2px 5px; background: rgba(7,10,10,.92); color: #d2d6d4; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .05em; white-space: nowrap; }
+.map-route-fit { position: absolute; z-index: 6; left: 50%; bottom: calc(100% + 8px); min-width: 116px; transform: translateX(-50%); display: grid; gap: 1px; padding: 4px 6px; border: 1px solid currentColor; background: rgba(8, 13, 12, .98); font-family: "Barlow Condensed"; letter-spacing: .055em; white-space: nowrap; pointer-events: none; }
+.map-route-fit b { font-size: 9px; }
+.map-route-fit small { color: #b7c2be; font-size: 8px; }
+.map-route-fit.aligned { color: #9ada79; box-shadow: 0 0 14px rgba(117, 201, 86, .38); }
+.map-route-fit.improvised { color: #f28a5f; background: rgba(42, 15, 9, .98); box-shadow: 0 0 16px rgba(236, 92, 57, .42); }
+.map-formation.route-aligned .formation-image { border-color: #89cf68; box-shadow: 0 0 0 4px rgba(102, 182, 75, .18), 0 8px 14px rgba(0,0,0,.75); }
+.map-formation.route-improvised .formation-image { border-color: #ef724f; border-style: dashed; box-shadow: 0 0 0 4px rgba(223, 79, 48, .2), 0 8px 14px rgba(0,0,0,.75); }
 .map-formation-state { position: absolute; left: 50%; bottom: -46px; transform: translateX(-50%); min-width: 112px; max-width: 190px; display: grid; gap: 1px; overflow: hidden; padding: 3px 7px; border: 1px solid currentColor; background: rgba(8, 12, 11, .96); color: #efba63; font-family: "Barlow Condensed"; letter-spacing: .07em; white-space: nowrap; box-shadow: 0 0 12px currentColor; pointer-events: none; }
 .map-formation-state b, .map-formation-state small { overflow: hidden; text-overflow: ellipsis; }
 .map-formation-state b { font-size: 10px; }
@@ -652,12 +659,12 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .doctrine-battle-readout b { color: #d3c49d; font-size: 9px; font-weight: 500; }
 .doctrine-battle-readout.triggered { border-color: #73a255; background: #152017; }
 .doctrine-battle-readout.triggered span, .doctrine-battle-readout.triggered b { color: #9bd079; }
-.playbook-board { position: absolute; z-index: 15; left: 3%; top: 20%; width: min(1020px, 94%); max-height: 76%; overflow-y: auto; padding: 14px 16px; background: rgba(8, 14, 14, .97); border-color: #4c8296; box-shadow: 0 14px 32px rgba(0, 0, 0, .58); }
+.playbook-board { position: absolute; z-index: 15; left: 2%; right: 2%; bottom: 1.5%; width: auto; max-height: 43%; overflow-y: auto; display: flex; flex-direction: column; padding: 9px 12px; background: rgba(8, 14, 14, .96); border-color: #4c8296; box-shadow: 0 -8px 26px rgba(0, 0, 0, .58); }
 .playbook-board.incomplete { box-shadow: inset 0 0 0 1px rgba(41, 169, 232, .1), 0 14px 32px rgba(0, 0, 0, .48); }
 .playbook-board.ready { border-color: #5b8b53; }
 .playbook-board-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
 .playbook-board-heading > div { display: grid; gap: 2px; }
-.playbook-board-heading > div > b { font-family: "Barlow Condensed"; font-size: 22px; letter-spacing: .07em; color: #edf4f2; }
+.playbook-board-heading > div > b { font-family: "Barlow Condensed"; font-size: 18px; letter-spacing: .07em; color: #edf4f2; }
 .playbook-board-heading > strong { font-family: "Barlow Condensed"; font-size: 16px; letter-spacing: .07em; color: #79d5f8; }
 .playbook-board-actions { display: grid; justify-items: end; gap: 6px; }
 .playbook-board-actions > strong { font-family: "Barlow Condensed"; font-size: 16px; letter-spacing: .07em; color: #79d5f8; }
@@ -666,16 +673,17 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playbook-board-actions > button svg { width: 12px; }
 .playbook-board.ready .playbook-board-heading > strong { color: #8bcf68; }
 .playbook-board.ready .playbook-board-actions > strong { color: #8bcf68; }
-.playbook-board > p { margin: 7px 0 13px; color: #c0cac6; font-size: 13px; line-height: 1.35; }
-.planning-priority { margin: -4px 0 9px; display: grid; grid-template-columns: minmax(0, 1.25fr) 22px minmax(0, 1fr); align-items: center; gap: 7px; }
-.planning-priority > div { display: grid; gap: 2px; padding: 7px 9px; border: 1px solid #4d879e; background: #10262e; }
+.playbook-board > p { margin: 4px 0 7px; color: #c0cac6; font-size: 11px; line-height: 1.25; }
+.planning-priority { display: none; }
+.planning-priority > div { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; padding: 4px 7px; border: 1px solid #4d879e; background: #10262e; }
 .planning-priority > div:last-child { border-color: #5d5a3b; background: #1b1a11; opacity: .78; }
 .planning-priority > svg { width: 16px; color: #6e8e99; }
 .planning-priority span { color: #75c9e8; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .11em; }
 .planning-priority div:last-child span { color: #c3ae63; }
-.planning-priority b { color: #e1f2f5; font-family: "Barlow Condensed"; font-size: 13px; letter-spacing: .06em; }
-.planning-priority small { color: #98aaa8; font-size: 9px; }
-.playbook-doctrine { margin: -4px 0 8px; display: grid; grid-template-columns: 145px minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 3px 10px; padding: 6px 8px; border: 1px solid #6b5d3e; background: linear-gradient(90deg, #1c1911, #101616); font-family: "Barlow Condensed"; }
+.planning-priority b { color: #e1f2f5; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .06em; }
+.planning-priority small { grid-column: 1 / -1; color: #98aaa8; font-size: 8px; }
+.playbook-doctrine { margin: 0 0 5px; display: grid; grid-template-columns: 145px minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 2px 8px; padding: 4px 7px; border: 1px solid #6b5d3e; background: linear-gradient(90deg, #1c1911, #101616); font-family: "Barlow Condensed"; }
+.playbook-board > .playbook-doctrine { order: 5; margin-top: 6px; }
 .playbook-doctrine > span { grid-row: 1 / 3; color: #e2c579; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
 .playbook-doctrine > b { color: #dde6e1; font-size: 11px; font-weight: 500; line-height: 1.3; }
 .playbook-doctrine > small { color: #c1a58f; font-size: 10px; line-height: 1.3; }
@@ -684,8 +692,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playbook-doctrine.triggered > span, .playbook-doctrine.triggered > em { color: #9bcf78; }
 .playbook-doctrine.concealed { border-color: #3f6170; background: linear-gradient(90deg, #102027, #101616); }
 .playbook-doctrine.concealed > span, .playbook-doctrine.concealed > em { color: #7bbbd3; }
-.route-terminals { margin: 2px 3px 6px; display: flex; justify-content: space-between; color: #85aab8; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .11em; }
+.route-terminals { margin: 1px 3px 4px; display: flex; justify-content: space-between; color: #85aab8; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .11em; }
+.playbook-board > .route-terminals { order: 3; }
 .playbook-route { display: grid; grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr); align-items: stretch; }
+.playbook-board > .playbook-route { order: 4; }
 .playbook-slot-shell { min-width: 0; position: relative; display: grid; }
 .playbook-slot-shell > .playbook-slot { width: 100%; height: 100%; }
 .route-leg { position: relative; display: grid; place-items: center; color: #4b7486; }
@@ -696,7 +706,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .route-leg.linked::before { border-color: #679c57; box-shadow: 0 0 8px rgba(139, 207, 104, .2); }
 .route-leg.cascade-powered svg { animation: comboLinkPower .72s ease-out var(--cascade-delay, 0ms); }
 .route-leg.cascade-broken svg { animation: comboLinkBreak .72s ease-out var(--cascade-delay, 0ms); }
-.playbook-slot { min-width: 0; min-height: 176px; position: relative; display: grid; grid-template-rows: 16px auto 1fr auto auto auto 22px; align-items: center; gap: 4px; padding: 9px 8px; border: 1px dashed #56869a; background: #0c171b; color: #cbd5d1; text-align: left; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+.playbook-slot { min-width: 0; min-height: 128px; position: relative; display: grid; grid-template-rows: 13px auto 1fr auto auto auto 18px; align-items: center; gap: 2px; padding: 6px; border: 1px dashed #56869a; background: #0c171b; color: #cbd5d1; text-align: left; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
 .playbook-slot:hover:not(:disabled) { transform: translateY(-2px); border-style: solid; border-color: #69cef7; background: #112933; box-shadow: 0 0 18px rgba(41, 169, 232, .16); }
 .playbook-slot.drop-target { transform: translateY(-3px) scale(1.02); border-style: solid; border-color: #8ad8fa; background: #153342; box-shadow: 0 0 22px rgba(41, 169, 232, .32); }
 .playbook-slot:disabled { cursor: default; }
@@ -744,6 +754,18 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .formation-interaction-partners p { grid-column: 1 / -1; margin: 0; padding: 8px; color: #aabbb7; font-size: 10px; }
 .formation-interaction-partners .independent-state { border-left: 2px solid #8a9b96; background: #151a18; color: #b6c1bd; font-family: "Barlow Condensed"; font-weight: 700; letter-spacing: .05em; }
 .formation-interaction-inspector > em { grid-column: 1 / -1; color: #94aaaf; font-size: 9px; font-style: normal; letter-spacing: .025em; }
+.secondary-combo-drawer { margin-top: 6px; border: 1px solid #3e6573; background: #0b1518; }
+.playbook-board > .secondary-combo-drawer { order: 8; }
+.playbook-board > .combo-window-drawer { order: 9; }
+.secondary-combo-drawer > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 9px; color: #84cbe4; cursor: pointer; list-style: none; font-family: "Barlow Condensed"; }
+.secondary-combo-drawer > summary::-webkit-details-marker { display: none; }
+.secondary-combo-drawer > summary span { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.secondary-combo-drawer > summary span svg { width: 11px; height: 11px; }
+.secondary-combo-drawer > summary small { color: #809398; font-size: 9px; letter-spacing: .035em; }
+.secondary-combo-drawer[open] > summary { border-bottom: 1px solid #3e6573; background: #10242a; }
+.secondary-combo-drawer[open] > summary::after { content: "CLOSE"; color: #b4dce8; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.secondary-combo-drawer .formation-interaction-inspector { margin: 7px; }
+.secondary-combo-drawer .tactical-handoff-board { margin: 7px; }
 .playbook-slot.cascade-moved { animation: comboSlotMoved .78s ease-out var(--cascade-delay, 0ms); }
 .playbook-slot.cascade-powered { animation: comboSlotPower .78s ease-out var(--cascade-delay, 0ms); }
 .playbook-slot.cascade-broken { animation: comboSlotBreak .78s ease-out var(--cascade-delay, 0ms); }
@@ -1284,6 +1306,6 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
   .formation-row { grid-template-columns: 22px 54px minmax(0, 1fr); }
   .formation-image.compact { width: 54px; }
   .combo-panel { width: 235px; }
-  .playbook-board { width: 94%; left: 3%; }
-  .playbook-slot { min-height: 124px; }
+  .playbook-board { left: 2%; right: 2%; width: auto; max-height: 46%; }
+  .playbook-slot { min-height: 116px; }
 }
