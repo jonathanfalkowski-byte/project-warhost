@@ -9,6 +9,7 @@ import {
   integrityLossFor,
   mergeCampaignConditions,
   seriousConditionsFromConsequences,
+  victoryGradeFor,
 } from "../src/campaignPersistence.js";
 
 const catalog = [
@@ -120,6 +121,52 @@ test("integrity loss distinguishes victory, defeat, rout, and annihilation", () 
   assert.equal(integrityLossFor({ operationWon: false, extractedCount: 0 }), 3);
   assert.equal(integrityLossFor({ operationWon: false, extractedCount: -5 }), 3);
   assert.equal(integrityLossFor({ operationWon: false, extractedCount: "invalid" }), 3);
+});
+
+test("victory grades distinguish decisive, ordinary, and costly operation wins", () => {
+  const decisive = victoryGradeFor({
+    won: true,
+    extractedCount: 5,
+    requiredExtraction: 3,
+    totalFormations: 5,
+    formationFates: Array.from({ length: 5 }, () => ({ fate: "extracted" })),
+  });
+  assert.equal(decisive.id, "decisive");
+  assert.equal(decisive.label, "DECISIVE VICTORY");
+
+  const victory = victoryGradeFor({
+    won: true,
+    extractedCount: 4,
+    requiredExtraction: 3,
+    totalFormations: 5,
+    formationFates: [
+      { fate: "extracted" },
+      { fate: "extracted" },
+      { fate: "extracted" },
+      { fate: "damaged" },
+      { fate: "missing" },
+    ],
+  });
+  assert.equal(victory.id, "victory");
+  assert.match(victory.summary, /1 formation missing/);
+
+  const costly = victoryGradeFor({
+    won: true,
+    extractedCount: 3,
+    requiredExtraction: 3,
+    totalFormations: 5,
+    formationFates: [
+      { fate: "extracted" },
+      { fate: "damaged" },
+      { fate: "extracted" },
+      { fate: "missing" },
+      { fate: "missing" },
+    ],
+  });
+  assert.equal(costly.id, "costly");
+  assert.equal(costly.label, "COSTLY VICTORY");
+  assert.equal(costly.summary, "Objective secured, but 2 formations missing and 1 formation escaped damaged.");
+  assert.equal(victoryGradeFor({ won: false }), null);
 });
 
 test("formation fates follow staffed slot order and distinguish force collapse from unit loss", () => {

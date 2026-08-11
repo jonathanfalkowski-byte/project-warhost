@@ -52,6 +52,7 @@ import {
   integrityLossFor,
   mergeCampaignConditions,
   seriousConditionsFromConsequences,
+  victoryGradeFor,
 } from "./campaignPersistence.js";
 import {
   buildBattlePlayback,
@@ -2945,8 +2946,16 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
   const fieldStateResult = finalConsequences.active.length > 0
     ? `Final field states: ${finalConsequences.active.map((consequence) => `${formations.find((formation) => formation.id === consequence.formationId)?.name ?? consequence.formationId} ${consequence.label}`).join(", ")}.`
     : "No formation carried a battlefield consequence into extraction.";
-  const outcomeLabel = won ? "OPERATION SUCCESS" : campaignDestroyed ? "CAMPAIGN DEFEAT" : canContinue ? "COSTLY CONTINUATION" : "OPERATION FAILED";
-  const outcomeBanner = won ? "VICTORY" : campaignDestroyed ? "WARHOST BROKEN" : canContinue ? "WITHDRAWAL" : "DEFEAT";
+  const victoryGrade = victoryGradeFor({
+    won,
+    extractedCount: profile.extractedCount,
+    requiredExtraction: operation.requiredExtraction,
+    totalFormations: formations.length,
+    formationFates,
+  });
+  const outcomeLabel = victoryGrade?.eyebrow ?? (campaignDestroyed ? "CAMPAIGN DEFEAT" : canContinue ? "COSTLY CONTINUATION" : "OPERATION FAILED");
+  const outcomeBanner = victoryGrade?.label ?? (campaignDestroyed ? "WARHOST BROKEN" : canContinue ? "WITHDRAWAL" : "DEFEAT");
+  const outcomeTone = victoryGrade?.tone ?? (campaignDestroyed ? "defeat" : canContinue ? "costly" : "defeat");
   const outcomeTitle = won
     ? `${operation.shortName} is secured.`
     : campaignDestroyed
@@ -2972,12 +2981,12 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
       : `${operation.primaryResult}, but only ${profile.extractedCount} formations escaped before the Warhost lost the ability to continue.`;
   return (
     <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
-      <div className={`decision-panel completion-panel ${won ? "victory" : campaignDestroyed ? "defeat" : canContinue ? "costly" : "defeat"}`}>
+      <div className={`decision-panel completion-panel ${outcomeTone}`}>
         {won ? <CheckCircle className="completion-icon" weight="duotone" /> : <Warning className="completion-icon" weight="duotone" />}
         <p className="eyebrow">{outcomeLabel}</p>
         <div className="victory-banner">{outcomeBanner}</div>
         <h2 id="complete-title">{outcomeTitle}</h2>
-        <p>{operationResult} Victory required the primary objective plus at least {operation.requiredExtraction} extracted formations.</p>
+        <p>{operationResult} {victoryGrade?.summary} Victory required the primary objective plus at least {operation.requiredExtraction} extracted formations.</p>
         <div className="after-action-grid">
           <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>

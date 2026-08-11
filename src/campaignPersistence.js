@@ -26,6 +26,70 @@ export const campaignOutcomeFor = ({ hasNextOperation = false, operationWon = fa
   return operationWon ? "terminal" : "destroyed";
 };
 
+const countLabel = (count, singular, plural = `${singular}s`) => `${count} ${count === 1 ? singular : plural}`;
+
+const joinCosts = (costs) => costs.length <= 1
+  ? costs[0] ?? ""
+  : `${costs.slice(0, -1).join(", ")} and ${costs.at(-1)}`;
+
+export const victoryGradeFor = ({
+  won = false,
+  extractedCount = 0,
+  requiredExtraction = 0,
+  totalFormations = 0,
+  formationFates = [],
+} = {}) => {
+  if (!won) return null;
+
+  const extracted = Math.max(0, Math.floor(Number(extractedCount) || 0));
+  const required = Math.max(0, Math.floor(Number(requiredExtraction) || 0));
+  const total = Math.max(0, Math.floor(Number(totalFormations) || 0));
+  const fates = Array.isArray(formationFates) ? formationFates : [];
+  const destroyed = fates.filter(({ fate }) => fate === "destroyed").length;
+  const missing = fates.filter(({ fate }) => fate === "missing").length;
+  const damaged = fates.filter(({ fate }) => fate === "damaged").length;
+  const unaccounted = destroyed + missing;
+  const everyFormationReady = total > 0 && extracted >= total && unaccounted === 0 && damaged === 0;
+
+  if (everyFormationReady) {
+    return {
+      id: "decisive",
+      label: "DECISIVE VICTORY",
+      eyebrow: "OPERATION SUCCESS · FORCE INTACT",
+      tone: "decisive",
+      summary: "Objective secured and every formation returned combat-ready.",
+    };
+  }
+
+  const costs = [];
+  if (destroyed > 0) costs.push(`${countLabel(destroyed, "formation")} destroyed`);
+  if (missing > 0) costs.push(`${countLabel(missing, "formation")} missing`);
+  if (damaged > 0) costs.push(`${countLabel(damaged, "formation")} escaped damaged`);
+  const costly = extracted <= required || unaccounted >= 2 || destroyed > 0;
+
+  if (costly) {
+    return {
+      id: "costly",
+      label: "COSTLY VICTORY",
+      eyebrow: "OPERATION SUCCESS · HIGH COST",
+      tone: "costly",
+      summary: costs.length > 0
+        ? `Objective secured, but ${joinCosts(costs)}.`
+        : "Objective secured at the minimum extraction threshold.",
+    };
+  }
+
+  return {
+    id: "victory",
+    label: "VICTORY",
+    eyebrow: "OPERATION SUCCESS",
+    tone: "victory",
+    summary: costs.length > 0
+      ? `Objective secured with ${joinCosts(costs)}.`
+      : "Objective secured with the surviving force ready to continue.",
+  };
+};
+
 export const formationFatesFor = ({
   formations = [],
   formationOrderIds = [],

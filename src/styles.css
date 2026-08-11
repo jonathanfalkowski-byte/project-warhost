@@ -1145,6 +1145,9 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .completion-panel.costly .victory-banner { border-color: #a96b37; background: #32200f; color: #ffc071; font-size: 21px; }
 .completion-panel.costly .after-action-grid > div:nth-child(2) { border-color: #8d5b31; background: #24190f; }
 .completion-panel.costly .after-action-grid > div:nth-child(2) svg { color: #ef9f5b; }
+.completion-panel.decisive { border-color: #79bd5b; box-shadow: 0 0 34px rgba(121, 189, 91, .16); }
+.completion-panel.decisive .completion-icon, .completion-panel.decisive .eyebrow { color: #a1e77b; }
+.completion-panel.decisive .victory-banner { border-color: #8ed068; background: #193916; color: #b1ef8c; }
 
 .workshop-panel { width: min(900px, 94vw); max-height: calc(100vh - 28px); display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; border-color: #8b7447; background: #111512; }
 .workshop-heading { display: grid; grid-template-columns: minmax(0, 1fr) 170px; align-items: center; gap: 20px; }
