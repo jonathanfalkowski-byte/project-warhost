@@ -15,6 +15,10 @@ test("the planning screen renders without an undefined runtime binding", async (
     const { App } = await server.ssrLoadModule("/src/App.jsx");
     const markup = renderToString(React.createElement(App));
     assert.match(markup, /PLACE THE FORMATIONS/);
+    assert.match(markup, /VIEW ROUTE MAP/);
+    assert.match(markup, /PRIMARY DECISION/);
+    assert.match(markup, /ROUTE RESPONSIBILITY/);
+    assert.match(markup, /SECONDARY BONUS/);
     assert.match(markup, /PROJECT WARHOST/);
     assert.match(markup, /FORCE MOVE/);
     assert.match(markup, /OUT OF POSITION/);

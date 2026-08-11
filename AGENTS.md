@@ -61,4 +61,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Use `TRANSFER` rather than `HAND OFF` in player-facing playbook stages and summaries. Internal implementation terminology may remain unchanged.
 - A route preview must temporarily clear the central formation-placement board so the authored battlefield geometry is actually visible; moving away or advancing keyboard focus restores placement.
 - The debrief must connect the player's named formation assignments and combo chains to the enemy orders they failed to stop, then to the resulting timing and extraction cost. Summary totals alone are insufficient.
+- Route responsibility is the primary placement decision; adjacent combo chains are secondary bonuses. A formation with no matching responsibility capability must remain a weak assignment even when it has two combo links, and the planning screen must state that hierarchy explicitly.
+- The formation board needs a persistent, player-controlled route-map view. Do not make route visibility depend only on hover or force the player to see the authored paths through an opaque placement panel.
+- Label the completion surface explicitly as the AFTER-ACTION DEBRIEF and lead with route assignments, then enemy exploitation, then mission cost before secondary combo totals or the full operation log.
 - Command Seals are reserved for varied, mission-specific dilemmas at consequential moments. Do not reuse the same binary interruption structure at every breakpoint; defer redesign until the authored decision set is ready.

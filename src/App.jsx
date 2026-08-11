@@ -820,7 +820,7 @@ const BASE_OPERATION = {
 };
 
 const PLAYBACK_BEAT_MS = 2600;
-const IMPROVISED_TASK_DELAY = 15;
+const IMPROVISED_TASK_DELAY = 20;
 
 const DEAD_CIRCUIT_REINFORCEMENT_WAVE = {
   number: "E4",
@@ -956,7 +956,9 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs, condition,
     const taskAligned = matchedCapabilities.length > 0;
     const inboundReaction = index > 0 && Boolean(handoffs[index - 1]?.maneuver);
     const outboundLink = index < handoffs.length && Boolean(handoffs[index]?.maneuver);
-    const score = Math.min(100, 52 + (taskAligned ? 20 : 0) + (inboundReaction ? 14 : 0) + (outboundLink ? 14 : 0));
+    // Route responsibility is the plan. Adjacency combinations can sharpen a
+    // sound assignment, but they cannot make an unsuitable formation "ready."
+    const score = Math.min(100, 48 + (taskAligned ? 36 : 0) + (inboundReaction ? 8 : 0) + (outboundLink ? 8 : 0));
     const label = score >= 95 ? "SYNCHRONIZED" : score >= 80 ? "READY" : score >= 65 ? "CAPABLE" : "STRAINED";
 
     return [role.id, {
@@ -2019,8 +2021,8 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
   return (
     <div className="handoff-board" aria-live="polite">
       <div className="handoff-heading">
-        <span>COMBO WINDOWS</span>
-        <small>Inspect one neighboring pair with a Staff Exercise.</small>
+        <span>SECONDARY BONUS · COMBO WINDOWS</span>
+        <small>After route jobs are covered, inspect one neighboring pair with a Staff Exercise.</small>
       </div>
       {feedback ? (
         <div className="cascade-readout placement-impact rewired" key={feedback.revision} role="status">
@@ -2076,7 +2078,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
   );
 }
 
-function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, inspected, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onInspectFormation, onSelectFormation, onStaffExercise, outputs, phase, playbook, profile, readiness, refitProtocols, staffExerciseIndex }) {
+function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, inspected, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onInspectFormation, onSelectFormation, onStaffExercise, onViewRouteMap, outputs, phase, playbook, profile, readiness, refitProtocols, staffExerciseIndex }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
@@ -2143,12 +2145,20 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           <span className="panel-label">{playbook.name} · AUTHORED TACTICAL ROUTE</span>
           <b>PLACE THE FORMATIONS</b>
         </div>
-        <strong>
-          {assignedCount} / {formations.length} FORMATIONS PLACED
-          {formations.length < playbook.roles.length ? ` · ${playbook.roles.length - formations.length} STOP EMPTY` : ""}
-        </strong>
+        <div className="playbook-board-actions">
+          <strong>
+            {assignedCount} / {formations.length} FORMATIONS PLACED
+            {formations.length < playbook.roles.length ? ` · ${playbook.roles.length - formations.length} STOP EMPTY` : ""}
+          </strong>
+          <button type="button" onClick={onViewRouteMap}><MapPin weight="fill" /> VIEW ROUTE MAP</button>
+        </div>
       </div>
-      <p>Assign each formation a responsibility. Rules stay visible; results remain sealed until commitment.</p>
+      <p>Assign each formation to a route responsibility first. Then use neighboring combinations as optional bonuses; results remain sealed until commitment.</p>
+      <div className="planning-priority" aria-label="Planning priority">
+        <div><span>PRIMARY DECISION</span><b>ROUTE RESPONSIBILITY</b><small>Can this formation perform the job at this stop?</small></div>
+        <ArrowRight weight="bold" />
+        <div><span>SECONDARY BONUS</span><b>COMBINATION LINK</b><small>Can a neighboring formation improve the route?</small></div>
+      </div>
       <div className="playbook-doctrine concealed">
         <span>PLAYBOOK DOCTRINE · {doctrine.name}</span>
         <b>{doctrine.strength}</b>
@@ -2158,7 +2168,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
       {inspectingInteractions && (
         <section className="formation-interaction-inspector" aria-live="polite" aria-label={`${inspectedFormation.name} potential formation interactions`}>
           <header>
-            <span><Radio weight="fill" /> SELECTED FORMATION</span>
+            <span><Radio weight="fill" /> SECONDARY BONUS · SELECTED FORMATION</span>
             <b>{inspectedFormation.name}</b>
             <small>CREATES <strong>{inspectedFormation.creates}</strong> · CAN REACT TO <strong>{inspectedFormation.uses.join(" / ")}</strong></small>
             <div className="interaction-legend"><span className="source">CYAN: INSPECTED</span><span className="outgoing">YELLOW: IT FEEDS THEM</span><span className="incoming">PURPLE: THEY FEED IT</span></div>
@@ -2176,11 +2186,14 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           <em>Color shows direction, not quality. Only neighboring staffed stops form an active combo; the board does not rank placements.</em>
         </section>
       )}
-      <div className="route-terminals" aria-hidden="true"><span>FORMATION LANES</span><span>COMBO ORDER</span></div>
+      <div className="route-terminals" aria-hidden="true"><span>PRIMARY · ROUTE RESPONSIBILITIES</span><span>SECONDARY · ADJACENT BONUSES</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
           const roleDemands = roleDemandsFor(role, index, condition);
           const formation = formations.find((item) => item.id === assignments[role.id]);
+          const matchedCapabilities = formation ? capabilityMatchesFor({ formation, demands: roleDemands }) : [];
+          const missingCapabilities = formation ? roleDemands.filter((demand) => !matchedCapabilities.includes(demand)) : [];
+          const routeAligned = Boolean(formation && matchedCapabilities.length > 0);
           const refitProtocol = refitProtocols[role.id];
           const nextRole = playbook.roles[index + 1];
           const nextFormation = nextRole ? formations.find((item) => item.id === assignments[nextRole.id]) : null;
@@ -2226,6 +2239,10 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                 {formation ? (
                   <>
                     <span className="slot-formation"><img src={formation.asset} alt="" /><span><b>{formation.name}</b><small>{formation.activeRefit.name}</small></span></span>
+                    <span className={`slot-route-fit ${routeAligned ? "aligned" : "improvised"}`}>
+                      <b>{routeAligned ? `ROUTE FIT · ${matchedCapabilities.join(" / ")}` : `ROUTE MISMATCH · NEEDS ${missingCapabilities.join(" / ")}`}</b>
+                      <small>{routeAligned ? "Performs this responsibility without delay." : `Improvised assignment adds +00:${String(IMPROVISED_TASK_DELAY).padStart(2, "0")} to the mission.`}</small>
+                    </span>
                     {formation.id === inspected && <span className="slot-interaction selected"><Radio weight="fill" /> INSPECTING · CREATES {tacticalTerm(formation.creates)}</span>}
                     {interaction && (
                       <span className={`slot-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}>
@@ -2272,6 +2289,10 @@ function BattleStateLegend() {
 }
 
 function Battlefield({ formations, formationFates, inspected, onInspect, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, previewPlaybookId, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onStaffExercise, readiness, refitProtocols, staffExerciseIndex, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
+  const [routeMapOpen, setRouteMapOpen] = useState(false);
+  useEffect(() => {
+    setRouteMapOpen(false);
+  }, [phase, playbook.id]);
   const alphaState = battleTime >= profile.alphaAt ? "secured" : "active";
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
   const reactorState = battleTime >= profile.reactorAt ? "secured" : "threat";
@@ -2313,6 +2334,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
   const previewPlaybook = previewBase ? playbookForOperation(previewBase, operation) : null;
   const mapPlaybook = previewPlaybook ?? playbook;
   const previewingPlaybook = Boolean(previewPlaybook);
+  const showingRouteMap = previewingPlaybook || routeMapOpen;
 
   return (
     <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""} ${collisionFocus ? "collision-focus" : ""} ${inspectingInteractions ? "interaction-inspecting" : ""}`} aria-label={`${operation.name} mission map`}>
@@ -2321,12 +2343,14 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <div className="battlefield-operation-veil" aria-hidden="true" />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
       <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} />
-      {previewingPlaybook && (
+      {showingRouteMap && (
         <div className="playbook-map-preview" role="status">
-          <span>ROUTE PREVIEW · {condition.name}</span>
+          <span>{routeMapOpen ? "YOUR AUTHORED ROUTE" : `ROUTE PREVIEW · ${condition.name}`}</span>
           <b>{mapPlaybook.name}</b>
           <small>{mapPlaybook.stages.map((stage) => stage.label).join(" → ")}</small>
-          <em>MAP ONLY · MOVE AWAY OR TAB ON TO RETURN TO FORMATION PLACEMENT</em>
+          {routeMapOpen
+            ? <button type="button" onClick={() => setRouteMapOpen(false)}>RETURN TO FORMATION PLACEMENT <ArrowRight weight="bold" /></button>
+            : <em>MAP ONLY · MOVE AWAY OR TAB ON TO RETURN TO FORMATION PLACEMENT</em>}
         </div>
       )}
       <DoctrineCollisionOverlay beat={playbackBeat} operation={operation} playbook={playbook} />
@@ -2415,7 +2439,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       )}
 
       {playbackActive && <BattleStateLegend />}
-      {!previewingPlaybook && <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} inspected={inspected} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onClearRole={onClearRole} onFormationDragStart={onFormationDragStart} onInspectFormation={onInspect} onSelectFormation={onSelect} onStaffExercise={onStaffExercise} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} />}
+      {!showingRouteMap && <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} inspected={inspected} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onClearRole={onClearRole} onFormationDragStart={onFormationDragStart} onInspectFormation={onInspect} onSelectFormation={onSelect} onStaffExercise={onStaffExercise} onViewRouteMap={() => setRouteMapOpen(true)} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} />}
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -3006,15 +3030,19 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         <div className="victory-banner">{outcomeBanner}</div>
         <h2 id="complete-title">{outcomeTitle}</h2>
         <p>{operationResult} {victoryGrade?.summary} Victory required the primary objective plus at least {operation.requiredExtraction} extracted formations.</p>
+        <div className="debrief-marker">
+          <Target weight="duotone" />
+          <span><b>AFTER-ACTION DEBRIEF</b><small>Start here to see why your route assignments produced this result.</small></span>
+        </div>
         <div className="after-action-grid">
           <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{carrierCutOffAfterRescue && <small>Recovery Carrier was cut off afterward.</small>}{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
+          <div><span>FORMATION ROUTE PLAN</span><b>{profile.readiness.alignedCount} / {profile.readiness.staffedCount} responsibilities matched</b><small>{profile.effects.length} secondary combo bonuses · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</small><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
         <section className="strategy-outcome-story" aria-label="How your choices produced the mission result">
-          <header><span>YOUR CHOICES → BATTLEFIELD CONSEQUENCE → MISSION COST</span><small>REVEALED AFTER COMMITMENT</small></header>
+          <header><span>WHY YOUR PLAN {won ? "WORKED" : "FAILED"}</span><small>ROUTE ASSIGNMENTS → ENEMY RESPONSE → MISSION COST</small></header>
           <div>
             {strategyOutcomeStory.map((item, index) => (
               <Fragment key={item.id}>

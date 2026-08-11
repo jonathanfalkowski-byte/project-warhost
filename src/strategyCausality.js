@@ -19,8 +19,8 @@ export const strategyOutcomeStoryFor = ({ profile = {}, requiredExtraction = 0 }
   const recoveryLost = safeNumber(profile.reinforcementLoss) + safeNumber(profile.enemyRecoveryLoss);
 
   const setupDetail = improvised.length > 0
-    ? improvised.map((placement) => `${placement.formationName ?? "A formation"} at ${placement.roleLabel ?? "an assigned stop"} lacked ${Array.isArray(placement.demands) && placement.demands.length > 0 ? placement.demands.join(" / ") : "a required capability"}`).join("; ")
-    : staffedCount > 0 ? "Every formation brought at least one capability required by its assigned responsibility." : "No formation assignments were recorded.";
+    ? `${improvised.map((placement) => `${placement.formationName ?? "A formation"} at ${placement.roleLabel ?? "an assigned stop"} lacked ${Array.isArray(placement.demands) && placement.demands.length > 0 ? placement.demands.join(" / ") : "a required capability"}`).join("; ")}. Secondary bonus: ${combos.length} ${plural(combos.length, "combo chain")} formed.`
+    : staffedCount > 0 ? `Every formation brought at least one capability required by its assigned responsibility. Secondary bonus: ${combos.length} ${plural(combos.length, "combo chain")} formed.` : "No formation assignments were recorded.";
   const enemyDetail = landedOrders.length > 0
     ? landedOrders.map((clash) => {
       const missing = Array.isArray(clash?.resolution?.missingCapabilities) ? clash.resolution.missingCapabilities : [];
@@ -34,21 +34,21 @@ export const strategyOutcomeStoryFor = ({ profile = {}, requiredExtraction = 0 }
   return [
     {
       id: "choice",
-      label: "YOUR FORMATION PLAN",
-      value: `${alignedCount}/${staffedCount} JOBS MATCHED · ${combos.length} ${plural(combos.length, "COMBO", "COMBOS")}`,
+      label: "1 · YOUR ROUTE ASSIGNMENTS",
+      value: `${alignedCount}/${staffedCount} RESPONSIBILITIES MATCHED`,
       detail: setupDetail,
       tone: alignedCount === staffedCount && staffedCount > 0 ? "support" : "cost",
     },
     {
       id: "collision",
-      label: "WHAT THE ENEMY EXPLOITED",
+      label: "2 · WHAT THE ENEMY EXPLOITED",
       value: `${disruptedCount}/${clashes.length} ORDERS STOPPED`,
       detail: enemyDetail,
       tone: disruptedCount === clashes.length && clashes.length > 0 ? "support" : disruptedCount > 0 ? "mixed" : "cost",
     },
     {
       id: "cost",
-      label: "MISSION COST",
+      label: "3 · MISSION COST",
       value: overrun > 0 ? `${overrun} SEC LATE → ${extractedCount}/${extractionTarget} EXTRACTED` : `${timeSaved} SEC EARLY → ${extractedCount}/${extractionTarget} EXTRACTED`,
       detail: resultDetail,
       tone: extractedCount >= extractionTarget && extractionTarget > 0 ? "support" : "cost",
@@ -89,7 +89,7 @@ export const strategyCausalityFor = ({ profile = {}, requiredExtraction = 0 } = 
         : staffedCount > 0 ? "Every staffed formation matched its assigned task." : "No staffed formations were recorded.",
     },
     {
-      id: "handoffs", step: "02", label: "COMBO CHAINS",
+      id: "handoffs", step: "02", label: "SECONDARY COMBO BONUS",
       value: `${handoffs.length} ${plural(handoffs.length, "CHAIN", "CHAINS")} FORMED`,
       tone: handoffs.length > 0 ? "support" : "cost",
       detail: handoffNames.length > 0 ? handoffNames.join(" / ") : "No neighboring trigger-response chain activated.",
