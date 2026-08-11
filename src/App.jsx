@@ -1749,7 +1749,7 @@ const fieldSegmentStyle = (start, end, size) => {
   };
 };
 
-function TacticalFieldPlan({ assignments, battleTime, branches, condition, consequences, formationFates, formations, operation, phase, playbook, playbackBeat }) {
+function TacticalFieldPlan({ assignments, battleTime, branches, condition, consequences, formationFates, formations, handoffs, operation, phase, playbook, playbackBeat, profile }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const operationField = operationFieldFor(operation);
@@ -1850,13 +1850,24 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
         }));
     });
   });
-  const tacticalLinks = execution ? [] : (playbook.comboWindows ?? []).map((window) => {
+  const rendezvousTiming = comboWindowTimes(profile);
+  const tacticalLinks = (playbook.comboWindows ?? []).map((window) => {
+    const handoff = handoffs.find((item) => item.from === window.from && item.to === window.to);
+    const windowAt = rendezvousTiming[window.from];
+    const live = execution && battleTime >= windowAt && battleTime < windowAt + 15;
+    const resolved = execution && battleTime >= windowAt + 15;
     return {
       ...window,
       fromIndex: window.from,
       toIndex: window.to,
       at: resolveFieldPoint(plan, operationField.landmarks, window.rendezvous),
       staffed: Boolean(assignments[playbook.roles[window.from]?.id] && assignments[playbook.roles[window.to]?.id]),
+      state: live ? "live" : resolved ? "resolved" : execution ? "upcoming" : "planning",
+      status: live
+        ? handoff?.maneuver ? "COMBO TRIGGERED" : "NO REACTION"
+        : resolved
+          ? handoff?.maneuver ? "COMBO RESOLVED" : "MET · NO COMBO"
+          : execution ? "PAIR APPROACHING" : "ROUTES MEET HERE",
     };
   });
 
@@ -1878,8 +1889,8 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
         </div>
       ))}
       {tacticalLinks.map((link) => (
-        <div className={`field-plan-rendezvous ${link.staffed ? "staffed" : ""}`} style={{ left: `${link.at.x}%`, top: `${link.at.y}%` }} key={`rendezvous-${link.fromIndex}-${link.toIndex}`}>
-          <Radio weight="fill" /><span>RENDEZVOUS</span><small>{link.label}</small>
+        <div className={`field-plan-rendezvous ${link.staffed ? "staffed" : ""} ${execution ? `execution-${link.state}` : ""}`} style={{ left: `${link.at.x}%`, top: `${link.at.y}%` }} key={`rendezvous-${link.fromIndex}-${link.toIndex}`}>
+          <Radio weight="fill" /><span>{link.status}</span><small>{link.label} · ROUTES {link.fromIndex + 1} + {link.toIndex + 1}</small>
         </div>
       ))}
       {branchTurns.map((turn) => (
@@ -2133,8 +2144,12 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   const interactionByFormationId = new Map(activeInteractions.map((interaction) => [interaction.partnerId, interaction]));
   const inspectedAssigned = playbook.roles.some((role) => assignments[role.id] === inspected);
   const inspectingInteractions = (phase === "plan" || phase === "drill") && Boolean(inspectedFormation);
+  const authoredRendezvousCount = playbook.comboWindows?.length ?? 0;
+  const staffedRendezvousCount = (playbook.comboWindows ?? []).filter((window) => (
+    assignments[playbook.roles[window.from]?.id] && assignments[playbook.roles[window.to]?.id]
+  )).length;
 
-  if (phase === "battle" || phase === "complete") {
+  if (phase === "complete") {
     return (
       <div className={`combo-panel panel-surface ${active ? "ready" : "broken"}`}>
         <span className="panel-label">{playbook.name}: {playbook.stages.map((stage) => stage.label).join(" → ")}</span>
@@ -2182,21 +2197,21 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
 
   const assignedCount = Object.values(assignments).filter(Boolean).length;
   return (
-    <div className={`playbook-board panel-surface ${active ? "ready" : "incomplete"}`}>
+    <div className={`playbook-board panel-surface ${active ? "ready" : "incomplete"} ${phase === "battle" ? "execution-view" : ""}`}>
       <div className="playbook-board-heading">
         <div>
           <span className="panel-label">{playbook.name} · AUTHORED TACTICAL ROUTE</span>
-          <b>PLACE THE FORMATIONS</b>
+          <b>{phase === "battle" ? "FORMATION ROUTE PLAN" : "PLACE THE FORMATIONS"}</b>
         </div>
         <div className="playbook-board-actions">
           <strong>
             {assignedCount} / {formations.length} FORMATIONS PLACED
             {formations.length < playbook.roles.length ? ` · ${playbook.roles.length - formations.length} STOP EMPTY` : ""}
           </strong>
-          <button type="button" onClick={onViewRouteMap}><MapPin weight="fill" /> VIEW ROUTE MAP</button>
+          {phase !== "battle" && <button type="button" onClick={onViewRouteMap}><MapPin weight="fill" /> VIEW ROUTE MAP</button>}
         </div>
       </div>
-      <p>Assign each formation to a route responsibility first. A combo is only possible at a named rendezvous where two authored routes meet.</p>
+      <p>{phase === "battle" ? "The committed assignments remain visible while the formations execute. Watch the named rendezvous below to see whether a bonus actually triggers." : "Assign each formation to a route responsibility first. A combo is only possible at a named rendezvous where two authored routes meet."}</p>
       <div className="planning-priority" aria-label="Planning priority">
         <div><span>PRIMARY DECISION</span><b>ROUTE RESPONSIBILITY</b><small>Can this formation perform the job at this stop?</small></div>
         <ArrowRight weight="bold" />
@@ -2208,10 +2223,10 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
         <small>EXPOSURE · {doctrine.exposure}</small>
         <em>DOCTRINE RESULT UNRESOLVED</em>
       </div>
-      <details className="secondary-combo-drawer">
+      <details className="secondary-combo-drawer" open>
         <summary>
           <span><Radio weight="fill" /> OPTIONAL COMBO BONUSES</span>
-          <small>Inspect formation links at authored rendezvous after route jobs are covered.</small>
+          <small>{authoredRendezvousCount} authored meeting points · {staffedRendezvousCount} pairs staffed</small>
         </summary>
       {inspectingInteractions && (
         <section className="formation-interaction-inspector" aria-live="polite" aria-label={`${inspectedFormation.name} potential formation interactions`}>
@@ -2234,6 +2249,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           <em>Color shows direction, not quality. A combo can arm only where the authored routes share a named rendezvous.</em>
         </section>
       )}
+      {!inspectingInteractions && <div className="combo-empty-guide"><Radio weight="fill" /><span><b>SELECT OR HOVER A STAFFED FORMATION</b><small>Only its real partner at an authored rendezvous will highlight. No highlight means the routes never meet.</small></span></div>}
       </details>
       <div className="route-terminals" aria-hidden="true"><span>PRIMARY · ROUTE RESPONSIBILITIES</span><span>SECONDARY · RENDEZVOUS BONUSES</span></div>
       <div className="playbook-route">
@@ -2318,10 +2334,10 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           );
         })}
       </div>
-      <details className="secondary-combo-drawer combo-window-drawer">
+      <details className="secondary-combo-drawer combo-window-drawer" open>
         <summary>
           <span><Lightning weight="fill" /> OPTIONAL COMBO WINDOWS</span>
-          <small>Test named rendezvous only after every route responsibility is staffed.</small>
+          <small>{phase === "battle" ? "Live battle result · a meeting does not guarantee a reaction" : "Inspect every real meeting point; separated routes are marked NO SHARED ROUTE EVENT."}</small>
         </summary>
         <TacticalHandoffBoard feedback={feedback} formations={formations} handoffs={handoffs} profile={profile} staffExerciseIndex={staffExerciseIndex} onStaffExercise={onStaffExercise} />
       </details>
@@ -2396,7 +2412,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
-      <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} />
+      <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} handoffs={handoffs} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} profile={profile} />
       {showingRouteMap && (
         <div className="playbook-map-preview" role="status">
           <span>{routeMapOpen ? "YOUR AUTHORED ROUTE" : `ROUTE PREVIEW · ${condition.name}`}</span>

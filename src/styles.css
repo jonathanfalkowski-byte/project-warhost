@@ -269,12 +269,15 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-segment.alternative-route::before { display: none; }
 .field-plan-segment.alternative-route > svg { opacity: .72; background: #111716; }
 .field-plan-segment.changed { height: 4px; box-shadow: 0 0 15px rgba(var(--route-rgb, 102, 206, 244), .72); }
-.field-plan-rendezvous { position: absolute; z-index: 4; display: grid; justify-items: center; gap: 1px; padding: 3px 5px; transform: translate(-50%, -50%); border: 1px dashed #8a7645; background: rgba(21, 19, 12, .94); color: #bca766; opacity: .72; }
-.field-plan-rendezvous svg { width: 11px; height: 11px; }
+.field-plan-rendezvous { position: absolute; z-index: 12; min-width: 104px; display: grid; grid-template-columns: 15px minmax(0, 1fr); align-items: center; gap: 1px 5px; padding: 5px 7px; transform: translate(-50%, -50%); border: 1px dashed #8a7645; background: rgba(21, 19, 12, .96); color: #bca766; opacity: .82; box-shadow: 0 5px 14px rgba(0,0,0,.48); }
+.field-plan-rendezvous svg { grid-row: 1 / 3; width: 14px; height: 14px; }
 .field-plan-rendezvous span, .field-plan-rendezvous small { font-family: "Barlow Condensed"; line-height: 1; white-space: nowrap; }
-.field-plan-rendezvous span { font-size: 7px; letter-spacing: .1em; }
-.field-plan-rendezvous small { font-size: 8px; color: #d4c58b; }
-.field-plan-rendezvous.staffed { border-style: solid; border-color: #e2c167; color: #f0d47b; opacity: 1; box-shadow: 0 0 12px rgba(226, 193, 103, .28); }
+.field-plan-rendezvous span { font-size: 8px; font-weight: 700; letter-spacing: .09em; }
+.field-plan-rendezvous small { font-size: 7px; color: #d4c58b; }
+.field-plan-rendezvous.staffed { border-style: solid; border-color: #e2c167; color: #f0d47b; opacity: 1; box-shadow: 0 0 18px rgba(226, 193, 103, .38), 0 5px 14px rgba(0,0,0,.5); }
+.field-plan-rendezvous.execution-upcoming { color: #86d4ee; border-color: #4f9db7; background: rgba(10, 31, 38, .97); }
+.field-plan-rendezvous.execution-live { color: #dcf8c9; border-color: #a6e37d; background: rgba(16, 48, 22, .98); box-shadow: 0 0 28px rgba(137, 218, 93, .82); animation: rendezvousLive 1s ease-in-out infinite alternate; }
+.field-plan-rendezvous.execution-resolved { color: #9fc88c; border-color: #66845a; background: rgba(13, 29, 16, .96); }
 .field-plan-turn { position: absolute; z-index: 3; display: flex; align-items: center; gap: 3px; padding: 3px 5px; transform: translate(-50%, -50%); border: 1px solid #a35e26; background: rgba(45, 23, 10, .96); color: #ffb36d; box-shadow: 0 0 12px rgba(230, 126, 40, .35); }
 .field-plan-turn svg { width: 12px; height: 12px; flex: 0 0 auto; }
 .field-plan-turn span { font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .06em; white-space: nowrap; }
@@ -666,7 +669,8 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .doctrine-battle-readout b { color: #d3c49d; font-size: 9px; font-weight: 500; }
 .doctrine-battle-readout.triggered { border-color: #73a255; background: #152017; }
 .doctrine-battle-readout.triggered span, .doctrine-battle-readout.triggered b { color: #9bd079; }
-.playbook-board { position: absolute; z-index: 15; left: 2%; right: 2%; bottom: 1.5%; width: auto; max-height: 36%; overflow-y: auto; display: flex; flex-direction: column; padding: 8px 11px; background: rgba(8, 14, 14, .96); border-color: #4c8296; box-shadow: 0 -8px 26px rgba(0, 0, 0, .58); }
+.playbook-board { position: absolute; z-index: 15; left: 2%; right: 2%; bottom: 1.5%; width: auto; max-height: 47%; overflow-y: auto; display: flex; flex-direction: column; padding: 8px 11px; background: rgba(8, 14, 14, .96); border-color: #4c8296; box-shadow: 0 -8px 26px rgba(0, 0, 0, .58); }
+.playbook-board.execution-view { max-height: 43%; border-color: #739a63; background: rgba(7, 14, 11, .97); }
 .playbook-board.incomplete { box-shadow: inset 0 0 0 1px rgba(41, 169, 232, .1), 0 14px 32px rgba(0, 0, 0, .48); }
 .playbook-board.ready { border-color: #5b8b53; }
 .playbook-board-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
@@ -776,6 +780,11 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .secondary-combo-drawer[open] > summary::after { content: "CLOSE"; color: #b4dce8; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
 .secondary-combo-drawer .formation-interaction-inspector { margin: 7px; }
 .secondary-combo-drawer .tactical-handoff-board { margin: 7px; }
+.combo-empty-guide { display: flex; align-items: center; gap: 8px; margin: 7px; padding: 8px 10px; border-left: 3px solid #4b91a9; background: #102127; color: #80cce6; }
+.combo-empty-guide > svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.combo-empty-guide > span { display: grid; gap: 2px; }
+.combo-empty-guide b { font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .07em; }
+.combo-empty-guide small { color: #94a9af; font-size: 9px; }
 .playbook-slot.cascade-moved { animation: comboSlotMoved .78s ease-out var(--cascade-delay, 0ms); }
 .playbook-slot.cascade-powered { animation: comboSlotPower .78s ease-out var(--cascade-delay, 0ms); }
 .playbook-slot.cascade-broken { animation: comboSlotBreak .78s ease-out var(--cascade-delay, 0ms); }
@@ -1295,6 +1304,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 @keyframes comboCardBreak { 0% { opacity: .55; border-color: #4c4138; } 50% { opacity: 1; border-color: #e38a55; box-shadow: 0 0 18px rgba(220, 105, 51, .3); } 100% { opacity: 1; } }
 @keyframes comboFormationSource { from { border-color: #70c4e9; box-shadow: 0 0 10px rgba(61, 183, 231, .55), 0 8px 14px rgba(0,0,0,.75); } to { border-color: #b6ed91; box-shadow: 0 0 24px rgba(137, 215, 99, .9), 0 8px 14px rgba(0,0,0,.75); } }
 @keyframes comboFormationReceiver { from { border-color: #b6ed91; box-shadow: 0 0 10px rgba(137, 215, 99, .55), 0 8px 14px rgba(0,0,0,.75); } to { border-color: #f1cf68; box-shadow: 0 0 28px rgba(220, 193, 77, .92), 0 8px 14px rgba(0,0,0,.75); } }
+@keyframes rendezvousLive { from { transform: translate(-50%, -50%) scale(1); } to { transform: translate(-50%, -50%) scale(1.08); } }
 @keyframes compatibleFormationPulse { from { box-shadow: 0 0 0 5px rgba(236, 199, 66, .14), 0 0 18px rgba(239, 202, 71, .62), 0 8px 14px rgba(0,0,0,.75); } to { box-shadow: 0 0 0 8px rgba(236, 199, 66, .24), 0 0 36px rgba(249, 213, 79, .96), 0 8px 14px rgba(0,0,0,.75); } }
 @keyframes comboBeatReveal { from { opacity: 0; transform: translate(-50%, -10px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes formationPulse { from { filter: brightness(.9); } to { filter: brightness(1.18); } }
