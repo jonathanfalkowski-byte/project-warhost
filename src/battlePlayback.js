@@ -14,6 +14,12 @@ const BEAT_PRIORITY = {
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
+const BATTLE_CONDITION_LABELS = Object.freeze({
+  DISPLACED: "OUT OF POSITION",
+});
+
+const battleConditionLabel = (value) => BATTLE_CONDITION_LABELS[value] ?? value;
+
 const orderedFormationIds = (handoffs, formations) => {
   const ids = [];
   const remember = (id) => {
@@ -138,9 +144,9 @@ export const buildBattlePlayback = ({
       id: `response-${handoff.id}`,
       at: comboTimes[handoff.from] ?? 0,
       kind: "response",
-      eyebrow: "AUTOMATIC RESPONSE",
-      title: `${source?.name ?? "Formation"} hands off to ${receiver?.name ?? "formation"}.`,
-      detail: `${handoff.maneuver.passes} triggers ${handoff.maneuver.name}: ${handoff.maneuver.result}.`,
+      eyebrow: "COMBO CHAIN · AUTOMATIC REACTION",
+      title: `${source?.name ?? "Formation"} creates ${battleConditionLabel(handoff.maneuver.passes)}; ${receiver?.name ?? "formation"} reacts.`,
+      detail: `${receiver?.name ?? "The receiving formation"} executes ${handoff.maneuver.name}, creating ${battleConditionLabel(handoff.maneuver.result)}.`,
       playerFormationIds: [handoff.sourceId, handoff.receiverId].filter(Boolean),
       routeState: "response",
     });

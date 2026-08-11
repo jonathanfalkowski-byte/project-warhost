@@ -50,6 +50,14 @@ test("playback orders enemy intent, contact, response, and result by authored ti
   assert.deepEqual(beats.slice(1, 6).map((beat) => beat.kind), ["enemy-intent", "mission", "response", "contact", "result"]);
 });
 
+test("automatic response beats explain the combo without handoff jargon", () => {
+  const response = buildBattlePlayback(fixture()).find((beat) => beat.kind === "response");
+  assert.equal(response.eyebrow, "COMBO CHAIN · AUTOMATIC REACTION");
+  assert.equal(response.title, "GRAV-SNARE TANK creates OUT OF POSITION; BASTION TANK reacts.");
+  assert.equal(response.detail, "BASTION TANK executes GRAVITIC SNARE, creating FORWARD HOLD.");
+  assert.doesNotMatch(`${response.title} ${response.detail}`, /hands? off|handoff/i);
+});
+
 test("contact beat carries both plans and the collision outcome", () => {
   const contact = buildBattlePlayback(fixture()).find((beat) => beat.kind === "contact");
   assert.equal(contact.enemyFormationIndex, 0);
