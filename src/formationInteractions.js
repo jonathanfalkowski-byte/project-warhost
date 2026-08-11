@@ -36,10 +36,17 @@ export const interactionDirectionFor = (interaction) => {
   return null;
 };
 
-export const adjacentFormationIdsFor = ({ roles, assignments, formationId } = {}) => {
+export const adjacentFormationIdsFor = ({ roles, assignments, formationId, connections } = {}) => {
   if (!Array.isArray(roles) || !assignments || typeof assignments !== "object" || typeof formationId !== "string") return [];
   const roleIndex = roles.findIndex((role) => role?.id && assignments[role.id] === formationId);
   if (roleIndex < 0) return [];
+  if (Array.isArray(connections)) {
+    return connections
+      .filter((connection) => connection?.from === roleIndex || connection?.to === roleIndex)
+      .map((connection) => connection.from === roleIndex ? connection.to : connection.from)
+      .map((connectedRoleIndex) => roles[connectedRoleIndex]?.id ? assignments[roles[connectedRoleIndex].id] : null)
+      .filter((connectedFormationId) => typeof connectedFormationId === "string" && connectedFormationId.length > 0);
+  }
   return [roles[roleIndex - 1], roles[roleIndex + 1]]
     .map((role) => role?.id ? assignments[role.id] : null)
     .filter((neighborId) => typeof neighborId === "string" && neighborId.length > 0);

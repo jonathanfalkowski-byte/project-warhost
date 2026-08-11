@@ -225,6 +225,11 @@ const PLAYBOOKS = [
       { label: "SABOTAGE", detail: "Disable primary asset.", icon: Hammer, warm: true },
       { label: "WITHDRAW", detail: "Reform at extraction.", icon: Truck },
     ],
+    comboWindows: [
+      { from: 0, to: 1, label: "ALPHA TRANSFER" },
+      { from: 1, to: 2, label: "OPENED SABOTAGE LANE" },
+      { from: 3, to: 4, label: "WITHDRAWAL RENDEZVOUS" },
+    ],
     roles: [
       { id: "pull", label: "LEAD ELEMENT", brief: "Seize the first control node and open the army route.", node: "alphaApproach", demands: ["CONTROL", "SHOCK"] },
       { id: "burn", label: "RELAY GUARD", brief: "Take responsibility for secured ground as the lead advances.", node: "fireLine", demands: ["DENIAL", "COVER"] },
@@ -245,6 +250,11 @@ const PLAYBOOKS = [
       { label: "STRIKE", detail: "Destroy objective defense.", icon: Hammer, warm: true },
       { label: "SECURE", detail: "Hold withdrawal route.", icon: Anchor },
     ],
+    comboWindows: [
+      { from: 0, to: 1, label: "SCREENED CONCENTRATION" },
+      { from: 1, to: 2, label: "ASSAULT LAUNCH" },
+      { from: 3, to: 4, label: "SECURED WITHDRAWAL" },
+    ],
     roles: [
       { id: "screen", label: "SCREENING ELEMENT", brief: "Protect the army while it concentrates for the assault.", node: "alphaApproach", demands: ["COVER", "SHOCK"] },
       { id: "point", label: "ADVANCE GUARD", brief: "Secure the narrow approach to the decisive objective.", node: "highWalk", demands: ["MOBILITY", "SHOCK"] },
@@ -264,6 +274,11 @@ const PLAYBOOKS = [
       { label: "CAPTURE", detail: "Seize both controls.", icon: Target },
       { label: "CONVERGE", detail: "Reunite on primary.", icon: Factory, warm: true },
       { label: "EXTRACT", detail: "Recover the split force.", icon: Truck },
+    ],
+    comboWindows: [
+      { from: 1, to: 2, label: "EAST INTERDICTION" },
+      { from: 2, to: 3, label: "PRIMARY CONVERGENCE" },
+      { from: 3, to: 4, label: "EXTRACTION MUSTER" },
     ],
     roles: [
       { id: "alpha", label: "WEST OBJECTIVE GROUP", brief: "Seize and maintain the western control objective.", node: "alphaApproach", demands: ["HOLD", "CONTROL"] },
@@ -899,6 +914,7 @@ const evaluateTacticalSequence = (playbook, assignments, formations) => {
     if (!formation) {
       outputs[role.id] = null;
       if (previousRole) {
+        const routeConnection = playbook.comboWindows?.find((window) => window.from === index - 1 && window.to === index) ?? null;
         handoffs.push({
           id: `${previousRole.id}:${role.id}`,
           from: index - 1,
@@ -906,6 +922,8 @@ const evaluateTacticalSequence = (playbook, assignments, formations) => {
           sourceId: previousFormation?.id ?? null,
           receiverId: null,
           incomingCondition: carriedCondition,
+          routeConnected: Boolean(routeConnection),
+          routeConnectionLabel: routeConnection?.label ?? null,
           maneuver: null,
         });
       }
@@ -915,7 +933,8 @@ const evaluateTacticalSequence = (playbook, assignments, formations) => {
       return;
     }
 
-    const reaction = previousFormation && carriedCondition && formation.uses.includes(carriedCondition)
+    const routeConnection = playbook.comboWindows?.find((window) => window.from === index - 1 && window.to === index) ?? null;
+    const reaction = routeConnection && previousFormation && carriedCondition && formation.uses.includes(carriedCondition)
       ? TACTICAL_REACTIONS[`${carriedCondition}:${formation.id}`] ?? null
       : null;
     const maneuver = reaction ? { ...reaction, passes: carriedCondition } : null;
@@ -928,6 +947,8 @@ const evaluateTacticalSequence = (playbook, assignments, formations) => {
         sourceId: previousFormation?.id ?? null,
         receiverId: formation.id,
         incomingCondition: carriedCondition,
+        routeConnected: Boolean(routeConnection),
+        routeConnectionLabel: routeConnection?.label ?? null,
         maneuver,
       });
     }
@@ -1588,7 +1609,7 @@ function FormationRoster({ formations, unavailableFormations = [], condition, in
   const inspectedRoleIndex = inspectedRole ? playbook.roles.findIndex((role) => role.id === inspectedRole.id) : -1;
   const inspectedInteractions = formationInteractionsFor({ formations, formationId: inspected });
   const interactionByFormationId = new Map(inspectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
-  const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected }));
+  const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected, connections: playbook.comboWindows }));
   return (
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
       {(phase === "plan" || phase === "drill") && <MissionMatchupBrief condition={condition} operation={operation} />}
@@ -1635,7 +1656,7 @@ function FormationRoster({ formations, unavailableFormations = [], condition, in
           return (
             <button
               key={formation.id}
-              className={`formation-row ${active ? "selected" : ""} ${inspectionSource ? "inspection-source" : ""} ${interaction ? `interaction-${direction} ${activeInteraction ? "interaction-active" : "interaction-potential"}` : ""} ${assignedRole ? "assigned" : "available"}`}
+              className={`formation-row ${active ? "selected" : ""} ${inspectionSource ? "inspection-source" : ""} ${activeInteraction ? `interaction-${direction} interaction-active` : ""} ${assignedRole ? "assigned" : "available"}`}
               onClick={() => onSelect(formation.id)}
               onMouseEnter={() => onInspect(formation.id)}
               onMouseLeave={() => onInspect(null)}
@@ -1654,7 +1675,7 @@ function FormationRoster({ formations, unavailableFormations = [], condition, in
                 <b>{formation.name}</b>
                 <small><Icon weight="duotone" /> {tacticalTerm(formation.role)}</small>
                 <em>{assignedRole ? `ASSIGNED · STOP ${String(assignedIndex + 1).padStart(2, "0")}` : "AVAILABLE · DRAG TO STOP"}</em>
-                {interaction && <em className={`formation-interaction-hint ${direction} ${activeInteraction ? "active" : "potential"}`}><Radio weight="fill" /> {activeInteraction ? "ACTIVE ADJACENT LINK" : "POTENTIAL IF ADJACENT"}</em>}
+                {activeInteraction && <em className={`formation-interaction-hint ${direction} active`}><Radio weight="fill" /> ACTIVE AT RENDEZVOUS</em>}
                 {formation.campaignCondition && <em className="formation-campaign-state">{formation.campaignCondition.label} · {formation.disabledCapability} OFFLINE</em>}
               </span>
             </button>
@@ -1754,8 +1775,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
     const roleIndex = route.role;
     const role = playbook.roles[roleIndex];
     const formation = formations.find((item) => item.id === assignments[role.id]);
-    const staging = formation ? STAGING_NODES[formation.id] : null;
-    const start = staging ? { x: staging.left, y: staging.top - 3 } : route.start;
+    const start = route.start;
     const playbackClass = execution && hasPlayerFocus
       ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted"
       : "";
@@ -1824,6 +1844,19 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
         }));
     });
   });
+  const tacticalLinks = execution ? [] : (playbook.comboWindows ?? []).map((window) => {
+    const from = plan.positions[window.from];
+    const to = plan.positions[window.to];
+    return {
+      ...window,
+      fromIndex: window.from,
+      toIndex: window.to,
+      from,
+      to,
+      at: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 },
+      staffed: Boolean(assignments[playbook.roles[window.from]?.id] && assignments[playbook.roles[window.to]?.id]),
+    };
+  });
 
   return (
     <div className={`field-plan-layer ${execution ? "executing" : "planning"}`} ref={layerRef} aria-label={`${playbook.name} authored battlefield plan`}>
@@ -1840,6 +1873,14 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
       {[...baseSegments, ...branchSegments].map((segment) => (
         <div className={`field-plan-segment ${segment.className}`} style={fieldSegmentStyle(segment.start, segment.end, layerSize)} key={segment.id}>
           <ArrowRight weight="bold" />
+        </div>
+      ))}
+      {tacticalLinks.map((link) => (
+        <div className={`field-plan-tactical-link ${link.staffed ? "staffed" : ""}`} style={fieldSegmentStyle(link.from, link.to, layerSize)} key={`tactical-link-${link.fromIndex}-${link.toIndex}`} />
+      ))}
+      {tacticalLinks.map((link) => (
+        <div className={`field-plan-rendezvous ${link.staffed ? "staffed" : ""}`} style={{ left: `${link.at.x}%`, top: `${link.at.y}%` }} key={`rendezvous-${link.fromIndex}-${link.toIndex}`}>
+          <Radio weight="fill" /><span>RENDEZVOUS</span><small>{link.label}</small>
         </div>
       ))}
       {branchTurns.map((turn) => (
@@ -2022,7 +2063,7 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
     <div className="handoff-board" aria-live="polite">
       <div className="handoff-heading">
         <span>SECONDARY BONUS · COMBO WINDOWS</span>
-        <small>After route jobs are covered, inspect one neighboring pair with a Staff Exercise.</small>
+        <small>After route jobs are covered, inspect one named route rendezvous with a Staff Exercise.</small>
       </div>
       {feedback ? (
         <div className="cascade-readout placement-impact rewired" key={feedback.revision} role="status">
@@ -2042,18 +2083,21 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
       )}
       <div className="handoff-grid">
         {handoffs.map((handoff, handoffIndex) => {
-          const staffed = handoff.sourceId && handoff.receiverId;
+          const routeConnected = handoff.routeConnected !== false;
+          const staffed = routeConnected && handoff.sourceId && handoff.receiverId;
           const source = formations.find((formation) => formation.id === handoff.sourceId);
           const receiver = formations.find((formation) => formation.id === handoff.receiverId);
           const windowAt = timing[handoff.from];
           const revealed = planningResultRevealed({ phase: "plan", handoffIndex, staffExerciseIndex });
           return (
             <div
-              className={`handoff-card ${revealed ? handoff.maneuver ? "discovered" : "independent" : "unresolved"}`}
+              className={`handoff-card ${!routeConnected ? "route-separated" : revealed ? handoff.maneuver ? "discovered" : "independent" : "unresolved"}`}
               key={handoff.id}
             >
-              <span className="combo-window-time">T+{fmtDuration(windowAt)} · AFTER {String(handoff.from + 1).padStart(2, "0")} / BEFORE {String(handoff.to + 1).padStart(2, "0")}</span>
-              {revealed && handoff.maneuver ? (
+              <span className="combo-window-time">{routeConnected ? `T+${fmtDuration(windowAt)} · ${handoff.routeConnectionLabel ?? `AFTER ${String(handoff.from + 1).padStart(2, "0")} / BEFORE ${String(handoff.to + 1).padStart(2, "0")}`}` : `ROUTES ${String(handoff.from + 1).padStart(2, "0")} / ${String(handoff.to + 1).padStart(2, "0")} REMAIN SEPARATE`}</span>
+              {!routeConnected ? (
+                <><b>NO SHARED ROUTE EVENT</b><small>These responsibilities do not meet anywhere in this battle plan, so they cannot form a combo.</small></>
+              ) : revealed && handoff.maneuver ? (
                 <>
                   <div className="combo-window-flow">
                     <span><b>{source.name}</b><small>CREATES {tacticalTerm(handoff.maneuver.passes)}</small></span>
@@ -2086,7 +2130,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   const inspectedFormation = formations.find((formation) => formation.id === inspected) ?? null;
   const inspectedInteractions = formationInteractionsFor({ formations, formationId: inspected });
   const interactionByFormationId = new Map(inspectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
-  const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected }));
+  const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected, connections: playbook.comboWindows }));
   const activeInteractions = inspectedInteractions.filter((interaction) => adjacentFormationIds.has(interaction.partnerId));
   const inspectedAssigned = playbook.roles.some((role) => assignments[role.id] === inspected);
   const inspectingInteractions = (phase === "plan" || phase === "drill") && Boolean(inspectedFormation);
@@ -2153,11 +2197,11 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           <button type="button" onClick={onViewRouteMap}><MapPin weight="fill" /> VIEW ROUTE MAP</button>
         </div>
       </div>
-      <p>Assign each formation to a route responsibility first. Then use neighboring combinations as optional bonuses; results remain sealed until commitment.</p>
+      <p>Assign each formation to a route responsibility first. A combo is only possible at a named rendezvous where two authored routes meet.</p>
       <div className="planning-priority" aria-label="Planning priority">
         <div><span>PRIMARY DECISION</span><b>ROUTE RESPONSIBILITY</b><small>Can this formation perform the job at this stop?</small></div>
         <ArrowRight weight="bold" />
-        <div><span>SECONDARY BONUS</span><b>COMBINATION LINK</b><small>Can a neighboring formation improve the route?</small></div>
+        <div><span>SECONDARY BONUS</span><b>RENDEZVOUS COMBO</b><small>Can another formation exploit a shared route event?</small></div>
       </div>
       <div className="playbook-doctrine concealed">
         <span>PLAYBOOK DOCTRINE · {doctrine.name}</span>
@@ -2168,7 +2212,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
       <details className="secondary-combo-drawer">
         <summary>
           <span><Radio weight="fill" /> OPTIONAL COMBO BONUSES</span>
-          <small>Inspect neighboring formation links after route jobs are covered.</small>
+          <small>Inspect formation links at authored rendezvous after route jobs are covered.</small>
         </summary>
       {inspectingInteractions && (
         <section className="formation-interaction-inspector" aria-live="polite" aria-label={`${inspectedFormation.name} potential formation interactions`}>
@@ -2181,18 +2225,18 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           <div className="formation-interaction-partners">
             {inspectedInteractions.length > 0 ? inspectedInteractions.map((interaction) => (
               <button className={`${adjacentFormationIds.has(interaction.partnerId) ? "active" : "potential"} ${interactionDirectionFor(interaction)}`} key={interaction.partnerId} onClick={() => onSelectFormation(interaction.partnerId)}>
-                <b>{interaction.partnerName}<em>{adjacentFormationIds.has(interaction.partnerId) ? "ACTIVE NEIGHBOR" : "POTENTIAL - PLACE BESIDE"}</em></b>
+                <b>{interaction.partnerName}<em>{adjacentFormationIds.has(interaction.partnerId) ? "ACTIVE RENDEZVOUS" : "NO SHARED ROUTE EVENT"}</em></b>
                 {interaction.outgoing && <small><ArrowRight weight="bold" /> {inspectedFormation.name} creates <strong>{tacticalTerm(interaction.outgoing.condition)}</strong>; {interaction.partnerName} reacts</small>}
                 {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.partnerName} creates <strong>{tacticalTerm(interaction.incoming.condition)}</strong>; {inspectedFormation.name} reacts</small>}
               </button>
             )) : <p>No direct keyword interaction with the current refits. This formation can still perform a responsibility on its own.</p>}
-            {inspectedAssigned && activeInteractions.length === 0 && <p className="independent-state">OPERATING INDEPENDENTLY - no adjacent combo is armed. This is valid if the responsibility matters more than a combo.</p>}
+            {inspectedAssigned && activeInteractions.length === 0 && <p className="independent-state">OPERATING INDEPENDENTLY - its route shares no active rendezvous. This is valid when the responsibility matters more than a bonus.</p>}
           </div>
-          <em>Color shows direction, not quality. Only neighboring staffed stops form an active combo; the board does not rank placements.</em>
+          <em>Color shows direction, not quality. A combo can arm only where the authored routes share a named rendezvous.</em>
         </section>
       )}
       </details>
-      <div className="route-terminals" aria-hidden="true"><span>PRIMARY · ROUTE RESPONSIBILITIES</span><span>SECONDARY · ADJACENT BONUSES</span></div>
+      <div className="route-terminals" aria-hidden="true"><span>PRIMARY · ROUTE RESPONSIBILITIES</span><span>SECONDARY · RENDEZVOUS BONUSES</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
           const roleDemands = roleDemandsFor(role, index, condition);
@@ -2212,9 +2256,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
               ? "interaction-selected"
               : activeInteraction
                 ? `interaction-active interaction-${interactionDirection}`
-                : interaction
-                  ? `interaction-potential interaction-${interactionDirection}`
-                  : "interaction-muted";
+                : "interaction-muted";
           return (
             <Fragment key={role.id}>
               <div
@@ -2250,9 +2292,9 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                       <small>{routeAligned ? "Performs this responsibility without delay." : `Improvised assignment adds +00:${String(IMPROVISED_TASK_DELAY).padStart(2, "0")} to the mission.`}</small>
                     </span>
                     {formation.id === inspected && <span className="slot-interaction selected"><Radio weight="fill" /> INSPECTING · CREATES {tacticalTerm(formation.creates)}</span>}
-                    {interaction && (
-                      <span className={`slot-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}>
-                        <Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}
+                    {activeInteraction && interaction && (
+                      <span className={`slot-interaction active ${interactionDirection}`}>
+                        <Radio weight="fill" /> ACTIVE AT RENDEZVOUS · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}
                       </span>
                     )}
                     {refitProtocol && (
@@ -2272,7 +2314,10 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
               </button>
               {formation && phase === "plan" && <button className="clear-slot-button" onClick={() => onClearRole(role.id)} aria-label={`Clear ${formation.name} from ${role.label}`}>CLEAR</button>}
               </div>
-              {nextRole && <span className={`route-leg ${formation && nextFormation ? "occupied" : ""} ${inspectingInteractions && formation && nextFormation && (formation.id === inspected || nextFormation.id === inspected) && interactionByFormationId.has(formation.id === inspected ? nextFormation.id : formation.id) ? "interaction-active" : ""}`} aria-hidden="true"><Radio weight="fill" /></span>}
+              {nextRole && (() => {
+                const routeConnection = playbook.comboWindows?.find((window) => window.from === index && window.to === index + 1) ?? null;
+                return <span className={`route-leg ${routeConnection ? "route-connected" : "route-separated"} ${routeConnection && formation && nextFormation ? "occupied" : ""} ${routeConnection && inspectingInteractions && formation && nextFormation && (formation.id === inspected || nextFormation.id === inspected) && interactionByFormationId.has(formation.id === inspected ? nextFormation.id : formation.id) ? "interaction-active" : ""}`} title={routeConnection?.label ?? "These routes do not meet"} aria-hidden="true">{routeConnection ? <Radio weight="fill" /> : <span>×</span>}</span>;
+              })()}
             </Fragment>
           );
         })}
@@ -2280,7 +2325,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
       <details className="secondary-combo-drawer combo-window-drawer">
         <summary>
           <span><Lightning weight="fill" /> OPTIONAL COMBO WINDOWS</span>
-          <small>Test neighboring pairs only after every route responsibility is staffed.</small>
+          <small>Test named rendezvous only after every route responsibility is staffed.</small>
         </summary>
         <TacticalHandoffBoard feedback={feedback} formations={formations} handoffs={handoffs} profile={profile} staffExerciseIndex={staffExerciseIndex} onStaffExercise={onStaffExercise} />
       </details>
@@ -2323,6 +2368,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
     .filter((formationFate) => formationFate.at <= battleTime)
     .map((formationFate) => [formationFate.formationId, formationFate]));
   const operationField = operationFieldFor(operation);
+  const staffedFieldPlan = fieldPlanForPressure(operationField.plans[playbook.id], condition, playbook.id);
   const authoredRoutes = buildAuthoredFormationRoutes({
     plan: operationField.plans[playbook.id],
     landmarks: operationField.landmarks,
@@ -2338,7 +2384,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
   const inspectedFormation = formations.find((formation) => formation.id === inspected) ?? null;
   const inspectedInteractions = formationInteractionsFor({ formations, formationId: inspected });
   const interactionByFormationId = new Map(inspectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
-  const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected }));
+  const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected, connections: playbook.comboWindows }));
   const inspectingInteractions = (phase === "plan" || phase === "drill") && Boolean(inspectedFormation);
   const previewBase = phase === "plan" && previewPlaybookId
     ? PLAYBOOKS.find((item) => item.id === previewPlaybookId)
@@ -2382,14 +2428,17 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <div className={`combo-path combo-break ${planReady ? "active" : ""}`} aria-hidden="true" />
       <div className={`kill-zone ${planReady ? "active" : ""}`}><span>DECISION AREA</span></div>
       {formations.map((formation) => {
-        const assignedNode = deployments[formation.id] ? NODES[deployments[formation.id]] : null;
-        const node = assignedNode ?? STAGING_NODES[formation.id];
+        const assignedRoleIndex = playbook.roles.findIndex((role) => assignments[role.id] === formation.id);
+        const assignedRole = assignedRoleIndex >= 0 ? playbook.roles[assignedRoleIndex] : null;
+        const assignedStop = assignedRole && staffedFieldPlan?.positions[assignedRoleIndex]
+          ? { left: staffedFieldPlan.positions[assignedRoleIndex].x, top: staffedFieldPlan.positions[assignedRoleIndex].y, label: `Stop ${String(assignedRoleIndex + 1).padStart(2, "0")} · ${assignedRole.label}` }
+          : null;
+        const node = assignedStop ?? STAGING_NODES[formation.id];
         const active = selected === formation.id;
         const consequence = consequences.player[formation.id] ?? null;
         const formationFate = resolvedFormationFates.get(formation.id) ?? null;
         const statusDisplay = formationStatusDisplay({ consequence, formationFate });
         const authoredRoute = authoredRoutes.find((route) => route.formationId === formation.id);
-        const assignedRole = playbook.roles.find((role) => assignments[role.id] === formation.id) ?? null;
         const routeReadiness = assignedRole ? readiness[assignedRole.id] : null;
         const interaction = interactionByFormationId.get(formation.id) ?? null;
         const interactionDirection = interactionDirectionFor(interaction);
@@ -2400,9 +2449,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             ? "interaction-selected"
             : activeInteraction
               ? `interaction-active interaction-${interactionDirection}`
-              : interaction
-                ? `interaction-potential interaction-${interactionDirection}`
-                : "interaction-muted";
+              : "interaction-muted";
         const routePosition = playbackActive && authoredRoute
           ? positionAlongAuthoredRoute({
               points: authoredRoute.points,
@@ -2416,7 +2463,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${routeReadiness ? routeReadiness.taskAligned ? "route-aligned" : "route-improvised" : ""} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${collisionFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${routeReadiness ? routeReadiness.taskAligned ? "route-aligned" : "route-improvised" : ""} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedStop && (phase === "plan" || phase === "drill") ? "staged" : ""} ${collisionFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
             onMouseEnter={() => onInspect(formation.id)}
@@ -2425,7 +2472,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             onBlur={() => onInspect(null)}
             draggable={phase === "plan"}
             onDragStart={(event) => onFormationDragStart(event, formation.id)}
-            aria-label={`${formation.name}, ${assignedNode ? tacticalTerm(formation.role) : "unassigned"}, at ${node.label}${formationFate ? `, ${formationFate.battleLabel}` : consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
+            aria-label={`${formation.name}, ${assignedStop ? tacticalTerm(formation.role) : "unassigned"}, at ${node.label}${formationFate ? `, ${formationFate.battleLabel}` : consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
           >
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
@@ -2436,7 +2483,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
                 <small>{routeReadiness.roleLabel}</small>
               </span>
             )}
-            {interaction && <span className={`map-formation-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}><Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"}<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}</small></span>}
+            {activeInteraction && interaction && <span className={`map-formation-interaction active ${interactionDirection}`}><Radio weight="fill" /> ACTIVE AT RENDEZVOUS<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}</small></span>}
             {statusDisplay && <span className="map-formation-state"><b>{statusDisplay.label}</b><small>{statusDisplay.detail}</small></span>}
           </button>
         );
@@ -2830,10 +2877,11 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
   const assignedFormationId = assignments[role.id];
   const roleIndex = playbook.roles.findIndex((item) => item.id === role.id);
   const roleDemands = roleDemandsFor(role, roleIndex, condition);
-  const neighboringFormationIds = [
-    playbook.roles[roleIndex - 1] ? assignments[playbook.roles[roleIndex - 1].id] : null,
-    playbook.roles[roleIndex + 1] ? assignments[playbook.roles[roleIndex + 1].id] : null,
-  ].filter(Boolean);
+  const connectedFormationIds = (playbook.comboWindows ?? [])
+    .filter((window) => window.from === roleIndex || window.to === roleIndex)
+    .map((window) => window.from === roleIndex ? window.to : window.from)
+    .map((connectedRoleIndex) => assignments[playbook.roles[connectedRoleIndex]?.id])
+    .filter(Boolean);
   const formationStartOrder = new Map(formations.map((formation, index) => [formation.id, index]));
   const formationSlotOrder = new Map(
     playbook.roles
@@ -2863,7 +2911,7 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
             const neighborHints = neighboringInteractionHints({
               formations,
               formationId: formation.id,
-              neighborIds: neighboringFormationIds.filter((formationId) => formationId !== formation.id),
+              neighborIds: connectedFormationIds.filter((formationId) => formationId !== formation.id),
             });
             return (
               <button key={formation.id} className={`${current ? "current" : ""} ${matchedCapabilities.length > 0 ? "role-capable" : ""}`} onClick={() => onChoose(formation.id)}>

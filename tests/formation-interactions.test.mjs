@@ -49,6 +49,14 @@ test("adjacency follows staffed tactical slot order rather than formation roster
   assert.deepEqual(adjacentFormationIdsFor({ roles, assignments, formationId: "railjack" }), ["breaker"]);
 });
 
+test("authored rendezvous connections exclude compatible formations on separated routes", () => {
+  const roles = [{ id: "lead" }, { id: "guard" }, { id: "assault" }, { id: "rear" }];
+  const assignments = { lead: "furnace", guard: "harpoon", assault: "breaker", rear: "railjack" };
+  const connections = [{ from: 0, to: 1, label: "ALPHA TRANSFER" }, { from: 2, to: 3, label: "WITHDRAWAL RENDEZVOUS" }];
+  assert.deepEqual(adjacentFormationIdsFor({ roles, assignments, formationId: "harpoon", connections }), ["furnace"]);
+  assert.deepEqual(adjacentFormationIdsFor({ roles, assignments, formationId: "breaker", connections }), ["railjack"]);
+});
+
 test("malformed interaction requests fail closed", () => {
   assert.deepEqual(formationInteractionsFor({ formations: null, formationId: "harpoon" }), []);
   assert.deepEqual(formationInteractionsFor({ formations, formationId: "unknown" }), []);

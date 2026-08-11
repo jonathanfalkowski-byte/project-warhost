@@ -34,10 +34,23 @@ const routeFixture = (branch = "protect") => buildAuthoredFormationRoutes({
   branches: { beta: branch },
 });
 
-test("routes begin at the assigned formation and converge on extraction", () => {
+test("staffing never changes the authored route origin", () => {
   const routes = routeFixture();
-  assert.deepEqual(routes[0].points[0], { x: 12, y: 75 });
+  assert.deepEqual(routes[0].points[0], plan.routes[0].start);
   assert.deepEqual(routes[1].points.at(-1), { x: 90, y: 15 });
+});
+
+test("route geometry remains fixed when formation staging coordinates change", () => {
+  const original = routeFixture();
+  const movedStaging = buildAuthoredFormationRoutes({
+    plan,
+    landmarks: { alpha: { x: 35, y: 25 }, reactor: { x: 75, y: 40 }, extraction: { x: 90, y: 15 } },
+    roles: [{ id: "pull" }, { id: "break" }],
+    assignments: { pull: "breaker", break: "harpoon" },
+    formationStarts: { harpoon: { x: 90, y: 90 }, breaker: { x: 5, y: 5 } },
+    branches: { beta: "protect" },
+  });
+  assert.deepEqual(movedStaging.map((route) => route.points), original.map((route) => route.points));
 });
 
 test("only the selected breakpoint geometry enters a formation route", () => {

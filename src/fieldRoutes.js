@@ -46,9 +46,9 @@ export const buildAuthoredFormationRoutes = ({
     const role = roles[route.role];
     const formationId = role ? assignments[role.id] : null;
     const authoredStart = resolveAuthoredPoint(plan, landmarks, route.start);
-    const formationStart = formationId && isPoint(formationStarts[formationId])
-      ? formationStarts[formationId]
-      : authoredStart;
+    // Staffing changes which formation travels a route, never the authored
+    // geometry of the army plan itself.
+    const formationStart = authoredStart;
     const points = [formationStart, ...route.points.map((reference) => resolveAuthoredPoint(plan, landmarks, reference))]
       .filter(isPoint);
 
