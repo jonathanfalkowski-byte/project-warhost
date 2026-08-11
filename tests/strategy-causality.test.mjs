@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { strategyCausalityFor } from "../src/strategyCausality.js";
+import { strategyCausalityFor, strategyOutcomeStoryFor } from "../src/strategyCausality.js";
 
 const profile = ({ extractedCount = 4, improvisedCount = 0, handoffs = 2, disrupted = 2, overrun = 0 } = {}) => ({
   extractedCount,
@@ -9,7 +9,18 @@ const profile = ({ extractedCount = 4, improvisedCount = 0, handoffs = 2, disrup
   timeSaved: overrun > 0 ? 0 : 15,
   reinforcementLoss: overrun > 0 ? 2 : 0,
   enemyRecoveryLoss: 0,
-  readiness: { staffedCount: 5, alignedCount: 5 - improvisedCount, improvisedCount, delay: improvisedCount * 15 },
+  readiness: {
+    staffedCount: 5,
+    alignedCount: 5 - improvisedCount,
+    improvisedCount,
+    delay: improvisedCount * 15,
+    placements: Array.from({ length: 5 }, (_, index) => ({
+      formationName: `FORMATION ${index + 1}`,
+      roleLabel: `ROLE ${index + 1}`,
+      taskAligned: index >= improvisedCount,
+      demands: ["CONTROL", "SHOCK"],
+    })),
+  },
   effects: Array.from({ length: handoffs }, (_, index) => ({ maneuver: { name: `HANDOFF ${index + 1}` } })),
   doctrine: { name: "OVERLAPPING FIRES", triggered: handoffs > 0, result: handoffs > 0 ? "FIRST HANDOFF ARMED" : "TRAP NEVER CLOSED" },
   enemyClashes: Array.from({ length: 3 }, (_, index) => ({ label: `ORDER ${index + 1}`, disrupted: index < disrupted, resolution: { label: index < disrupted ? "CHECKED" : "COSTLY" } })),
@@ -42,4 +53,21 @@ test("causal debrief fails closed for malformed or missing profile evidence", ()
   assert.equal(rows[1].value, "0 CHAINS FORMED");
   assert.equal(rows[3].value, "0/0 ORDERS BROKEN");
   assert.equal(rows[4].value, "0/3 EXTRACTED");
+});
+
+test("outcome story names the choices, enemy gap, and extraction cost", () => {
+  const story = strategyOutcomeStoryFor({ profile: profile({ extractedCount: 2, improvisedCount: 1, disrupted: 1, overrun: 75 }), requiredExtraction: 3 });
+  assert.deepEqual(story.map((item) => item.label), ["YOUR FORMATION PLAN", "WHAT THE ENEMY EXPLOITED", "MISSION COST"]);
+  assert.match(story[0].detail, /FORMATION 1 at ROLE 1 lacked CONTROL \/ SHOCK/);
+  assert.match(story[1].detail, /ORDER 2 landed/);
+  assert.equal(story[2].value, "75 SEC LATE → 2/3 EXTRACTED");
+  assert.match(story[2].detail, /recovery capacity was lost/);
+});
+
+test("outcome story fails closed when detailed evidence is malformed", () => {
+  const story = strategyOutcomeStoryFor({ profile: { readiness: { staffedCount: -1, placements: "invalid" }, effects: null, enemyClashes: null }, requiredExtraction: 3 });
+  assert.equal(story.length, 3);
+  assert.equal(story[0].value, "0/0 JOBS MATCHED · 0 COMBOS");
+  assert.equal(story[1].value, "0/0 ORDERS STOPPED");
+  assert.equal(story[2].value, "0 SEC EARLY → 0/3 EXTRACTED");
 });

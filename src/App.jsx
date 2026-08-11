@@ -66,7 +66,7 @@ import {
 } from "./fieldRoutes.js";
 import { PLAYBOOK_DOCTRINES, resolvePlaybookDoctrine } from "./playbookDoctrine.js";
 import { resolveTacticalEngagement } from "./tacticalResolution.js";
-import { strategyCausalityFor } from "./strategyCausality.js";
+import { strategyCausalityFor, strategyOutcomeStoryFor } from "./strategyCausality.js";
 import {
   fieldPlanForPressure,
   missionPressureFor,
@@ -971,6 +971,8 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs, condition,
       taskDelay: taskAligned ? 0 : IMPROVISED_TASK_DELAY,
       demands,
       matchedCapabilities,
+      roleLabel: role.label,
+      stopNumber: index + 1,
       inboundReaction,
       outboundLink,
     }];
@@ -988,6 +990,14 @@ const summarizePlacementReadiness = (readiness) => {
     improvisedCount,
     average: staffed.length > 0 ? Math.round(totalScore / staffed.length) : 0,
     delay: improvisedCount * IMPROVISED_TASK_DELAY,
+    placements: staffed.map(({ formationName, roleLabel, stopNumber, taskAligned, demands, matchedCapabilities }) => ({
+      formationName,
+      roleLabel,
+      stopNumber,
+      taskAligned,
+      demands,
+      matchedCapabilities,
+    })),
   };
 };
 
@@ -2302,7 +2312,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
     : null;
   const previewPlaybook = previewBase ? playbookForOperation(previewBase, operation) : null;
   const mapPlaybook = previewPlaybook ?? playbook;
-  const previewingPlaybook = Boolean(previewPlaybook && previewPlaybook.id !== playbook.id);
+  const previewingPlaybook = Boolean(previewPlaybook);
 
   return (
     <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""} ${collisionFocus ? "collision-focus" : ""} ${inspectingInteractions ? "interaction-inspecting" : ""}`} aria-label={`${operation.name} mission map`}>
@@ -2316,6 +2326,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
           <span>ROUTE PREVIEW · {condition.name}</span>
           <b>{mapPlaybook.name}</b>
           <small>{mapPlaybook.stages.map((stage) => stage.label).join(" → ")}</small>
+          <em>MAP ONLY · MOVE AWAY OR TAB ON TO RETURN TO FORMATION PLACEMENT</em>
         </div>
       )}
       <DoctrineCollisionOverlay beat={playbackBeat} operation={operation} playbook={playbook} />
@@ -2404,7 +2415,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       )}
 
       {playbackActive && <BattleStateLegend />}
-      <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} inspected={inspected} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onClearRole={onClearRole} onFormationDragStart={onFormationDragStart} onInspectFormation={onInspect} onSelectFormation={onSelect} onStaffExercise={onStaffExercise} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} />
+      {!previewingPlaybook && <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} inspected={inspected} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onClearRole={onClearRole} onFormationDragStart={onFormationDragStart} onInspectFormation={onInspect} onSelectFormation={onSelect} onStaffExercise={onStaffExercise} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} />}
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -2972,6 +2983,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         : `${operation.shortName} was lost.`;
   const trialResult = strategyTrialResult(strategyTrial, profile.extractedCount);
   const blindResult = blindPredictionResult({ predictionId: blindPrediction, extractedCount: profile.extractedCount, requiredExtraction: operation.requiredExtraction });
+  const strategyOutcomeStory = strategyOutcomeStoryFor({ profile, requiredExtraction: operation.requiredExtraction });
   const strategyCausality = strategyCausalityFor({ profile, requiredExtraction: operation.requiredExtraction });
   const actionLabel = blindTestActive ? "REPEAT BLIND TEST" : strategyTrial ? "RETURN TO STRATEGY TEST" : canContinue ? "ENTER SALVAGE WORKSHOP" : campaignDestroyed ? "BEGIN NEW CAMPAIGN" : "RETURN TO BATTLEFIELD";
   const actionDetail = blindTestActive
@@ -3001,10 +3013,25 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
           <div><span>PLAN VS PLAN</span><b>{profile.doctrine.name} · {profile.effects.length} combos · {disruptedEnemyOrders} / {profile.enemyClashes.length} orders broken</b><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
-        <section className="strategy-causality" aria-label="Why this result happened">
+        <section className="strategy-outcome-story" aria-label="How your choices produced the mission result">
+          <header><span>YOUR CHOICES → BATTLEFIELD CONSEQUENCE → MISSION COST</span><small>REVEALED AFTER COMMITMENT</small></header>
+          <div>
+            {strategyOutcomeStory.map((item, index) => (
+              <Fragment key={item.id}>
+                <article className={item.tone}>
+                  <span>{item.label}</span>
+                  <b>{item.value}</b>
+                  <p>{item.detail}</p>
+                </article>
+                {index < strategyOutcomeStory.length - 1 && <ArrowRight weight="bold" aria-hidden="true" />}
+              </Fragment>
+            ))}
+          </div>
+        </section>
+        <section className="strategy-causality" aria-label="Detailed result breakdown">
           <header>
-            <span>WHY THIS RESULT HAPPENED</span>
-            <small>REVEALED AFTER COMMITMENT</small>
+            <span>DETAILED RESULT BREAKDOWN</span>
+            <small>OPEN THE OPERATION LOG FOR FULL TIMING</small>
           </header>
           <div className="strategy-causality-chain">
             {strategyCausality.map((item, index) => (
@@ -3360,7 +3387,6 @@ export function App() {
     const next = PLAYBOOKS.find((item) => item.id === nextId);
     if (!next) return;
     setPlaybookId(next.id);
-    setPreviewPlaybookId(null);
     setAssignments(emptyAssignments(next));
     setBranches(defaultBranches(operation));
     setBattleBranches(defaultBranches(operation));

@@ -230,9 +230,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 
 .battlefield { min-width: 0; min-height: 0; position: relative; overflow: hidden; background: #111; }
 .playbook-map-preview { position: absolute; z-index: 17; left: 50%; top: 7.5%; width: min(360px, 52%); transform: translateX(-50%); display: grid; gap: 2px; padding: 8px 12px; border: 1px solid #55a9c8; border-left-width: 4px; background: rgba(7, 20, 25, .96); box-shadow: 0 8px 22px rgba(0, 0, 0, .55), 0 0 18px rgba(77, 170, 204, .18); pointer-events: none; }
-.playbook-map-preview span, .playbook-map-preview small { color: #78b8ca; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .1em; }
+.playbook-map-preview span, .playbook-map-preview small, .playbook-map-preview em { color: #78b8ca; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .1em; }
 .playbook-map-preview b { color: #e3f1f4; font-family: "Barlow Condensed"; font-size: 17px; letter-spacing: .08em; }
 .playbook-map-preview small { color: #d1b56f; }
+.playbook-map-preview em { margin-top: 3px; color: #83979b; font-size: 8px; font-style: normal; }
 .battlefield-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(.82) saturate(.82) contrast(1.08); }
 .battlefield-wash { position: absolute; inset: 0; background: rgba(5, 8, 8, .22); pointer-events: none; }
 .battlefield-operation-veil { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
@@ -1070,6 +1071,19 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .integrity-after-action.collapsed { border-color: #8f3e2c; background: #2b110c; }
 .integrity-after-action.collapsed b, .integrity-after-action.collapsed svg { color: #ef7655; }
 .strategy-causality { margin: 0 0 18px; border: 1px solid #45606a; background: #0c1518; text-align: left; }
+.strategy-outcome-story { margin: 0 0 12px; border: 1px solid #547380; background: #0b1518; text-align: left; }
+.strategy-outcome-story > header { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #38535d; background: #10242a; }
+.strategy-outcome-story > header span { color: #8dd8ef; font-family: "Barlow Condensed"; font-size: 13px; font-weight: 700; letter-spacing: .09em; }
+.strategy-outcome-story > header small { color: #71929b; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .07em; }
+.strategy-outcome-story > div { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr); align-items: stretch; }
+.strategy-outcome-story article { min-width: 0; display: grid; align-content: start; gap: 6px; padding: 12px; border-top: 3px solid #71848a; }
+.strategy-outcome-story article.support { border-color: #77b85d; background: #101b15; }
+.strategy-outcome-story article.mixed { border-color: #d59d4d; background: #1d1810; }
+.strategy-outcome-story article.cost { border-color: #dd6b4a; background: #20130f; }
+.strategy-outcome-story article > span { color: #8ca2a8; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .09em; }
+.strategy-outcome-story article > b { color: #edf2ef; font-family: "Barlow Condensed"; font-size: 15px; letter-spacing: .025em; line-height: 1.15; }
+.strategy-outcome-story article > p { margin: 0; color: #a8b4b0; font-size: 10px; line-height: 1.4; }
+.strategy-outcome-story > div > svg { align-self: center; justify-self: center; width: 18px; color: #6c99a5; }
 .strategy-causality > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; border-bottom: 1px solid #354d55; background: #102026; }
 .strategy-causality > header span { color: #86cee7; font-family: "Barlow Condensed"; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
 .strategy-causality > header small { color: #6f929e; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .08em; }
@@ -1116,6 +1130,9 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .debrief-button { min-height: 68px; width: 100%; }
 .completion-note { margin: -10px 0 18px !important; font-size: 11px !important; }
 @media (max-width: 680px) {
+  .strategy-outcome-story > header { flex-direction: column; }
+  .strategy-outcome-story > div { grid-template-columns: 1fr; }
+  .strategy-outcome-story > div > svg { transform: rotate(90deg); margin: 2px 0; }
   .strategy-cause { grid-template-columns: 28px minmax(0, 1fr); gap: 4px 8px; padding-right: 28px; }
   .strategy-cause b, .strategy-cause p { grid-column: 2; }
   .strategy-causality > header { align-items: flex-start; flex-direction: column; gap: 3px; }
