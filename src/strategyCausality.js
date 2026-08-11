@@ -5,9 +5,7 @@ const plural = (count, singular, pluralForm = `${singular}s`) => count === 1 ? s
 export const strategyOutcomeStoryFor = ({ profile = {}, requiredExtraction = 0 } = {}) => {
   const readiness = profile.readiness ?? {};
   const staffedCount = safeNumber(readiness.staffedCount);
-  const alignedCount = Math.min(staffedCount, safeNumber(readiness.alignedCount));
   const placements = Array.isArray(readiness.placements) ? readiness.placements : [];
-  const improvised = placements.filter((placement) => placement && placement.taskAligned === false).slice(0, 3);
   const combos = Array.isArray(profile.effects) ? profile.effects : [];
   const clashes = Array.isArray(profile.enemyClashes) ? profile.enemyClashes : [];
   const disruptedCount = clashes.filter((clash) => clash?.disrupted).length;
@@ -18,9 +16,9 @@ export const strategyOutcomeStoryFor = ({ profile = {}, requiredExtraction = 0 }
   const timeSaved = safeNumber(profile.timeSaved);
   const recoveryLost = safeNumber(profile.reinforcementLoss) + safeNumber(profile.enemyRecoveryLoss);
 
-  const setupDetail = improvised.length > 0
-    ? `${improvised.map((placement) => `${placement.formationName ?? "A formation"} at ${placement.roleLabel ?? "an assigned stop"} lacked ${Array.isArray(placement.demands) && placement.demands.length > 0 ? placement.demands.join(" / ") : "a required capability"}`).join("; ")}. Secondary bonus: ${combos.length} ${plural(combos.length, "combo chain")} formed.`
-    : staffedCount > 0 ? `Every formation brought at least one capability required by its assigned responsibility. Secondary bonus: ${combos.length} ${plural(combos.length, "combo chain")} formed.` : "No formation assignments were recorded.";
+  const setupDetail = staffedCount > 0
+    ? `${placements.slice(0, 3).map((placement) => `${placement.formationName ?? "A formation"} received ${placement.roleLabel ?? "an authored route order"}`).join("; ")}${placements.length > 3 ? `; ${placements.length - 3} more orders staffed` : ""}. Secondary bonus: ${combos.length} ${plural(combos.length, "combo chain")} formed.`
+    : "No formation assignments were recorded.";
   const enemyDetail = landedOrders.length > 0
     ? landedOrders.map((clash) => {
       const missing = Array.isArray(clash?.resolution?.missingCapabilities) ? clash.resolution.missingCapabilities : [];
@@ -35,9 +33,9 @@ export const strategyOutcomeStoryFor = ({ profile = {}, requiredExtraction = 0 }
     {
       id: "choice",
       label: "1 · YOUR ROUTE ASSIGNMENTS",
-      value: `${alignedCount}/${staffedCount} RESPONSIBILITIES MATCHED`,
+      value: `${staffedCount} ROUTE ORDERS STAFFED`,
       detail: setupDetail,
-      tone: alignedCount === staffedCount && staffedCount > 0 ? "support" : "cost",
+      tone: staffedCount > 0 ? "support" : "cost",
     },
     {
       id: "collision",
@@ -59,9 +57,6 @@ export const strategyOutcomeStoryFor = ({ profile = {}, requiredExtraction = 0 }
 export const strategyCausalityFor = ({ profile = {}, requiredExtraction = 0 } = {}) => {
   const readiness = profile.readiness ?? {};
   const staffedCount = safeNumber(readiness.staffedCount);
-  const alignedCount = Math.min(staffedCount, safeNumber(readiness.alignedCount));
-  const improvisedCount = Math.min(staffedCount, safeNumber(readiness.improvisedCount));
-  const readinessDelay = safeNumber(readiness.delay);
   const handoffs = Array.isArray(profile.effects) ? profile.effects : [];
   const clashes = Array.isArray(profile.enemyClashes) ? profile.enemyClashes : [];
   const disruptedCount = clashes.filter((clash) => clash?.disrupted).length;
@@ -81,12 +76,12 @@ export const strategyCausalityFor = ({ profile = {}, requiredExtraction = 0 } = 
 
   return [
     {
-      id: "assignments", step: "01", label: "RESPONSIBILITY FIT",
-      value: `${alignedCount}/${staffedCount} ALIGNED`,
-      tone: improvisedCount > 0 ? "cost" : staffedCount > 0 ? "support" : "neutral",
-      detail: improvisedCount > 0
-        ? `${improvisedCount} improvised ${plural(improvisedCount, "assignment")} added ${readinessDelay} seconds after mitigation.`
-        : staffedCount > 0 ? "Every staffed formation matched its assigned task." : "No staffed formations were recorded.",
+      id: "assignments", step: "01", label: "ROUTE ORDERS",
+      value: `${staffedCount} RESPONSIBILITIES STAFFED`,
+      tone: staffedCount > 0 ? "support" : "neutral",
+      detail: staffedCount > 0
+        ? "Every assigned formation executed its authored order. There is no generic route-fit bonus or mismatch penalty."
+        : "No staffed formations were recorded.",
     },
     {
       id: "handoffs", step: "02", label: "SECONDARY COMBO BONUS",

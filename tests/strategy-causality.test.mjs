@@ -28,8 +28,8 @@ const profile = ({ extractedCount = 4, improvisedCount = 0, handoffs = 2, disrup
 
 test("causal debrief explains a successful plan without ranking placements", () => {
   const rows = strategyCausalityFor({ profile: profile(), requiredExtraction: 3 });
-  assert.deepEqual(rows.map((row) => row.label), ["RESPONSIBILITY FIT", "SECONDARY COMBO BONUS", "PLAYBOOK DOCTRINE", "ENEMY PLAN", "MISSION RESULT"]);
-  assert.equal(rows[0].value, "5/5 ALIGNED");
+  assert.deepEqual(rows.map((row) => row.label), ["ROUTE ORDERS", "SECONDARY COMBO BONUS", "PLAYBOOK DOCTRINE", "ENEMY PLAN", "MISSION RESULT"]);
+  assert.equal(rows[0].value, "5 RESPONSIBILITIES STAFFED");
   assert.equal(rows[1].value, "2 CHAINS FORMED");
   assert.equal(rows[3].value, "2/3 ORDERS BROKEN");
   assert.equal(rows[4].value, "4/3 EXTRACTED");
@@ -38,8 +38,8 @@ test("causal debrief explains a successful plan without ranking placements", () 
 
 test("causal debrief exposes the costs behind a withdrawal", () => {
   const rows = strategyCausalityFor({ profile: profile({ extractedCount: 1, improvisedCount: 2, handoffs: 0, disrupted: 0, overrun: 61 }), requiredExtraction: 3 });
-  assert.equal(rows[0].tone, "cost");
-  assert.match(rows[0].detail, /2 improvised assignments added 40 seconds/);
+  assert.equal(rows[0].tone, "support");
+  assert.match(rows[0].detail, /no generic route-fit bonus or mismatch penalty/i);
   assert.equal(rows[1].tone, "cost");
   assert.equal(rows[2].detail, "TRAP NEVER CLOSED");
   assert.equal(rows[4].tone, "cost");
@@ -49,7 +49,7 @@ test("causal debrief exposes the costs behind a withdrawal", () => {
 test("causal debrief fails closed for malformed or missing profile evidence", () => {
   const rows = strategyCausalityFor({ profile: { readiness: { staffedCount: -2 }, effects: "not-an-array" }, requiredExtraction: 3 });
   assert.equal(rows.length, 5);
-  assert.equal(rows[0].value, "0/0 ALIGNED");
+  assert.equal(rows[0].value, "0 RESPONSIBILITIES STAFFED");
   assert.equal(rows[1].value, "0 CHAINS FORMED");
   assert.equal(rows[3].value, "0/0 ORDERS BROKEN");
   assert.equal(rows[4].value, "0/3 EXTRACTED");
@@ -58,7 +58,7 @@ test("causal debrief fails closed for malformed or missing profile evidence", ()
 test("outcome story names the choices, enemy gap, and extraction cost", () => {
   const story = strategyOutcomeStoryFor({ profile: profile({ extractedCount: 2, improvisedCount: 1, disrupted: 1, overrun: 75 }), requiredExtraction: 3 });
   assert.deepEqual(story.map((item) => item.label), ["1 · YOUR ROUTE ASSIGNMENTS", "2 · WHAT THE ENEMY EXPLOITED", "3 · MISSION COST"]);
-  assert.match(story[0].detail, /FORMATION 1 at ROLE 1 lacked CONTROL \/ SHOCK/);
+  assert.match(story[0].detail, /FORMATION 1 received ROLE 1/);
   assert.match(story[1].detail, /ORDER 2 landed/);
   assert.equal(story[2].value, "75 SEC LATE → 2/3 EXTRACTED");
   assert.match(story[2].detail, /recovery capacity was lost/);
@@ -67,7 +67,7 @@ test("outcome story names the choices, enemy gap, and extraction cost", () => {
 test("outcome story fails closed when detailed evidence is malformed", () => {
   const story = strategyOutcomeStoryFor({ profile: { readiness: { staffedCount: -1, placements: "invalid" }, effects: null, enemyClashes: null }, requiredExtraction: 3 });
   assert.equal(story.length, 3);
-  assert.equal(story[0].value, "0/0 RESPONSIBILITIES MATCHED");
+  assert.equal(story[0].value, "0 ROUTE ORDERS STAFFED");
   assert.equal(story[1].value, "0/0 ORDERS STOPPED");
   assert.equal(story[2].value, "0 SEC EARLY → 0/3 EXTRACTED");
 });

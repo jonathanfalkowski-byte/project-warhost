@@ -80,7 +80,7 @@ const FORMATIONS = [
   {
     id: "harpoon",
     number: "1",
-    name: "GRAV-SNARE TANK",
+    name: "RECON TANK",
     role: "DISPLACE",
     endurance: { armor: 3, cohesion: 3, mobility: 5 },
     capabilities: ["CONTROL", "MOBILITY"],
@@ -88,7 +88,7 @@ const FORMATIONS = [
       { id: "winch", name: "GRAVITIC WINCH", summary: "Control package built for forced movement.", capabilities: ["CONTROL", "MOBILITY"], creates: "DISPLACED" },
       { id: "magnet", name: "BREACH MAGNET", summary: "Trades transit speed for armor-shearing force.", capabilities: ["CONTROL", "BREACH"], creates: "FRACTURED ARMOR" },
     ],
-    purpose: "Controls enemy movement and drags blockers out of position.",
+    purpose: "Scouts the advance, controls enemy movement, and forces blockers out of position.",
     creates: "DISPLACED",
     uses: ["SCREENED", "SUPPLIED", "FORWARD HOLD"],
     asset: "/assets/harpoon-rig.png",
@@ -98,7 +98,7 @@ const FORMATIONS = [
   {
     id: "furnace",
     number: "2",
-    name: "INCINERATOR SQUAD",
+    name: "FLAME SUPPORT VEHICLE",
     role: "DENY",
     endurance: { armor: 2, cohesion: 4, mobility: 3 },
     capabilities: ["DENIAL", "AREA"],
@@ -106,7 +106,7 @@ const FORMATIONS = [
       { id: "jets", name: "SMELTER JETS", summary: "Wide thermal denial across exposed lanes.", capabilities: ["DENIAL", "AREA"], creates: "OVERHEATED" },
       { id: "crucible", name: "ASH CRUCIBLE", summary: "Trades area pressure for a moving smoke screen.", capabilities: ["DENIAL", "COVER"], creates: "SCREENED" },
     ],
-    purpose: "Denies ground with fire and seals exposed approach lanes.",
+    purpose: "Uses heavy flame weapons to deny ground and seal exposed approach lanes.",
     creates: "OVERHEATED",
     uses: ["DISPLACED", "SCREENED", "SUPPLIED", "FORWARD HOLD"],
     asset: "/assets/furnace-crew.png",
@@ -116,7 +116,7 @@ const FORMATIONS = [
   {
     id: "breaker",
     number: "3",
-    name: "BREACHER WALKER",
+    name: "ASSAULT WALKER",
     role: "BREACH",
     endurance: { armor: 5, cohesion: 3, mobility: 2 },
     capabilities: ["BREACH", "SHOCK"],
@@ -124,7 +124,7 @@ const FORMATIONS = [
       { id: "ram", name: "RAM FRAME", summary: "Direct shock package for rupturing a fixed target.", capabilities: ["BREACH", "SHOCK"], creates: "BREACHED" },
       { id: "charge", name: "FRACTURE CHARGE", summary: "Trades shock control for a wider armor break.", capabilities: ["BREACH", "AREA"], creates: "FRACTURED ARMOR" },
     ],
-    purpose: "Breaks fortified positions and shocks defenders off objectives.",
+    purpose: "Assaults fortified positions and drives defenders off objectives.",
     creates: "BREACHED",
     uses: ["DISPLACED", "OVERHEATED", "SCREENED", "SUPPLIED", "KILL ZONE", "SEALED LANE"],
     asset: "/assets/breaker-exo.png",
@@ -134,7 +134,7 @@ const FORMATIONS = [
   {
     id: "railjack",
     number: "4",
-    name: "BASTION TANK",
+    name: "MAIN BATTLE TANK",
     role: "HOLD",
     endurance: { armor: 4, cohesion: 5, mobility: 2 },
     capabilities: ["HOLD", "COVER"],
@@ -142,7 +142,7 @@ const FORMATIONS = [
       { id: "plates", name: "BASTION PLATES", summary: "Armored screen for holding captured ground.", capabilities: ["HOLD", "COVER"], creates: "SCREENED" },
       { id: "sled", name: "SUPPLY SLED", summary: "Trades frontal cover for forward sustainment.", capabilities: ["HOLD", "SUPPORT"], creates: "SUPPLIED" },
     ],
-    purpose: "Holds captured objectives and screens nearby formations.",
+    purpose: "Provides armored firepower, holds objectives, and screens nearby formations.",
     creates: "SCREENED",
     uses: ["DISPLACED", "OVERHEATED", "BREACHED", "SUPPLIED", "OPEN CORE", "FRACTURED ARMOR"],
     asset: "/assets/railjack.png",
@@ -152,7 +152,7 @@ const FORMATIONS = [
   {
     id: "hauler",
     number: "5",
-    name: "RECOVERY CARRIER",
+    name: "ARMOURED RECOVERY VEHICLE",
     role: "EXTRACT",
     endurance: { armor: 3, cohesion: 4, mobility: 4 },
     capabilities: ["RECOVERY", "SUPPORT"],
@@ -160,7 +160,7 @@ const FORMATIONS = [
       { id: "crane", name: "RECOVERY CRANE", summary: "Sustainment rig for damaged formations and crew.", capabilities: ["RECOVERY", "SUPPORT"], creates: "SUPPLIED" },
       { id: "shield", name: "EVAC SHIELD", summary: "Trades repair throughput for protected movement.", capabilities: ["RECOVERY", "COVER"], creates: "SCREENED" },
     ],
-    purpose: "Recovers personnel and keeps damaged formations moving.",
+    purpose: "Recovers personnel and keeps damaged vehicles moving toward extraction.",
     creates: "SUPPLIED",
     uses: ["OVERHEATED", "BREACHED", "SCREENED", "OPEN CORE", "SECURED BREACH", "SECURED CORRIDOR"],
     asset: "/assets/salvage-hauler.png",
@@ -226,9 +226,8 @@ const PLAYBOOKS = [
       { label: "WITHDRAW", detail: "Reform at extraction.", icon: Truck },
     ],
     comboWindows: [
-      { from: 0, to: 1, label: "ALPHA TRANSFER" },
-      { from: 1, to: 2, label: "OPENED SABOTAGE LANE" },
-      { from: 3, to: 4, label: "WITHDRAWAL RENDEZVOUS" },
+      { from: 0, to: 1, label: "ALPHA TRANSFER", rendezvous: "alphaTransfer" },
+      { from: 1, to: 2, label: "OPENED SABOTAGE LANE", rendezvous: "sabotageLane" },
     ],
     roles: [
       { id: "pull", label: "LEAD ELEMENT", brief: "Seize the first control node and open the army route.", node: "alphaApproach", demands: ["CONTROL", "SHOCK"] },
@@ -251,9 +250,8 @@ const PLAYBOOKS = [
       { label: "SECURE", detail: "Hold withdrawal route.", icon: Anchor },
     ],
     comboWindows: [
-      { from: 0, to: 1, label: "SCREENED CONCENTRATION" },
-      { from: 1, to: 2, label: "ASSAULT LAUNCH" },
-      { from: 3, to: 4, label: "SECURED WITHDRAWAL" },
+      { from: 0, to: 1, label: "SCREENED CONCENTRATION", rendezvous: "screenedConcentration" },
+      { from: 1, to: 2, label: "ASSAULT LAUNCH", rendezvous: "assaultLaunch" },
     ],
     roles: [
       { id: "screen", label: "SCREENING ELEMENT", brief: "Protect the army while it concentrates for the assault.", node: "alphaApproach", demands: ["COVER", "SHOCK"] },
@@ -276,9 +274,8 @@ const PLAYBOOKS = [
       { label: "EXTRACT", detail: "Recover the split force.", icon: Truck },
     ],
     comboWindows: [
-      { from: 1, to: 2, label: "EAST INTERDICTION" },
-      { from: 2, to: 3, label: "PRIMARY CONVERGENCE" },
-      { from: 3, to: 4, label: "EXTRACTION MUSTER" },
+      { from: 1, to: 2, label: "EAST INTERDICTION", rendezvous: "eastInterdiction" },
+      { from: 2, to: 3, label: "PRIMARY CONVERGENCE", rendezvous: "primaryConvergence" },
     ],
     roles: [
       { id: "alpha", label: "WEST OBJECTIVE GROUP", brief: "Seize and maintain the western control objective.", node: "alphaApproach", demands: ["HOLD", "CONTROL"] },
@@ -415,7 +412,7 @@ const ASHEN_REFIT_PROTOCOLS = {
   shield: {
     name: "VOID LIFT BUBBLE",
     stopIndex: 0,
-    text: "The Evac Shield catches the full column at deployment, absorbing improvised-task delay and protecting the lift run.",
+    text: "The Evac Shield catches the full column at deployment, absorbing contact delay and protecting the lift run.",
     impact: { extraction: 30, protects: 1, delayReduction: 45 },
   },
 };
@@ -645,9 +642,9 @@ const FIELD_PLANS = {
       { x: 73, y: 47 },
     ],
     routes: [
-      { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha", { x: 48, y: 25 }] },
-      { role: 1, start: { x: 26, y: 80 }, points: [1, { x: 57, y: 39 }, { x: 67, y: 46 }] },
-      { role: 2, start: { x: 35, y: 76 }, points: [2], breakpoint: "beta" },
+      { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha", "alphaTransfer"] },
+      { role: 1, start: { x: 26, y: 80 }, points: [1, "alphaTransfer", "sabotageLane", { x: 67, y: 46 }] },
+      { role: 2, start: { x: 35, y: 76 }, points: [2, "sabotageLane"], breakpoint: "beta" },
       { role: 3, start: { x: 44, y: 80 }, points: [3, "beta"] },
       { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
     ],
@@ -672,9 +669,9 @@ const FIELD_PLANS = {
       { x: 73, y: 48 },
     ],
     routes: [
-      { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha"] },
-      { role: 1, start: { x: 26, y: 80 }, points: [1, "beta"] },
-      { role: 2, start: { x: 35, y: 76 }, points: [2], breakpoint: "beta" },
+      { role: 0, start: { x: 17, y: 76 }, points: [0, "screenedConcentration", "alpha"] },
+      { role: 1, start: { x: 26, y: 80 }, points: [1, "screenedConcentration", "assaultLaunch", "beta"] },
+      { role: 2, start: { x: 35, y: 76 }, points: [2, "assaultLaunch"], breakpoint: "beta" },
       { role: 3, start: { x: 44, y: 80 }, points: [3, { x: 66, y: 43 }] },
       { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
     ],
@@ -700,9 +697,9 @@ const FIELD_PLANS = {
     ],
     routes: [
       { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha"] },
-      { role: 1, start: { x: 26, y: 80 }, points: [1, "beta"] },
-      { role: 2, start: { x: 35, y: 76 }, points: [2, { x: 56, y: 33 }] },
-      { role: 3, start: { x: 44, y: 80 }, points: [3], breakpoint: "beta" },
+      { role: 1, start: { x: 26, y: 80 }, points: [1, "eastInterdiction", "beta"] },
+      { role: 2, start: { x: 35, y: 76 }, points: [2, "eastInterdiction", "primaryConvergence"] },
+      { role: 3, start: { x: 44, y: 80 }, points: [3, "primaryConvergence"], breakpoint: "beta" },
       { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 3, rescue: 4 },
@@ -725,6 +722,12 @@ const FIELD_LANDMARKS = {
   reactor: { x: 76, y: 46 },
   extraction: { x: 91, y: 18 },
   rescue: { x: 83, y: 75 },
+  alphaTransfer: { x: 45, y: 29 },
+  sabotageLane: { x: 56, y: 36 },
+  screenedConcentration: { x: 43, y: 31 },
+  assaultLaunch: { x: 56, y: 31 },
+  eastInterdiction: { x: 56, y: 29 },
+  primaryConvergence: { x: 64, y: 39 },
 };
 
 const ASHEN_PASSAGE_FIELD_PLANS = {
@@ -737,9 +740,9 @@ const ASHEN_PASSAGE_FIELD_PLANS = {
       { x: 79, y: 24 },
     ],
     routes: [
-      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha", { x: 45, y: 31 }] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, { x: 51, y: 46 }, "beta"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2], breakpoint: "beta" },
+      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha", "alphaTransfer"] },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, "alphaTransfer", "sabotageLane", "beta"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2, "sabotageLane"], breakpoint: "beta" },
       { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor"] },
       { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
     ],
@@ -764,9 +767,9 @@ const ASHEN_PASSAGE_FIELD_PLANS = {
       { x: 79, y: 25 },
     ],
     routes: [
-      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha"] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, "beta"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2], breakpoint: "beta" },
+      { role: 0, start: { x: 15, y: 73 }, points: [0, "screenedConcentration", "alpha"] },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, "screenedConcentration", "assaultLaunch", "beta"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2, "assaultLaunch"], breakpoint: "beta" },
       { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor"] },
       { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
     ],
@@ -792,9 +795,9 @@ const ASHEN_PASSAGE_FIELD_PLANS = {
     ],
     routes: [
       { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha"] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, "beta"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2, { x: 52, y: 45 }] },
-      { role: 3, start: { x: 44, y: 81 }, points: [3], breakpoint: "beta" },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, "eastInterdiction", "beta"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2, "eastInterdiction", "primaryConvergence"] },
+      { role: 3, start: { x: 44, y: 81 }, points: [3, "primaryConvergence"], breakpoint: "beta" },
       { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 3, rescue: 4 },
@@ -817,6 +820,12 @@ const ASHEN_PASSAGE_LANDMARKS = {
   reactor: { x: 72, y: 40 },
   extraction: { x: 91, y: 13 },
   rescue: { x: 84, y: 68 },
+  alphaTransfer: { x: 39, y: 37 },
+  sabotageLane: { x: 51, y: 43 },
+  screenedConcentration: { x: 37, y: 39 },
+  assaultLaunch: { x: 50, y: 37 },
+  eastInterdiction: { x: 49, y: 35 },
+  primaryConvergence: { x: 61, y: 42 },
 };
 
 const OPERATION_FIELDS = {
@@ -835,8 +844,6 @@ const BASE_OPERATION = {
 };
 
 const PLAYBACK_BEAT_MS = 2600;
-const IMPROVISED_TASK_DELAY = 20;
-
 const DEAD_CIRCUIT_REINFORCEMENT_WAVE = {
   number: "E4",
   name: "HELIOCH RELIEF COLUMN",
@@ -974,13 +981,13 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs, condition,
     const formation = formations.find((item) => item.id === formationId);
     const demands = roleDemandsFor(role, index, condition);
     const matchedCapabilities = demands.filter((demand) => formation.capabilities.includes(demand));
-    const taskAligned = matchedCapabilities.length > 0;
     const inboundReaction = index > 0 && Boolean(handoffs[index - 1]?.maneuver);
     const outboundLink = index < handoffs.length && Boolean(handoffs[index]?.maneuver);
-    // Route responsibility is the plan. Adjacency combinations can sharpen a
-    // sound assignment, but they cannot make an unsuitable formation "ready."
-    const score = Math.min(100, 48 + (taskAligned ? 36 : 0) + (inboundReaction ? 8 : 0) + (outboundLink ? 8 : 0));
-    const label = score >= 95 ? "SYNCHRONIZED" : score >= 80 ? "READY" : score >= 65 ? "CAPABLE" : "STRAINED";
+    // Every formation can carry every authored responsibility. Capabilities
+    // describe how it fights and which enemy orders it can answer; they are not
+    // a hidden placement gate or a binary correct-answer test.
+    const score = Math.min(100, 70 + (inboundReaction ? 15 : 0) + (outboundLink ? 15 : 0));
+    const label = score >= 100 ? "COORDINATED" : score >= 85 ? "SUPPORTED" : "ASSIGNED";
 
     return [role.id, {
       formationId: formation.id,
@@ -990,8 +997,8 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs, condition,
       endurance: formation.endurance,
       score,
       label,
-      taskAligned,
-      taskDelay: taskAligned ? 0 : IMPROVISED_TASK_DELAY,
+      taskAligned: true,
+      taskDelay: 0,
       demands,
       matchedCapabilities,
       roleLabel: role.label,
@@ -1004,15 +1011,13 @@ const calculatePlacementReadiness = (playbook, assignments, handoffs, condition,
 
 const summarizePlacementReadiness = (readiness) => {
   const staffed = Object.values(readiness).filter(Boolean);
-  const alignedCount = staffed.filter((item) => item.taskAligned).length;
-  const improvisedCount = staffed.length - alignedCount;
   const totalScore = staffed.reduce((sum, item) => sum + item.score, 0);
   return {
     staffedCount: staffed.length,
-    alignedCount,
-    improvisedCount,
+    alignedCount: staffed.length,
+    improvisedCount: 0,
     average: staffed.length > 0 ? Math.round(totalScore / staffed.length) : 0,
-    delay: improvisedCount * IMPROVISED_TASK_DELAY,
+    delay: 0,
     placements: staffed.map(({ formationName, roleLabel, stopNumber, taskAligned, demands, matchedCapabilities }) => ({
       formationName,
       roleLabel,
@@ -1384,7 +1389,7 @@ const protocolImpactText = (impact) => [
   impact.reactor ? `RELAY -${fmtDuration(impact.reactor)}` : null,
   impact.extraction ? `VOID LIFT -${fmtDuration(impact.extraction)}` : null,
   impact.protects ? `+${impact.protects} FORMATION PRESERVED` : null,
-  impact.delayReduction ? `ABSORBS ${fmtDuration(impact.delayReduction)} IMPROVISED DELAY` : null,
+  impact.delayReduction ? `ABSORBS ${fmtDuration(impact.delayReduction)} CONTACT DELAY` : null,
 ].filter(Boolean).join(" · ");
 
 const reinforcementForecast = (profile) => profile.overrun > 0
@@ -1510,15 +1515,15 @@ function FormationDossier({ formation, interactions, assignedRole, assignedIndex
         <div>{formation.uses.map((condition) => <em key={condition}>{tacticalTerm(condition)}</em>)}</div>
       </div>
       <div className="dossier-links">
-        <span>POTENTIAL FORMATION LINKS</span>
+        <span>AUTHORED RENDEZVOUS LINKS</span>
         {interactions.length > 0 ? interactions.map((interaction) => (
           <div key={interaction.partnerId}>
             <b>{interaction.partnerName}</b>
             {interaction.incoming && <small><ArrowRight weight="bold" /> {tacticalText(interaction.incoming.text)}</small>}
             {interaction.outgoing && <small><ArrowRight weight="bold" /> {tacticalText(interaction.outgoing.text)}</small>}
           </div>
-        )) : <p>No direct keyword interaction with the current refits. It may still fit a responsibility.</p>}
-        <em>Compatibility shows a possible combo link, not the best placement or a guaranteed result.</em>
+        )) : <p>No staffed formation currently meets this formation at an authored rendezvous.</p>}
+        <em>Only shared route events can create a combo. No meeting point means no link.</em>
       </div>
       {assignedRole && readiness ? (
         <div className="dossier-placement concealed">
@@ -1610,6 +1615,7 @@ function FormationRoster({ formations, unavailableFormations = [], condition, in
   const inspectedInteractions = formationInteractionsFor({ formations, formationId: inspected });
   const interactionByFormationId = new Map(inspectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
   const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected, connections: playbook.comboWindows }));
+  const activeInspectedInteractions = inspectedInteractions.filter((interaction) => adjacentFormationIds.has(interaction.partnerId));
   return (
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
       {(phase === "plan" || phase === "drill") && <MissionMatchupBrief condition={condition} operation={operation} />}
@@ -1689,7 +1695,7 @@ function FormationRoster({ formations, unavailableFormations = [], condition, in
           </div>
         ))}
       </div>
-      <FormationDossier formation={inspectedFormation} interactions={inspectedInteractions} assignedRole={inspectedRole} assignedIndex={inspectedRoleIndex} readiness={inspectedRole ? readiness[inspectedRole.id] : null} phase={phase} refitsLocked={refitsLocked} onRefit={onRefit} />
+      <FormationDossier formation={inspectedFormation} interactions={activeInspectedInteractions} assignedRole={inspectedRole} assignedIndex={inspectedRoleIndex} readiness={inspectedRole ? readiness[inspectedRole.id] : null} phase={phase} refitsLocked={refitsLocked} onRefit={onRefit} />
     </section>
   );
 }
@@ -1845,15 +1851,11 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
     });
   });
   const tacticalLinks = execution ? [] : (playbook.comboWindows ?? []).map((window) => {
-    const from = plan.positions[window.from];
-    const to = plan.positions[window.to];
     return {
       ...window,
       fromIndex: window.from,
       toIndex: window.to,
-      from,
-      to,
-      at: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 },
+      at: resolveFieldPoint(plan, operationField.landmarks, window.rendezvous),
       staffed: Boolean(assignments[playbook.roles[window.from]?.id] && assignments[playbook.roles[window.to]?.id]),
     };
   });
@@ -1874,9 +1876,6 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
         <div className={`field-plan-segment ${segment.className}`} style={fieldSegmentStyle(segment.start, segment.end, layerSize)} key={segment.id}>
           <ArrowRight weight="bold" />
         </div>
-      ))}
-      {tacticalLinks.map((link) => (
-        <div className={`field-plan-tactical-link ${link.staffed ? "staffed" : ""}`} style={fieldSegmentStyle(link.from, link.to, layerSize)} key={`tactical-link-${link.fromIndex}-${link.toIndex}`} />
       ))}
       {tacticalLinks.map((link) => (
         <div className={`field-plan-rendezvous ${link.staffed ? "staffed" : ""}`} style={{ left: `${link.at.x}%`, top: `${link.at.y}%` }} key={`rendezvous-${link.fromIndex}-${link.toIndex}`}>
@@ -2129,9 +2128,9 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   const doctrine = profile.doctrine;
   const inspectedFormation = formations.find((formation) => formation.id === inspected) ?? null;
   const inspectedInteractions = formationInteractionsFor({ formations, formationId: inspected });
-  const interactionByFormationId = new Map(inspectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
   const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected, connections: playbook.comboWindows }));
   const activeInteractions = inspectedInteractions.filter((interaction) => adjacentFormationIds.has(interaction.partnerId));
+  const interactionByFormationId = new Map(activeInteractions.map((interaction) => [interaction.partnerId, interaction]));
   const inspectedAssigned = playbook.roles.some((role) => assignments[role.id] === inspected);
   const inspectingInteractions = (phase === "plan" || phase === "drill") && Boolean(inspectedFormation);
 
@@ -2223,13 +2222,13 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
             <div className="interaction-legend"><span className="source">CYAN: INSPECTED</span><span className="outgoing">YELLOW: IT FEEDS THEM</span><span className="incoming">PURPLE: THEY FEED IT</span></div>
           </header>
           <div className="formation-interaction-partners">
-            {inspectedInteractions.length > 0 ? inspectedInteractions.map((interaction) => (
-              <button className={`${adjacentFormationIds.has(interaction.partnerId) ? "active" : "potential"} ${interactionDirectionFor(interaction)}`} key={interaction.partnerId} onClick={() => onSelectFormation(interaction.partnerId)}>
-                <b>{interaction.partnerName}<em>{adjacentFormationIds.has(interaction.partnerId) ? "ACTIVE RENDEZVOUS" : "NO SHARED ROUTE EVENT"}</em></b>
+            {activeInteractions.length > 0 ? activeInteractions.map((interaction) => (
+              <button className={`active ${interactionDirectionFor(interaction)}`} key={interaction.partnerId} onClick={() => onSelectFormation(interaction.partnerId)}>
+                <b>{interaction.partnerName}<em>ACTIVE RENDEZVOUS</em></b>
                 {interaction.outgoing && <small><ArrowRight weight="bold" /> {inspectedFormation.name} creates <strong>{tacticalTerm(interaction.outgoing.condition)}</strong>; {interaction.partnerName} reacts</small>}
                 {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.partnerName} creates <strong>{tacticalTerm(interaction.incoming.condition)}</strong>; {inspectedFormation.name} reacts</small>}
               </button>
-            )) : <p>No direct keyword interaction with the current refits. This formation can still perform a responsibility on its own.</p>}
+            )) : <p>No staffed route meets this formation at a named rendezvous. It is operating independently.</p>}
             {inspectedAssigned && activeInteractions.length === 0 && <p className="independent-state">OPERATING INDEPENDENTLY - its route shares no active rendezvous. This is valid when the responsibility matters more than a bonus.</p>}
           </div>
           <em>Color shows direction, not quality. A combo can arm only where the authored routes share a named rendezvous.</em>
@@ -2241,9 +2240,6 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
         {playbook.roles.map((role, index) => {
           const roleDemands = roleDemandsFor(role, index, condition);
           const formation = formations.find((item) => item.id === assignments[role.id]);
-          const matchedCapabilities = formation ? capabilityMatchesFor({ formation, demands: roleDemands }) : [];
-          const missingCapabilities = formation ? roleDemands.filter((demand) => !matchedCapabilities.includes(demand)) : [];
-          const routeAligned = Boolean(formation && matchedCapabilities.length > 0);
           const refitProtocol = refitProtocols[role.id];
           const nextRole = playbook.roles[index + 1];
           const nextFormation = nextRole ? formations.find((item) => item.id === assignments[nextRole.id]) : null;
@@ -2287,9 +2283,9 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                 {formation ? (
                   <>
                     <span className="slot-formation"><img src={formation.asset} alt="" /><span><b>{formation.name}</b><small>{formation.activeRefit.name}</small></span></span>
-                    <span className={`slot-route-fit ${routeAligned ? "aligned" : "improvised"}`}>
-                      <b>{routeAligned ? `ROUTE FIT · ${matchedCapabilities.join(" / ")}` : `ROUTE MISMATCH · NEEDS ${missingCapabilities.join(" / ")}`}</b>
-                      <small>{routeAligned ? "Performs this responsibility without delay." : `Improvised assignment adds +00:${String(IMPROVISED_TASK_DELAY).padStart(2, "0")} to the mission.`}</small>
+                    <span className="slot-route-fit assigned">
+                      <b>ORDER ACCEPTED · {tacticalTerm(formation.role)}</b>
+                      <small>{formation.purpose}</small>
                     </span>
                     {formation.id === inspected && <span className="slot-interaction selected"><Radio weight="fill" /> INSPECTING · CREATES {tacticalTerm(formation.creates)}</span>}
                     {activeInteraction && interaction && (
@@ -2305,7 +2301,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                     )}
                     <span className="slot-result concealed">
                       <span className="slot-output"><b>RESULT SEALED</b></span>
-                      <span className="slot-readiness"><b>?</b><small>FIT</small></span>
+                      <span className="slot-readiness"><b>?</b><small>RESULT</small></span>
                     </span>
                   </>
                 ) : (
@@ -2463,7 +2459,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${routeReadiness ? routeReadiness.taskAligned ? "route-aligned" : "route-improvised" : ""} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedStop && (phase === "plan" || phase === "drill") ? "staged" : ""} ${collisionFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${routeReadiness ? "route-assigned" : ""} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedStop && (phase === "plan" || phase === "drill") ? "staged" : ""} ${collisionFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
             onMouseEnter={() => onInspect(formation.id)}
@@ -2478,8 +2474,8 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
             {routeReadiness && (phase === "plan" || phase === "drill") && (
-              <span className={`map-route-fit ${routeReadiness.taskAligned ? "aligned" : "improvised"}`}>
-                <b>{routeReadiness.taskAligned ? "ROUTE FIT" : `ROUTE MISMATCH · +00:${String(IMPROVISED_TASK_DELAY).padStart(2, "0")}`}</b>
+              <span className="map-route-fit assigned">
+                <b>ASSIGNED TO ROUTE</b>
                 <small>{routeReadiness.roleLabel}</small>
               </span>
             )}
@@ -2707,10 +2703,10 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
           <small>{planningSealed ? "The playbook will be tested against the enemy plan during execution." : profile.doctrine.triggered ? "The selected playbook's advantage is active." : "The selected playbook's exposure remains active."}</small>
         </div>
         {profile.readiness.staffedCount > 0 && (
-          <div className={`readiness-impact ${planningSealed ? "sealed" : profile.readiness.delay > 0 ? "penalty" : "aligned"}`}>
-            <span>FORMATION READINESS</span>
-            <b>{planningSealed ? "TASK FIT UNRESOLVED" : `${profile.readiness.average}% · ${profile.readiness.delay > 0 ? `+${fmtDuration(profile.readiness.delay)} EXECUTION DELAY` : "NO TASK-FIT DELAY"}`}</b>
-            <small>{planningSealed ? "INSPECT EACH FORMATION'S CAPABILITIES AGAINST ITS ASSIGNED RESPONSIBILITY." : `${profile.readiness.alignedCount} / ${profile.readiness.staffedCount} STAFFED FORMATIONS TASK-ALIGNED · COMBO EFFECTS RESOLVE SEPARATELY`}</small>
+          <div className={`readiness-impact ${planningSealed ? "sealed" : "aligned"}`}>
+            <span>FORMATION COMMAND</span>
+            <b>{planningSealed ? "ORDERS ASSIGNED · RESULTS SEALED" : `${profile.effects.length} COMBO CHAINS · ${profile.enemyClashes.filter((clash) => clash.disrupted).length} ENEMY ORDERS BROKEN`}</b>
+            <small>{planningSealed ? "EVERY FORMATION MAY CARRY ANY ORDER. EQUIPMENT, ROUTE EXPOSURE, AND RENDEZVOUS TIMING RESOLVE UNDER CONTACT." : "NO BINARY ROUTE-FIT PENALTY. THE RESULT CAME FROM THE FORCE'S ACTUAL COLLISIONS WITH THE ENEMY PLAN."}</small>
           </div>
         )}
         {planReady && !planningSealed && (
@@ -2901,26 +2897,25 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
       <div className="decision-panel formation-picker-panel">
         <p className="eyebrow">STAFF ACTION STOP</p>
         <h2 id="formation-picker-title">Who executes {role.label}?</h2>
-        <p>{role.brief} This condition demands <b>{roleDemands.join(" / ")}</b>. Choose from the rules below; readiness and combo results stay sealed until execution.</p>
+        <p>{role.brief} Battlefield pressure: <b>{roleDemands.join(" / ")}</b>. Every formation may take this order; its equipment and battlefield method determine what happens under contact.</p>
         <div className="formation-picker-list">
           {orderedFormations.map((formation) => {
             const currentRole = playbook.roles.find((item) => assignments[item.id] === formation.id);
             const currentRoleIndex = currentRole ? playbook.roles.findIndex((item) => item.id === currentRole.id) : -1;
             const current = assignedFormationId === formation.id;
-            const matchedCapabilities = capabilityMatchesFor({ formation, demands: roleDemands });
             const neighborHints = neighboringInteractionHints({
               formations,
               formationId: formation.id,
               neighborIds: connectedFormationIds.filter((formationId) => formationId !== formation.id),
             });
             return (
-              <button key={formation.id} className={`${current ? "current" : ""} ${matchedCapabilities.length > 0 ? "role-capable" : ""}`} onClick={() => onChoose(formation.id)}>
+              <button key={formation.id} className={current ? "current" : ""} onClick={() => onChoose(formation.id)}>
                 <FormationPortrait formation={formation} compact />
                 <span className="picker-formation-copy">
                   <b>{formation.name}</b>
                   <span className="formation-refit-line">REFIT {formation.activeRefit.name}</span>
                   <span className="formation-capability-line">CAPABILITIES {formation.capabilities.join(" / ")}</span>
-                  <span className={`responsibility-match ${matchedCapabilities.length > 0 ? "matched" : "unmatched"}`}>{matchedCapabilities.length > 0 ? `CAN PERFORM · ${matchedCapabilities.join(" / ")}` : "NO DIRECT RESPONSIBILITY MATCH"}</span>
+                  <span className="responsibility-match method">METHOD · {tacticalTerm(formation.role)}</span>
                   <small>{tacticalTerm(formation.role)} · {formation.purpose}</small>
                   <span className="tactic-vocabulary"><em>CREATES {tacticalTerm(formation.creates)}</em><em>USES {formation.uses.map(tacticalTerm).join(" · ")}</em></span>
                   {neighborHints.length > 0 && <span className="neighbor-interaction-hints">{neighborHints.map((hint, index) => <em key={`${hint.direction}-${hint.condition}-${index}`}><Radio weight="fill" /> {tacticalText(hint.text)}</em>)}</span>}
@@ -3046,9 +3041,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
     : profile.timeSaved > 0
     ? `The Warhost cleared extraction ${profile.timeSaved} seconds before the enemy wave arrived.`
     : "The Warhost cleared the gantry as the enemy wave arrived.";
-  const readinessResult = profile.readiness.rawDelay > 0
-    ? `${profile.readiness.improvisedCount} improvised ${profile.readiness.improvisedCount === 1 ? "assignment created" : "assignments created"} ${profile.readiness.rawDelay} seconds of execution delay.${profile.readiness.protocolDelayReduction > 0 ? ` The active refit absorbed ${profile.readiness.protocolDelayReduction} seconds, leaving ${profile.readiness.delay}.` : ""}`
-    : `All ${profile.readiness.staffedCount} formations were task-aligned with no readiness delay.`;
+  const readinessResult = `${profile.readiness.staffedCount} formation orders were assigned. No generic route-fit modifier was applied; each formation resolved with its own equipment, endurance, combo conditions, and enemy contact.`;
   const protocolResult = profile.protocols.length > 0
     ? `Active Ashen field protocols: ${profile.protocols.map((protocol) => protocol.name).join(", ")}.`
     : "No installed refit found an Ashen field interface.";
@@ -3105,8 +3098,8 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         <div className="after-action-grid">
           <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{carrierCutOffAfterRescue && <small>Recovery Carrier was cut off afterward.</small>}{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>FORMATION ROUTE PLAN</span><b>{profile.readiness.alignedCount} / {profile.readiness.staffedCount} responsibilities matched</b><small>{profile.effects.length} secondary combo bonuses · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</small><Seal weight="duotone" /></div>
+          <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{carrierCutOffAfterRescue && <small>ARMOURED RECOVERY VEHICLE was cut off afterward.</small>}{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
+          <div><span>FORMATION ROUTE PLAN</span><b>{profile.readiness.staffedCount} / {playbook.roles.length} orders staffed</b><small>{profile.effects.length} secondary combo bonuses · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</small><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
         <section className="strategy-outcome-story" aria-label="How your choices produced the mission result">
@@ -3153,7 +3146,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
             <span>BLIND COMMAND RESULT · {blindResult.accurate ? "PREDICTION ACCURATE" : "PREDICTION MISSED"}</span>
             <div><b>PREDICTED {blindResult.prediction.label}</b><ArrowRight weight="bold" /><b>ACTUAL {blindResult.actual.label}</b></div>
             <ul>
-              <li><strong>{profile.readiness.alignedCount}/{profile.readiness.staffedCount}</strong> formations matched their responsibility.</li>
+              <li><strong>{profile.readiness.staffedCount}/{playbook.roles.length}</strong> authored route orders were staffed.</li>
               <li><strong>{profile.effects.length}</strong> combo chains formed; <strong>{disruptedEnemyOrders}/{profile.enemyClashes.length}</strong> enemy orders were broken.</li>
               <li>{profile.overrun > 0 ? <><strong>{fmtDuration(profile.overrun)}</strong> late to extraction; <strong>{profile.reinforcementLoss + profile.enemyRecoveryLoss}</strong> recovery capacity lost.</> : <><strong>{fmtDuration(profile.timeSaved)}</strong> ahead of the enemy wave.</>}</li>
             </ul>
@@ -3347,7 +3340,7 @@ export function App() {
       `${formations.length} installed refits locked; no loadout changes after commitment`,
       `Loading ${playbook.name} geometry`,
       ...playbook.stages.map((stage) => `${stage.label} responsibility acknowledged`),
-      `${assignedCount} formations assigned; derived task fit remains sealed`,
+      `${assignedCount} formation orders assigned; battlefield results remain sealed`,
       `${tacticalHandoffs.length} combo windows registered; automatic reactions remain sealed`,
       `${operationProfile.enemyClashes.length} enemy orders identified; collision outcomes remain sealed`,
       `Command drill complete. Commit the play to reveal the result.`,
