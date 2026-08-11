@@ -60,7 +60,11 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .formation-row.selected { border-color: var(--blue); background: #10212a; box-shadow: inset 3px 0 #1688bd; }
 .formation-row[draggable="true"] { cursor: grab; }
 .formation-row[draggable="true"]:active { cursor: grabbing; }
-.formation-row.available .formation-copy em { color: #69c9ef; }
+.formation-row.available { opacity: 1; filter: none; border-color: #355f70; background: linear-gradient(90deg, #11232a, #101716 68%); box-shadow: inset 3px 0 #2695c4; }
+.formation-row.available:hover { border-color: #71ccef; background: linear-gradient(90deg, #15313c, #141d1b 68%); }
+.formation-row.available .formation-image { filter: saturate(1) contrast(1.08) brightness(1.05); }
+.formation-row.available .formation-copy b { color: #e3eeeb; }
+.formation-row.available .formation-copy em { width: fit-content; padding: 1px 4px; border: 1px solid #2e718b; background: #102b36; color: #78d5f7; font-weight: 700; letter-spacing: .05em; }
 .formation-row.assigned .formation-copy em { color: #70b8d3; }
 .formation-row.assigned:not(.selected):not(.inspection-source):not(.interaction-active):not(.interaction-potential) { opacity: .42; filter: grayscale(.78) saturate(.35); }
 .formation-row.assigned:not(.selected):not(.inspection-source):not(.interaction-active):not(.interaction-potential) .formation-copy em { color: #74807c; }
@@ -525,6 +529,33 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .map-formation.playback-muted { opacity: .1; filter: grayscale(.8); animation: none; }
 .map-formation.playback-focused { z-index: 14; opacity: 1; filter: none; transform: translate(-50%, -50%) scale(1.16); animation: playbackPlayerPulse .85s ease-in-out infinite alternate; }
 .map-formation.playback-focused .formation-image { border: 3px solid #69d2ff; box-shadow: 0 0 28px rgba(49, 184, 239, .9), 0 10px 18px rgba(0,0,0,.8); }
+
+.battlefield.collision-focus .mission-route,
+.battlefield.collision-focus .objective-marker,
+.battlefield.collision-focus .combo-panel,
+.battlefield.collision-focus .map-sector,
+.battlefield.collision-focus .mission-path,
+.battlefield.collision-focus .kill-zone,
+.battlefield.collision-focus .combo-path,
+.battlefield.collision-focus .battle-consequence-ledger,
+.battlefield.collision-focus .battle-state-legend { opacity: .025 !important; filter: grayscale(1); }
+.battlefield.collision-focus .field-plan-layer.executing .field-plan-caption,
+.battlefield.collision-focus .field-plan-layer.executing .field-plan-turn { opacity: .02 !important; }
+.battlefield.collision-focus .field-plan-layer.executing .field-plan-segment:not(.playback-focused),
+.battlefield.collision-focus .field-plan-layer.executing .field-plan-entry:not(.playback-focused),
+.battlefield.collision-focus .field-plan-layer.executing .field-plan-position:not(.playback-focused),
+.battlefield.collision-focus .enemy-plan-segment:not(.playback-focused),
+.battlefield.collision-focus .enemy-plan-stop:not(.playback-focused),
+.battlefield.collision-focus .enemy-plan-formation:not(.playback-focused),
+.battlefield.collision-focus .enemy-collision-marker:not(.playback-focused),
+.battlefield.collision-focus .reinforcement-route:not(.playback-focused),
+.battlefield.collision-focus .reinforcement-intercept:not(.playback-focused),
+.battlefield.collision-focus .reinforcement-wave:not(.playback-focused) { opacity: .015 !important; filter: grayscale(1); }
+.battlefield.collision-focus .map-formation.playback-muted { opacity: .018; filter: grayscale(1) brightness(.35); pointer-events: none; }
+.battlefield.collision-focus .map-formation.playback-muted .map-formation-label,
+.battlefield.collision-focus .map-formation.playback-muted .map-formation-state,
+.battlefield.collision-focus .map-formation.playback-muted .map-formation-interaction,
+.battlefield.collision-focus .map-formation.playback-muted .map-formation-number { visibility: hidden; }
 
 .enemy-plan-layer.doctrine-player-play .enemy-plan-segment,
 .enemy-plan-layer.doctrine-player-play .enemy-plan-stop,

@@ -160,6 +160,16 @@ const FORMATIONS = [
   },
 ];
 
+const TACTICAL_TERM_LABELS = Object.freeze({
+  DISPLACE: "FORCE MOVE",
+  DISPLACED: "OUT OF POSITION",
+});
+
+const tacticalTerm = (value) => TACTICAL_TERM_LABELS[value] ?? value;
+const tacticalText = (value) => typeof value === "string"
+  ? value.replace(/\bDISPLACED\b/g, TACTICAL_TERM_LABELS.DISPLACED).replace(/\bDISPLACE\b/g, TACTICAL_TERM_LABELS.DISPLACE)
+  : value;
+
 const defaultRefits = () => Object.fromEntries(
   FORMATIONS.map((formation) => [formation.id, formation.refits[0].id]),
 );
@@ -1432,7 +1442,7 @@ function FormationDossier({ formation, interactions, assignedRole, assignedIndex
       <div className="dossier-heading"><span>FORMATION DOSSIER</span><em>NEUTRAL INTEL</em></div>
       <div className="dossier-identity">
         <FormationPortrait formation={formation} compact />
-        <div><span>FORMATION {formation.number}</span><b>{formation.name}</b><small><Icon weight="duotone" /> {formation.role}</small></div>
+        <div><span>FORMATION {formation.number}</span><b>{formation.name}</b><small><Icon weight="duotone" /> {tacticalTerm(formation.role)}</small></div>
       </div>
       <p>{formation.purpose}</p>
       <div className="dossier-endurance" aria-label="Formation endurance profile">
@@ -1459,7 +1469,7 @@ function FormationDossier({ formation, interactions, assignedRole, assignedIndex
             >
               <b>{refit.name}</b>
               <small>{refit.summary}</small>
-              <em>{refit.capabilities.join(" / ")} · CREATES {refit.creates}</em>
+              <em>{refit.capabilities.join(" / ")} · CREATES {tacticalTerm(refit.creates)}</em>
             </button>
           ))}
         </div>
@@ -1470,19 +1480,19 @@ function FormationDossier({ formation, interactions, assignedRole, assignedIndex
       </div>
       <div className="dossier-condition">
         <span>CREATES</span>
-        <b>{formation.creates}</b>
+        <b>{tacticalTerm(formation.creates)}</b>
       </div>
       <div className="dossier-reactions">
         <span>CAN REACT TO</span>
-        <div>{formation.uses.map((condition) => <em key={condition}>{condition}</em>)}</div>
+        <div>{formation.uses.map((condition) => <em key={condition}>{tacticalTerm(condition)}</em>)}</div>
       </div>
       <div className="dossier-links">
         <span>POTENTIAL FORMATION LINKS</span>
         {interactions.length > 0 ? interactions.map((interaction) => (
           <div key={interaction.partnerId}>
             <b>{interaction.partnerName}</b>
-            {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.incoming.text}</small>}
-            {interaction.outgoing && <small><ArrowRight weight="bold" /> {interaction.outgoing.text}</small>}
+            {interaction.incoming && <small><ArrowRight weight="bold" /> {tacticalText(interaction.incoming.text)}</small>}
+            {interaction.outgoing && <small><ArrowRight weight="bold" /> {tacticalText(interaction.outgoing.text)}</small>}
           </div>
         )) : <p>No direct keyword interaction with the current refits. It may still fit a responsibility.</p>}
         <em>Compatibility shows a possible combo link, not the best placement or a guaranteed result.</em>
@@ -1635,8 +1645,8 @@ function FormationRoster({ formations, unavailableFormations = [], inspected, on
               <FormationPortrait formation={formation} compact />
               <span className="formation-copy">
                 <b>{formation.name}</b>
-                <small><Icon weight="duotone" /> {formation.role}</small>
-                <em>{assignedRole ? `STOP ${String(assignedIndex + 1).padStart(2, "0")} · ${assignedRole.label}` : "AVAILABLE · DRAG TO STOP"}</em>
+                <small><Icon weight="duotone" /> {tacticalTerm(formation.role)}</small>
+                <em>{assignedRole ? `ASSIGNED · STOP ${String(assignedIndex + 1).padStart(2, "0")}` : "AVAILABLE · DRAG TO STOP"}</em>
                 {interaction && <em className={`formation-interaction-hint ${direction} ${activeInteraction ? "active" : "potential"}`}><Radio weight="fill" /> {activeInteraction ? "ACTIVE ADJACENT LINK" : "POTENTIAL IF ADJACENT"}</em>}
                 {formation.campaignCondition && <em className="formation-campaign-state">{formation.campaignCondition.label} · {formation.disabledCapability} OFFLINE</em>}
               </span>
@@ -1854,7 +1864,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, consequences, fo
   );
 }
 
-function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planReady, playbook, playbackBeat }) {
+function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planReady, playbook, playbackBeat, collisionFocus }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const enemyPlan = enemyPlanFor(operation);
@@ -1915,12 +1925,11 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
       {enemyPlan.formations.map((formation, index) => {
         const clash = clashes[index];
         const inBattle = phase === "battle" || phase === "complete";
-        const playbackHasEnemyFocus = focusedEnemyIndices.length > 0;
         const playbackFocused = focusedEnemyIndices.includes(index);
         const playbackClass = inBattle
-          ? playbackHasEnemyFocus
+          ? collisionFocus
             ? playbackFocused ? "playback-focused" : "playback-muted"
-            : "playback-muted"
+            : ""
           : "";
         const counterRevealClass = playbackFocused && (doctrinePhase === "enemy-counter" || doctrinePhase === "outcome") ? "doctrine-counter-reveal" : "";
         const progress = inBattle ? Math.min(1, battleTime / formation.actionAt) : 0;
@@ -2040,11 +2049,11 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
               {revealed && handoff.maneuver ? (
                 <>
                   <div className="combo-window-flow">
-                    <span><b>{source.name}</b><small>CREATES {handoff.maneuver.passes}</small></span>
+                    <span><b>{source.name}</b><small>CREATES {tacticalTerm(handoff.maneuver.passes)}</small></span>
                     <ArrowRight weight="bold" />
                     <span><b>{receiver.name}</b><small>REACTS: {handoff.maneuver.name}</small></span>
                   </div>
-                  <p><Target weight="fill" /> RESULT: {handoff.maneuver.result} · {handoff.maneuver.impact.text}</p>
+                  <p><Target weight="fill" /> RESULT: {tacticalTerm(handoff.maneuver.result)} · {tacticalText(handoff.maneuver.impact.text)}</p>
                 </>
               ) : (
                 <>
@@ -2109,10 +2118,10 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                 ? "RESOLVED"
                 : `IN ${fmtDuration(windowAt - battleTime)}`;
             return (
-              <div className={state} key={handoff.id} title={`${source.name} creates ${handoff.maneuver.passes}; ${receiver.name} responds with ${handoff.maneuver.name}`}>
+              <div className={state} key={handoff.id} title={`${source.name} creates ${tacticalTerm(handoff.maneuver.passes)}; ${receiver.name} responds with ${handoff.maneuver.name}`}>
                 <Lightning weight="fill" />
                 <b>{timingLabel} · {handoff.maneuver.name}</b>
-                <small>{source.name} creates {handoff.maneuver.passes} → {receiver.name} turns it into {handoff.maneuver.result}</small>
+                <small>{source.name} creates {tacticalTerm(handoff.maneuver.passes)} → {receiver.name} turns it into {tacticalTerm(handoff.maneuver.result)}</small>
               </div>
             );
           }) : <p>No combo windows are armed; formations execute independently.</p>}
@@ -2153,8 +2162,8 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
             {inspectedInteractions.length > 0 ? inspectedInteractions.map((interaction) => (
               <button className={`${adjacentFormationIds.has(interaction.partnerId) ? "active" : "potential"} ${interactionDirectionFor(interaction)}`} key={interaction.partnerId} onClick={() => onSelectFormation(interaction.partnerId)}>
                 <b>{interaction.partnerName}<em>{adjacentFormationIds.has(interaction.partnerId) ? "ACTIVE NEIGHBOR" : "POTENTIAL - PLACE BESIDE"}</em></b>
-                {interaction.outgoing && <small><ArrowRight weight="bold" /> {inspectedFormation.name} creates <strong>{interaction.outgoing.condition}</strong>; {interaction.partnerName} reacts</small>}
-                {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.partnerName} creates <strong>{interaction.incoming.condition}</strong>; {inspectedFormation.name} reacts</small>}
+                {interaction.outgoing && <small><ArrowRight weight="bold" /> {inspectedFormation.name} creates <strong>{tacticalTerm(interaction.outgoing.condition)}</strong>; {interaction.partnerName} reacts</small>}
+                {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.partnerName} creates <strong>{tacticalTerm(interaction.incoming.condition)}</strong>; {inspectedFormation.name} reacts</small>}
               </button>
             )) : <p>No direct keyword interaction with the current refits. This formation can still perform a responsibility on its own.</p>}
             {inspectedAssigned && activeInteractions.length === 0 && <p className="independent-state">OPERATING INDEPENDENTLY - no adjacent combo is armed. This is valid if the responsibility matters more than a combo.</p>}
@@ -2212,10 +2221,10 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
                 {formation ? (
                   <>
                     <span className="slot-formation"><img src={formation.asset} alt="" /><span><b>{formation.name}</b><small>{formation.activeRefit.name}</small></span></span>
-                    {formation.id === inspected && <span className="slot-interaction selected"><Radio weight="fill" /> INSPECTING · CREATES {formation.creates}</span>}
+                    {formation.id === inspected && <span className="slot-interaction selected"><Radio weight="fill" /> INSPECTING · CREATES {tacticalTerm(formation.creates)}</span>}
                     {interaction && (
                       <span className={`slot-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}>
-                        <Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).join(" / ")}
+                        <Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}
                       </span>
                     )}
                     {refitProtocol && (
@@ -2265,6 +2274,12 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
   const playbackActive = phase === "battle" || phase === "complete";
   const focusedPlayerIds = playbackBeat?.playerFormationIds ?? [];
   const hasPlayerFocus = focusedPlayerIds.length > 0;
+  const hasEnemyFocus = Boolean(
+    playbackBeat?.enemyFormationIndices?.length
+      || Number.isInteger(playbackBeat?.enemyFormationIndex)
+      || playbackBeat?.reinforcementFocus,
+  );
+  const collisionFocus = playbackActive && (hasPlayerFocus || hasEnemyFocus);
   const consequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime });
   const resolvedFormationFates = new Map((playbackActive ? formationFates : [])
     .filter((formationFate) => formationFate.at <= battleTime)
@@ -2289,11 +2304,11 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
   const inspectingInteractions = (phase === "plan" || phase === "drill") && Boolean(inspectedFormation);
 
   return (
-    <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""} ${inspectingInteractions ? "interaction-inspecting" : ""}`} aria-label={`${operation.name} mission map`}>
+    <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""} ${collisionFocus ? "collision-focus" : ""} ${inspectingInteractions ? "interaction-inspecting" : ""}`} aria-label={`${operation.name} mission map`}>
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
-      <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} />
+      <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
       <TacticalFieldPlan assignments={assignments} battleTime={battleTime} branches={branches} consequences={consequences.player} formationFates={formationFates} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
       <DoctrineCollisionOverlay beat={playbackBeat} operation={operation} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
@@ -2344,7 +2359,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
         return (
           <button
             key={formation.id}
-            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${hasPlayerFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
+            className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedNode && (phase === "plan" || phase === "drill") ? "staged" : ""} ${collisionFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
             onMouseEnter={() => onInspect(formation.id)}
@@ -2353,12 +2368,12 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             onBlur={() => onInspect(null)}
             draggable={phase === "plan"}
             onDragStart={(event) => onFormationDragStart(event, formation.id)}
-            aria-label={`${formation.name}, ${assignedNode ? formation.role : "unassigned"}, at ${node.label}${formationFate ? `, ${formationFate.battleLabel}` : consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
+            aria-label={`${formation.name}, ${assignedNode ? tacticalTerm(formation.role) : "unassigned"}, at ${node.label}${formationFate ? `, ${formationFate.battleLabel}` : consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
           >
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
-            {interaction && <span className={`map-formation-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}><Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"}<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).join(" / ")}</small></span>}
+            {interaction && <span className={`map-formation-interaction ${activeInteraction ? "active" : "potential"} ${interactionDirection}`}><Radio weight="fill" /> {activeInteraction ? "ACTIVE COMBO LINK" : "POTENTIAL IF ADJACENT"}<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}</small></span>}
             {statusDisplay && <span className="map-formation-state"><b>{statusDisplay.label}</b><small>{statusDisplay.detail}</small></span>}
           </button>
         );
@@ -2795,9 +2810,9 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
                   <span className="formation-refit-line">REFIT {formation.activeRefit.name}</span>
                   <span className="formation-capability-line">CAPABILITIES {formation.capabilities.join(" / ")}</span>
                   <span className={`responsibility-match ${matchedCapabilities.length > 0 ? "matched" : "unmatched"}`}>{matchedCapabilities.length > 0 ? `CAN PERFORM · ${matchedCapabilities.join(" / ")}` : "NO DIRECT RESPONSIBILITY MATCH"}</span>
-                  <small>{formation.role} · {formation.purpose}</small>
-                  <span className="tactic-vocabulary"><em>CREATES {formation.creates}</em><em>USES {formation.uses.join(" · ")}</em></span>
-                  {neighborHints.length > 0 && <span className="neighbor-interaction-hints">{neighborHints.map((hint, index) => <em key={`${hint.direction}-${hint.condition}-${index}`}><Radio weight="fill" /> {hint.text}</em>)}</span>}
+                  <small>{tacticalTerm(formation.role)} · {formation.purpose}</small>
+                  <span className="tactic-vocabulary"><em>CREATES {tacticalTerm(formation.creates)}</em><em>USES {formation.uses.map(tacticalTerm).join(" · ")}</em></span>
+                  {neighborHints.length > 0 && <span className="neighbor-interaction-hints">{neighborHints.map((hint, index) => <em key={`${hint.direction}-${hint.condition}-${index}`}><Radio weight="fill" /> {tacticalText(hint.text)}</em>)}</span>}
                   <em className={currentRole ? "assigned" : "available"}>{currentRole ? `ASSIGNED · STOP ${String(currentRoleIndex + 1).padStart(2, "0")} ${currentRole.label}` : "AVAILABLE"}</em>
                 </span>
                 {current ? <CheckCircle weight="fill" /> : <ArrowRight weight="bold" />}
@@ -2890,7 +2905,7 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
                         aria-pressed={isSelected(action)}
                       >
                         <b>{refit.name}</b>
-                        <small>{carried ? "INSTALLED" : `${refit.capabilities.join(" / ")} · CREATES ${refit.creates}`}</small>
+                        <small>{carried ? "INSTALLED" : `${refit.capabilities.join(" / ")} · CREATES ${tacticalTerm(refit.creates)}`}</small>
                       </button>
                     );
                   })}
