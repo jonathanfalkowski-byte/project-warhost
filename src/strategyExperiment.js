@@ -10,7 +10,6 @@ const template = (playbookId, posture, run, assignments, branches, priority, sac
   posture,
   run,
   name: posture.toUpperCase(),
-  conditionId: "clear",
   assignments,
   branches,
   priority,

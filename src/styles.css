@@ -169,6 +169,8 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .mission-matchup-brief .player-order b { color: #62c8ef; }
 .mission-matchup-brief .enemy-order { border-left: 3px solid #d8753e; background: #281711; }
 .mission-matchup-brief .enemy-order b { color: #e99350; }
+.mission-matchup-brief .mission-pressure-order { border-left: 3px solid #e2b24e; background: #211d11; }
+.mission-matchup-brief .mission-pressure-order b { color: #f0ca68; }
 .strategy-test-panel { margin: 6px; padding: 8px; border: 1px solid #546545; background: #101814; }
 .strategy-test-panel header { display: flex; justify-content: space-between; gap: 6px; color: #9bcf78; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
 .strategy-test-panel header small { color: #728078; font-size: 7px; }

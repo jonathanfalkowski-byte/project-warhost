@@ -67,6 +67,14 @@ import {
 import { PLAYBOOK_DOCTRINES, resolvePlaybookDoctrine } from "./playbookDoctrine.js";
 import { resolveTacticalEngagement } from "./tacticalResolution.js";
 import { strategyCausalityFor } from "./strategyCausality.js";
+import {
+  fieldPlanForPressure,
+  missionPressureFor,
+  missionPressuresForOperation,
+  playbookTimingForPressure,
+  roleDemandsForPressure,
+  waveArrivalForPressure,
+} from "./missionPressure.js";
 
 const FORMATIONS = [
   {
@@ -267,43 +275,13 @@ const PLAYBOOKS = [
   },
 ];
 
-const MISSION_CONDITIONS = [
-  {
-    id: "clear",
-    name: "CLEAR LANES",
-    brief: "Foundry access is intact.",
-    effect: "Authored task profiles are unchanged.",
-    roleOverrides: {},
-  },
-  {
-    id: "blackout",
-    name: "SENSOR BLACKOUT",
-    brief: "Smoke severs visual contact across the approach.",
-    effect: "STOP 01 demands COVER / SHOCK. STOP 04 demands CONTROL / DENIAL.",
-    roleOverrides: {
-      0: ["COVER", "SHOCK"],
-      3: ["CONTROL", "DENIAL"],
-    },
-  },
-  {
-    id: "surge",
-    name: "REACTOR SURGE",
-    brief: "Core venting scrambles the center lane.",
-    effect: "STOP 02 demands BREACH / CONTROL. STOP 03 demands DENIAL / COVER.",
-    roleOverrides: {
-      1: ["BREACH", "CONTROL"],
-      2: ["DENIAL", "COVER"],
-    },
-  },
-];
-
 const OPERATIONS = [
   {
     id: "dead-circuit",
     name: "OPERATION DEAD CIRCUIT",
     shortName: "Dead Circuit",
     type: "SABOTAGE & EXTRACT",
-    conditionId: "clear",
+    conditionId: "fractured-transit",
     conditionLocked: false,
     requiredExtraction: 3,
     matchup: {
@@ -441,7 +419,7 @@ const playbookForOperation = (playbook, operation) => {
   };
 };
 
-const roleDemandsFor = (role, index, condition) => condition.roleOverrides[index] ?? role.demands;
+const roleDemandsFor = roleDemandsForPressure;
 
 const DEAD_CIRCUIT_BREAKPOINTS = [
   {
@@ -871,7 +849,11 @@ const REINFORCEMENT_WAVES = {
   "ashen-passage": ASHEN_PASSAGE_REINFORCEMENT_WAVE,
 };
 
-const reinforcementWaveFor = (operation) => REINFORCEMENT_WAVES[operation?.id] ?? DEAD_CIRCUIT_REINFORCEMENT_WAVE;
+const reinforcementWaveFor = (operation, condition) => {
+  const wave = REINFORCEMENT_WAVES[operation?.id] ?? DEAD_CIRCUIT_REINFORCEMENT_WAVE;
+  const arrivalAt = waveArrivalForPressure(wave.arrivalAt, condition);
+  return arrivalAt === wave.arrivalAt ? wave : { ...wave, arrivalAt };
+};
 
 const emptyAssignments = (playbook) => Object.fromEntries(
   playbook.roles.map((role) => [role.id, null]),
@@ -1259,15 +1241,21 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     };
   });
   const branchTotal = (key) => branchEffects.reduce((sum, branch) => sum + (branch.impact[key] ?? 0), 0);
+  const pressureTiming = playbookTimingForPressure(condition, playbook.id);
+  const reinforcementWave = reinforcementWaveFor(operation, condition);
   const alphaAt = Math.max(30, BASE_OPERATION.alphaAt - total("alpha") - protocolTotal("alpha") - doctrine.impact.alpha);
   const betaAt = Math.max(alphaAt + 45, BASE_OPERATION.betaAt - total("beta") - protocolTotal("beta") - doctrine.impact.beta);
   const betaDecisionAt = Math.max(alphaAt + 15, betaAt - 45);
   const reactorAt = Math.max(betaAt + 60, BASE_OPERATION.reactorAt - total("reactor") - protocolTotal("reactor") - doctrine.impact.reactor + branchTotal("reactorDelay") + enemyTotal("reactorDelay"));
   const reactorExposeAt = Math.max(betaAt + 30, reactorAt - 45);
   const rescueDecisionAt = Math.max(betaAt + 30, Math.min(210, reactorExposeAt - 15));
-  const extractionAt = Math.max(reactorAt + 30, BASE_OPERATION.extractionAt - total("extraction") - protocolTotal("extraction") - doctrine.impact.extraction) + branchTotal("missionDelay") + enemyTotal("missionDelay") + readinessSummary.delay + doctrine.impact.missionDelay;
+  const extractionAt = Math.max(
+    reactorAt + 30,
+    BASE_OPERATION.extractionAt - total("extraction") - protocolTotal("extraction") - doctrine.impact.extraction
+      + branchTotal("missionDelay") + enemyTotal("missionDelay") + readinessSummary.delay + doctrine.impact.missionDelay + pressureTiming,
+  );
   const completeAt = extractionAt + 15;
-  const overrun = Math.max(0, completeAt - BASE_OPERATION.completeAt);
+  const overrun = Math.max(0, completeAt - reinforcementWave.arrivalAt);
   const protectedCount = total("protects") + protocolTotal("protects") + branchTotal("protects") + doctrine.impact.protects;
   const enemyRecoveryLoss = Math.ceil(enemyTotal("recoveryLoss"));
   const deployedCount = readinessSummary.staffedCount;
@@ -1291,8 +1279,9 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     completeAt,
     extractedCount,
     reserveCapacity,
-    timeSaved: Math.max(0, BASE_OPERATION.completeAt - completeAt),
+    timeSaved: Math.max(0, reinforcementWave.arrivalAt - completeAt),
     overrun,
+    pressureTiming,
     reinforcementLoss,
     enemyRecoveryLoss,
     enemyClashes,
@@ -1314,7 +1303,7 @@ const comboWindowTimes = (profile) => [
 ];
 
 const buildOperationEvents = (profile, operation) => {
-  const reinforcementWave = reinforcementWaveFor(operation);
+  const reinforcementWave = reinforcementWaveFor(operation, profile.condition);
   const maneuverFor = (phase) => profile.effects.find((maneuver) => maneuver.impact.phase === phase)?.name;
   const alphaManeuver = maneuverFor("alpha");
   const betaManeuver = maneuverFor("beta");
@@ -1388,7 +1377,7 @@ function FormationPortrait({ formation, compact = false }) {
 }
 
 function AppHeader({ phase, battleTime, operation, operationIndex, profile }) {
-  const reinforcementWave = reinforcementWaveFor(operation);
+  const reinforcementWave = reinforcementWaveFor(operation, profile.condition);
   const reinforcementsEngaged = (phase === "battle" || phase === "complete") && battleTime >= reinforcementWave.arrivalAt;
   const clock = phase === "plan" || phase === "drill"
     ? { label: "ENEMY WAVE IN", value: fmtDuration(reinforcementWave.arrivalAt), detail: reinforcementWave.name }
@@ -1398,7 +1387,7 @@ function AppHeader({ phase, battleTime, operation, operationIndex, profile }) {
         : { label: "EXTRACTION CLEAR", value: fmtDuration(profile.timeSaved), detail: "BEFORE ENEMY WAVE" }
       : reinforcementsEngaged
         ? { label: "ENEMY WAVE ENGAGED", value: `+${fmtDuration(battleTime - reinforcementWave.arrivalAt)}`, detail: reinforcementWave.order }
-        : { label: "ENEMY WAVE IN", value: fmtClock(battleTime), detail: reinforcementWave.approach };
+        : { label: "ENEMY WAVE IN", value: fmtDuration(Math.max(0, reinforcementWave.arrivalAt - battleTime)), detail: reinforcementWave.approach };
   return (
     <header className="app-header">
       <div className="brand-block">
@@ -1510,7 +1499,7 @@ function FormationDossier({ formation, interactions, assignedRole, assignedIndex
   );
 }
 
-function MissionMatchupBrief({ operation }) {
+function MissionMatchupBrief({ condition, operation }) {
   const matchup = resolveDispositionMatchup({
     playerDisposition: operation.matchup?.playerDisposition,
     enemyDisposition: operation.matchup?.enemyDisposition,
@@ -1528,6 +1517,7 @@ function MissionMatchupBrief({ operation }) {
       <h2>{matchup.title}</h2>
       <p className="player-order"><b>YOUR ORDER</b>{matchup.playerObjective}</p>
       <p className="enemy-order"><b>ENEMY ORDER</b>{matchup.enemyObjective}</p>
+      <p className="mission-pressure-order"><b>MISSION PRESSURE · {condition.name}</b>{condition.brief} {condition.effect}</p>
     </section>
   );
 }
@@ -1577,7 +1567,7 @@ function StrategyTestPanel({ activeTrial, available, blindActive, blindPredictio
   );
 }
 
-function FormationRoster({ formations, unavailableFormations = [], inspected, onInspect, selected, onSelect, assignments, playbook, onPlaybook, operation, phase, strategyTrial, blindTestActive, blindPrediction, onBlindPrediction, onLoadStrategyTrial, onStartBlindTest, onFormationDragStart, readiness, refitsLocked, onRefit }) {
+function FormationRoster({ formations, unavailableFormations = [], condition, inspected, onInspect, selected, onSelect, assignments, playbook, onPlaybook, operation, phase, strategyTrial, blindTestActive, blindPrediction, onBlindPrediction, onLoadStrategyTrial, onStartBlindTest, onFormationDragStart, readiness, refitsLocked, onRefit }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -1589,7 +1579,7 @@ function FormationRoster({ formations, unavailableFormations = [], inspected, on
   const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected }));
   return (
     <section className="left-rail" aria-label="Tactical playbooks and Warhost formations">
-      {(phase === "plan" || phase === "drill") && <MissionMatchupBrief operation={operation} />}
+      {(phase === "plan" || phase === "drill") && <MissionMatchupBrief condition={condition} operation={operation} />}
       <div className="doctrine-heading"><span>CHOOSE TOTAL-ARMY PLAY</span><Radio weight="duotone" /></div>
       <div className="playbook-list">
         {PLAYBOOKS.map((baseItem) => {
@@ -1716,11 +1706,11 @@ const fieldSegmentStyle = (start, end, size) => {
   };
 };
 
-function TacticalFieldPlan({ assignments, battleTime, branches, consequences, formationFates, formations, operation, phase, playbook, playbackBeat }) {
+function TacticalFieldPlan({ assignments, battleTime, branches, condition, consequences, formationFates, formations, operation, phase, playbook, playbackBeat }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const operationField = operationFieldFor(operation);
-  const plan = operationField.plans[playbook.id];
+  const plan = fieldPlanForPressure(operationField.plans[playbook.id], condition, playbook.id);
   const breakpoints = breakpointsFor(operation);
   const execution = phase === "battle" || phase === "complete";
   const resolvedFates = new Map((execution ? formationFates : [])
@@ -1740,7 +1730,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, consequences, fo
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [phase, playbook.id]);
+  }, [condition.id, phase, playbook.id]);
 
   if (!plan) return null;
 
@@ -1869,9 +1859,9 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const enemyPlan = enemyPlanFor(operation);
-  const reinforcementWave = reinforcementWaveFor(operation);
+  const reinforcementWave = reinforcementWaveFor(operation, profile.condition);
   const operationField = operationFieldFor(operation);
-  const fieldPlan = operationField.plans[playbook.id];
+  const fieldPlan = fieldPlanForPressure(operationField.plans[playbook.id], profile.condition, playbook.id);
   const firstPosition = fieldPlan.positions[0];
   const secondPosition = fieldPlan.positions[1];
   const collisionPoint = {
@@ -2310,7 +2300,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
-      <TacticalFieldPlan assignments={assignments} battleTime={battleTime} branches={branches} consequences={consequences.player} formationFates={formationFates} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
+      <TacticalFieldPlan assignments={assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
       <DoctrineCollisionOverlay beat={playbackBeat} operation={operation} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
@@ -2485,7 +2475,7 @@ function BattlePlaybackDirector({ beat, beats, index, playing, onToggle, onStep,
 
 function EnemyPlanIntel({ battleTime, operation, phase, planReady, blindTestActive, clashes, profile }) {
   const enemyPlan = enemyPlanFor(operation);
-  const reinforcementWave = reinforcementWaveFor(operation);
+  const reinforcementWave = reinforcementWaveFor(operation, profile.condition);
   const collision = profile.enemyCollision;
   const collisionSource = FORMATIONS.find((formation) => formation.id === collision?.sourceId);
   const collisionReceiver = FORMATIONS.find((formation) => formation.id === collision?.receiverId);
@@ -2549,12 +2539,12 @@ function EnemyPlanIntel({ battleTime, operation, phase, planReady, blindTestActi
   );
 }
 
-function MissionConditionSelector({ condition, locked, phase, onCondition }) {
-  const visibleConditions = locked ? [condition] : MISSION_CONDITIONS;
+function MissionConditionSelector({ condition, locked, operation, phase, onCondition }) {
+  const visibleConditions = locked ? [condition] : missionPressuresForOperation(operation.id);
   return (
     <div className="intel-block condition-intel">
-      <span className="panel-label">MISSION CONDITION · {locked ? "ASSIGNED BY OPERATION" : "DISCLOSED BEFORE DEPLOYMENT"}</span>
-      <div className="condition-options" role="group" aria-label="Prototype mission condition">
+      <span className="panel-label">MISSION PRESSURE · {locked ? "ASSIGNED BY OPERATION" : "DISCLOSED BEFORE DEPLOYMENT"}</span>
+      <div className="condition-options" role="group" aria-label="Prototype mission pressure">
         {visibleConditions.map((item) => (
           <button
             key={item.id}
@@ -2569,7 +2559,7 @@ function MissionConditionSelector({ condition, locked, phase, onCondition }) {
         ))}
       </div>
       <p className="condition-effect"><Warning weight="duotone" /><span><b>{condition.name}</b>{condition.effect}</span></p>
-      <small className="prototype-note">{locked ? "FIXED FOR THIS OPERATION · ADAPT PLACEMENT AND REFITS TO THE FIELD." : "PROTOTYPE SWITCH · LATER OPERATIONS ASSIGN THEIR CONDITION BEFORE DEPLOYMENT."}</small>
+      <small className="prototype-note">{locked ? "FIXED FOR THIS OPERATION · ADAPT PLACEMENT AND REFITS TO THE FIELD." : "PROTOTYPE SWITCH · A FULL CAMPAIGN ASSIGNS ONE PRESSURE FROM THE TWO DISPOSITIONS BEFORE PLAYBOOK SELECTION."}</small>
     </div>
   );
 }
@@ -2581,7 +2571,7 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
     : `${profile.extractedCount} / ${formationCount} EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
-      <MissionConditionSelector condition={condition} locked={operation.conditionLocked} phase={phase} onCondition={onCondition} />
+      <MissionConditionSelector condition={condition} locked={operation.conditionLocked} operation={operation} phase={phase} onCondition={onCondition} />
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planningSealed ? "sealed" : planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planningSealed && planReady ? "OUTCOME SEALED · COMMIT TO REVEAL" : planReady ? forecast : `${assignedCount} / ${formationCount} AVAILABLE ASSIGNED`}</strong>
@@ -2828,7 +2818,7 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
 }
 
 function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperation, onChoose, onLaunch }) {
-  const incomingCondition = MISSION_CONDITIONS.find((condition) => condition.id === nextOperation.conditionId);
+  const incomingCondition = missionPressureFor(nextOperation.conditionId, nextOperation.id);
   const selectedAction = choice
     ? choice.type === "repair"
       ? `Repair ${FORMATIONS.find((formation) => formation.id === choice.formationId)?.name}.`
@@ -2930,7 +2920,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
   const carrierCutOffAfterRescue = rescued && recoveryCarrierFate?.history?.some(({ state }) => state === "cut-off");
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
   const finalConsequences = battlefieldConsequencesAt({ clashes: profile.enemyClashes, battleTime: profile.completeAt });
-  const reinforcementWave = reinforcementWaveFor(operation);
+  const reinforcementWave = reinforcementWaveFor(operation, profile.condition);
   const timingResult = profile.overrun > 0
     ? `The ${reinforcementWave.name} reached ${operation.extractionTitle} ${profile.overrun} seconds before extraction cleared.`
     : profile.timeSaved > 0
@@ -3055,7 +3045,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         </section>
         <details className="completion-detail-log">
           <summary>FULL OPERATION LOG</summary>
-          <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission condition: {profile.condition.name}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {fieldStateResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
+          <p className="completion-note">Doctrine result: {profile.doctrine.result}. Mission pressure: {profile.condition.name}{profile.pressureTiming ? ` (${profile.pressureTiming > 0 ? "+" : "-"}${fmtDuration(Math.abs(profile.pressureTiming))} playbook timing)` : ""}. Installed refits: {formations.map((formation) => formation.activeRefit.name).join(", ")}. {engagementResult} {fieldStateResult} {protocolResult} {timingResult} {readinessResult} {lostCount === 0 ? "Every formation was recovered." : `${lostCount} ${lostCount === 1 ? "formation did" : "formations did"} not clear extraction.`} {usedSeals === 0 ? "Both authored breakpoints held under contact." : `${usedSeals} authored ${usedSeals === 1 ? "order was" : "orders were"} overridden after contact.`}</p>
         </details>
         <button className="commit-button debrief-button" onClick={onAction}><span><b>{actionLabel}</b><small>{actionDetail}</small></span><ArrowRight /></button>
       </div>
@@ -3069,7 +3059,7 @@ export function App() {
   const [selected, setSelected] = useState("harpoon");
   const [hoveredFormationId, setHoveredFormationId] = useState(null);
   const [playbookId, setPlaybookId] = useState("trapline");
-  const [conditionId, setConditionId] = useState("clear");
+  const [conditionId, setConditionId] = useState("fractured-transit");
   const [refits, setRefits] = useState(defaultRefits);
   const [campaignConditions, setCampaignConditions] = useState({});
   const [warhostIntegrity, setWarhostIntegrity] = useState(3);
@@ -3104,8 +3094,8 @@ export function App() {
     [operation, playbookId],
   );
   const condition = useMemo(
-    () => MISSION_CONDITIONS.find((item) => item.id === conditionId) ?? MISSION_CONDITIONS[0],
-    [conditionId],
+    () => missionPressureFor(conditionId, operation.id),
+    [conditionId, operation.id],
   );
   const allFormations = useMemo(
     () => applyCampaignConditions(resolveFormations(refits), campaignConditions),
@@ -3204,15 +3194,15 @@ export function App() {
       events: operationEvents,
       comboTimes: comboWindowTimes(operationProfile),
       formationFates: operationFormationFates,
-      reinforcementWave: reinforcementWaveFor(operation),
+      reinforcementWave: reinforcementWaveFor(operation, condition),
     }),
-    [formations, operation, operationEvents, operationFormationFates, operationProfile, playbook.id, tacticalHandoffs],
+    [condition, formations, operation, operationEvents, operationFormationFates, operationProfile, playbook.id, tacticalHandoffs],
   );
   const currentPlaybackBeat = playbackBeats[Math.min(playbackIndex, playbackBeats.length - 1)] ?? null;
 
   const drillSteps = useMemo(
     () => [
-      `Condition ${condition.name}: ${condition.effect}`,
+      `Mission pressure ${condition.name}: ${condition.effect}`,
       `${formations.length} installed refits locked; no loadout changes after commitment`,
       `Loading ${playbook.name} geometry`,
       ...playbook.stages.map((stage) => `${stage.label} responsibility acknowledged`),
@@ -3285,7 +3275,6 @@ export function App() {
     if (!trial || !trialPlaybook || assignmentIds.length !== formations.length || assignmentIds.some((formationId) => !formationIds.has(formationId))) return;
 
     setPlaybookId(trial.playbookId);
-    setConditionId(trial.conditionId);
     setRefits(defaultRefits());
     setAssignments({ ...trial.assignments });
     setBranches({ ...trial.branches });
@@ -3311,7 +3300,7 @@ export function App() {
   const startBlindTest = () => {
     if (phase !== "plan" || operationIndex !== 0 || formations.length !== FORMATIONS.length) return;
     setPlaybookId(playbook.id);
-    setConditionId("clear");
+    setConditionId(condition.id);
     setRefits(defaultRefits());
     setAssignments(emptyAssignments(playbook));
     setBranches(defaultBranches(OPERATIONS[0]));
@@ -3367,7 +3356,7 @@ export function App() {
   };
 
   const changeCondition = (nextId) => {
-    if (phase !== "plan" || operation.conditionLocked || !MISSION_CONDITIONS.some((item) => item.id === nextId)) return;
+    if (phase !== "plan" || operation.conditionLocked || !missionPressuresForOperation(operation.id).some((item) => item.id === nextId)) return;
     setConditionId(nextId);
     setPickerRoleId(null);
     setPlacementFeedback(null);
@@ -3676,7 +3665,7 @@ export function App() {
     setPlaybackPlaying(false);
     setOperationIndex(0);
     setPlaybookId("trapline");
-    setConditionId("clear");
+    setConditionId(OPERATIONS[0].conditionId);
     setRefits(defaultRefits());
     setCampaignConditions({});
     setWarhostIntegrity(3);
@@ -3711,7 +3700,7 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} condition={condition} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
         <Battlefield formations={formations} formationFates={operationFormationFates} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onClearRole={clearRoleAssignment} onFormationDragStart={beginFormationDrag} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} blindTestActive={blindTestActive} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
