@@ -216,12 +216,12 @@ const PLAYBOOKS = [
   {
     id: "trapline",
     name: "ROLLING SABOTAGE",
-    summary: "Seize, hand off, sabotage, withdraw.",
+    summary: "Seize, transfer, sabotage, withdraw.",
     intent: "Advance the whole Warhost through both control nodes, transfer security behind the lead, sabotage the primary asset, and reform for extraction.",
     icon: Anchor,
     stages: [
       { label: "SEIZE", detail: "Open first objective.", icon: Anchor },
-      { label: "HAND OFF", detail: "Pass secured ground.", icon: Shield },
+      { label: "TRANSFER", detail: "Pass secured ground.", icon: Shield },
       { label: "SABOTAGE", detail: "Disable primary asset.", icon: Hammer, warm: true },
       { label: "WITHDRAW", detail: "Reform at extraction.", icon: Truck },
     ],
@@ -351,9 +351,9 @@ const OPERATIONS = [
 const ASHEN_PASSAGE_PLAYBOOK_COPY = {
   trapline: {
     name: "ROLLING EVACUATION",
-    summary: "Open, hand off, hold, evacuate.",
+    summary: "Open, transfer, hold, evacuate.",
     intent: "Advance the whole Warhost through both Ember Gates, transfer security behind the lead, hold the relay, and reform at the Void Lift.",
-    stageLabels: ["OPEN", "HAND OFF", "HOLD", "EVACUATE"],
+    stageLabels: ["OPEN", "TRANSFER", "HOLD", "EVACUATE"],
     briefs: ["Open the western gate and establish the army route.", "Take responsibility for the opened gate as the lead advances.", "Secure the Signal Furnace and maintain the evacuation uplink.", "Hold the corridor connecting the army to the Void Lift.", "Recover the relay crew and reform the army for evacuation."],
   },
   spear: {
@@ -1567,7 +1567,7 @@ function StrategyTestPanel({ activeTrial, available, blindActive, blindPredictio
   );
 }
 
-function FormationRoster({ formations, unavailableFormations = [], condition, inspected, onInspect, selected, onSelect, assignments, playbook, onPlaybook, operation, phase, strategyTrial, blindTestActive, blindPrediction, onBlindPrediction, onLoadStrategyTrial, onStartBlindTest, onFormationDragStart, readiness, refitsLocked, onRefit }) {
+function FormationRoster({ formations, unavailableFormations = [], condition, inspected, onInspect, selected, onSelect, assignments, playbook, previewPlaybookId, onPreviewPlaybook, onPlaybook, operation, phase, strategyTrial, blindTestActive, blindPrediction, onBlindPrediction, onLoadStrategyTrial, onStartBlindTest, onFormationDragStart, readiness, refitsLocked, onRefit }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -1588,8 +1588,12 @@ function FormationRoster({ formations, unavailableFormations = [], condition, in
           return (
             <button
               key={item.id}
-              className={`playbook-row ${playbook.id === item.id ? "selected" : ""}`}
+              className={`playbook-row ${playbook.id === item.id ? "selected" : ""} ${previewPlaybookId === item.id ? "previewing" : ""}`}
               onClick={() => onPlaybook(item.id)}
+              onMouseEnter={() => onPreviewPlaybook(item.id)}
+              onMouseLeave={() => onPreviewPlaybook(null)}
+              onFocus={() => onPreviewPlaybook(item.id)}
+              onBlur={() => onPreviewPlaybook(null)}
               disabled={phase !== "plan"}
               aria-pressed={playbook.id === item.id}
             >
@@ -2257,7 +2261,7 @@ function BattleStateLegend() {
   );
 }
 
-function Battlefield({ formations, formationFates, inspected, onInspect, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onStaffExercise, readiness, refitProtocols, staffExerciseIndex, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
+function Battlefield({ formations, formationFates, inspected, onInspect, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, previewPlaybookId, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onStaffExercise, readiness, refitProtocols, staffExerciseIndex, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
   const alphaState = battleTime >= profile.alphaAt ? "secured" : "active";
   const betaState = battleTime >= profile.betaAt ? "secured" : "threat";
   const reactorState = battleTime >= profile.reactorAt ? "secured" : "threat";
@@ -2293,6 +2297,12 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
   const interactionByFormationId = new Map(inspectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
   const adjacentFormationIds = new Set(adjacentFormationIdsFor({ roles: playbook.roles, assignments, formationId: inspected }));
   const inspectingInteractions = (phase === "plan" || phase === "drill") && Boolean(inspectedFormation);
+  const previewBase = phase === "plan" && previewPlaybookId
+    ? PLAYBOOKS.find((item) => item.id === previewPlaybookId)
+    : null;
+  const previewPlaybook = previewBase ? playbookForOperation(previewBase, operation) : null;
+  const mapPlaybook = previewPlaybook ?? playbook;
+  const previewingPlaybook = Boolean(previewPlaybook && previewPlaybook.id !== playbook.id);
 
   return (
     <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""} ${collisionFocus ? "collision-focus" : ""} ${inspectingInteractions ? "interaction-inspecting" : ""}`} aria-label={`${operation.name} mission map`}>
@@ -2300,7 +2310,14 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
-      <TacticalFieldPlan assignments={assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} operation={operation} phase={phase} playbook={playbook} playbackBeat={playbackBeat} />
+      <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} />
+      {previewingPlaybook && (
+        <div className="playbook-map-preview" role="status">
+          <span>ROUTE PREVIEW · {condition.name}</span>
+          <b>{mapPlaybook.name}</b>
+          <small>{mapPlaybook.stages.map((stage) => stage.label).join(" → ")}</small>
+        </div>
+      )}
       <DoctrineCollisionOverlay beat={playbackBeat} operation={operation} playbook={playbook} />
       <MissionRoute phase={phase} battleTime={battleTime} operation={operation} profile={profile} />
       <div className="map-sector entry-sector"><span>{phase === "plan" || phase === "drill" ? operation.entryPlanTitle : operation.entryBattleTitle}</span><small>{phase === "plan" || phase === "drill" ? "Visible formations · drag into a stop" : "Player deployment edge"}</small></div>
@@ -3059,6 +3076,7 @@ export function App() {
   const [selected, setSelected] = useState("harpoon");
   const [hoveredFormationId, setHoveredFormationId] = useState(null);
   const [playbookId, setPlaybookId] = useState("trapline");
+  const [previewPlaybookId, setPreviewPlaybookId] = useState(null);
   const [conditionId, setConditionId] = useState("fractured-transit");
   const [refits, setRefits] = useState(defaultRefits);
   const [campaignConditions, setCampaignConditions] = useState({});
@@ -3342,6 +3360,7 @@ export function App() {
     const next = PLAYBOOKS.find((item) => item.id === nextId);
     if (!next) return;
     setPlaybookId(next.id);
+    setPreviewPlaybookId(null);
     setAssignments(emptyAssignments(next));
     setBranches(defaultBranches(operation));
     setBattleBranches(defaultBranches(operation));
@@ -3700,8 +3719,8 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} condition={condition} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
-        <Battlefield formations={formations} formationFates={operationFormationFates} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onClearRole={clearRoleAssignment} onFormationDragStart={beginFormationDrag} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
+        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} condition={condition} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} previewPlaybookId={previewPlaybookId} onPreviewPlaybook={setPreviewPlaybookId} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <Battlefield formations={formations} formationFates={operationFormationFates} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} previewPlaybookId={previewPlaybookId} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onClearRole={clearRoleAssignment} onFormationDragStart={beginFormationDrag} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} blindTestActive={blindTestActive} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} blindTestActive={blindTestActive} blindPrediction={blindPrediction} branches={activeBranches} onBranch={chooseBranch} />

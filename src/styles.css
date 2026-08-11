@@ -214,6 +214,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playbook-row small { color: #7d8581; font-size: 10px; line-height: 1.2; }
 .playbook-row em { margin-top: 2px; color: #8f8060; font-family: "Barlow Condensed"; font-size: 8px; font-style: normal; letter-spacing: .1em; }
 .playbook-row.selected { border-color: var(--blue); background: #102331; box-shadow: inset 3px 0 #1688bd; }
+.playbook-row.previewing:not(.selected) { border-color: #53879a; background: #142126; box-shadow: inset 3px 0 #6db9d2; }
 .playbook-row.selected > svg, .playbook-row.selected b { color: #59c2f4; }
 .playbook-row.selected em { color: #d0b06b; }
 .playbook-row:disabled { cursor: default; }
@@ -228,6 +229,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .doctrine-row:disabled { cursor: default; }
 
 .battlefield { min-width: 0; min-height: 0; position: relative; overflow: hidden; background: #111; }
+.playbook-map-preview { position: absolute; z-index: 17; left: 50%; top: 7.5%; width: min(360px, 52%); transform: translateX(-50%); display: grid; gap: 2px; padding: 8px 12px; border: 1px solid #55a9c8; border-left-width: 4px; background: rgba(7, 20, 25, .96); box-shadow: 0 8px 22px rgba(0, 0, 0, .55), 0 0 18px rgba(77, 170, 204, .18); pointer-events: none; }
+.playbook-map-preview span, .playbook-map-preview small { color: #78b8ca; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .1em; }
+.playbook-map-preview b { color: #e3f1f4; font-family: "Barlow Condensed"; font-size: 17px; letter-spacing: .08em; }
+.playbook-map-preview small { color: #d1b56f; }
 .battlefield-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(.82) saturate(.82) contrast(1.08); }
 .battlefield-wash { position: absolute; inset: 0; background: rgba(5, 8, 8, .22); pointer-events: none; }
 .battlefield-operation-veil { position: absolute; z-index: 1; inset: 0; pointer-events: none; }

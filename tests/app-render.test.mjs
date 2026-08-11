@@ -18,6 +18,8 @@ test("the planning screen renders without an undefined runtime binding", async (
     assert.match(markup, /PROJECT WARHOST/);
     assert.match(markup, /FORCE MOVE/);
     assert.match(markup, /OUT OF POSITION/);
+    assert.match(markup, /Seize, transfer, sabotage, withdraw\./);
+    assert.doesNotMatch(markup, /hand off/i);
     assert.match(markup, /AVAILABLE · DRAG TO STOP/);
     assert.doesNotMatch(markup, />DISPLACE</);
   } finally {
