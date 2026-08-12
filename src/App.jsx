@@ -63,6 +63,7 @@ import {
   buildAuthoredFormationRoutes,
   pointAlongRoute as pointAlongFieldRoute,
   positionAlongAuthoredRoute,
+  splitAuthoredRouteAtActionStop,
 } from "./fieldRoutes.js";
 import { PLAYBOOK_DOCTRINES, resolvePlaybookDoctrine } from "./playbookDoctrine.js";
 import { resolveTacticalEngagement } from "./tacticalResolution.js";
@@ -1802,11 +1803,12 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
       ? route.points
       : [route.start, ...route.points].map((point) => resolveFieldPoint(plan, operationField.landmarks, point));
     const routePresentation = routes.find((item) => item.roleIndex === route.roleIndex);
+    const routeParts = splitAuthoredRouteAtActionStop(points);
     return points.slice(0, -1).map((point, index) => ({
       id: `route-${route.roleIndex}-${index}`,
       start: point,
       end: points[index + 1],
-      className: `base lane-${route.roleIndex + 1} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
+      className: `base lane-${route.roleIndex + 1} ${index < routeParts.approach.length - 1 ? "action-stop-approach" : "route-continuation"} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
     }));
   });
   const branchSegments = execution ? [] : breakpoints.flatMap((breakpoint, breakpointIndex) => {
@@ -1828,7 +1830,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
         id: `${breakpoint.id}-${option.id}-${index}`,
         start: resolveFieldPoint(plan, operationField.landmarks, point),
         end: resolveFieldPoint(plan, operationField.landmarks, route[index + 1]),
-        className: `branch breakpoint-${breakpointIndex + 1} lane-${roleIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"} ${staffed ? "staffed" : ""} ${changed ? "changed" : ""} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(assignments[role.id]) ? "playback-focused" : "playback-muted" : ""}`,
+        className: `branch route-continuation breakpoint-${breakpointIndex + 1} lane-${roleIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"} ${staffed ? "staffed" : ""} ${changed ? "changed" : ""} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(assignments[role.id]) ? "playback-focused" : "playback-muted" : ""}`,
       }));
     });
   });
@@ -1881,6 +1883,10 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
             const changed = branches[breakpoint.id] !== breakpoint.defaultOption;
             return <span className={changed ? "changed" : ""} key={breakpoint.id}>BP{index + 1} · {option.routeLabel}</span>;
           })}
+        </div>
+        <div className="field-plan-route-key" aria-label="Route line key">
+          <span><i className="approach" />TO ACTION STOP</span>
+          <span><i className="continuation" />THEN CONTINUES</span>
         </div>
       </div>
       {[...baseSegments, ...branchSegments].map((segment) => (
@@ -2520,12 +2526,12 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             <FormationPortrait formation={formation} />
             <span className="map-formation-number">{formation.number}</span>
             <span className="map-formation-label">{formation.name}</span>
-            {routeReadiness && (phase === "plan" || phase === "drill") && (
-              <span className="map-route-fit assigned">
-                <b>ASSIGNED TO ROUTE</b>
-                <small>{routeReadiness.roleLabel}</small>
-              </span>
-            )}
+              {routeReadiness && (phase === "plan" || phase === "drill") && (
+                <span className="map-route-fit assigned">
+                  <b>ASSIGNED ACTION STOP</b>
+                  <small>STOP {String(assignedRoleIndex + 1).padStart(2, "0")} · {routeReadiness.roleLabel}</small>
+                </span>
+              )}
             {activeInteraction && interaction && <span className={`map-formation-interaction active ${interactionDirection}`}><Radio weight="fill" /> ACTIVE AT RENDEZVOUS<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}</small></span>}
             {statusDisplay && <span className="map-formation-state"><b>{statusDisplay.label}</b><small>{statusDisplay.detail}</small></span>}
           </button>

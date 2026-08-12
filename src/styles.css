@@ -248,7 +248,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .phase-battle .battlefield-art { filter: brightness(.86) saturate(.96) contrast(1.08); }
 .phase-complete .battlefield-art { filter: brightness(.8) saturate(.68) contrast(1.05); }
 .field-plan-layer { position: absolute; z-index: 5; inset: 0; overflow: hidden; pointer-events: none; }
-.field-plan-caption { position: absolute; z-index: 3; left: 27%; top: 2.5%; width: min(240px, 34%); min-height: 45px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border-color: #39748d; background: rgba(7, 18, 22, .94); }
+.field-plan-caption { position: absolute; z-index: 3; left: 27%; top: 2.5%; width: min(330px, 42%); min-height: 45px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border-color: #39748d; background: rgba(7, 18, 22, .94); }
 .field-plan-caption > div:first-child { display: grid; }
 .field-plan-caption > div:first-child span { font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .13em; color: #66c8f1; }
 .field-plan-caption > div:first-child b { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; color: #d7edf5; }
@@ -264,6 +264,14 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-segment::before { content: ""; position: absolute; left: 0; right: 0; top: -3px; border-top: 1px dashed rgba(var(--route-rgb, 102, 206, 244), .34); }
 .field-plan-segment > svg { position: absolute; right: -8px; top: -7px; width: 15px; height: 15px; padding: 2px; border: 1px solid var(--route-color, #66cef4); border-radius: 50%; background: #0c181c; color: var(--route-color, #66cef4); }
 .field-plan-segment.staffed { height: 3px; box-shadow: 0 0 11px rgba(var(--route-rgb, 102, 206, 244), .5); }
+.field-plan-segment.action-stop-approach { z-index: 2; height: 4px; box-shadow: 0 0 13px rgba(var(--route-rgb, 102, 206, 244), .64); }
+.field-plan-segment.route-continuation { height: 1px; opacity: .42; background: transparent; border-top: 2px dashed rgba(var(--route-rgb, 102, 206, 244), .72); box-shadow: none; }
+.field-plan-segment.route-continuation::before { display: none; }
+.field-plan-segment.route-continuation > svg { right: -6px; top: -6px; width: 13px; height: 13px; opacity: .7; background: rgba(8, 15, 16, .92); }
+.field-plan-route-key { flex: 0 0 auto; display: grid; gap: 3px; padding-left: 8px; border-left: 1px solid #31535e; }
+.field-plan-route-key span { display: flex; align-items: center; gap: 5px; color: #9badad; font-family: "Barlow Condensed"; font-size: 7px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; }
+.field-plan-route-key i { width: 22px; height: 0; border-top: 3px solid #6bcdf2; box-shadow: 0 0 6px rgba(102, 206, 244, .48); }
+.field-plan-route-key i.continuation { border-top-width: 1px; border-top-style: dashed; box-shadow: none; opacity: .62; }
 .field-plan-segment.selected-route { z-index: 2; }
 .field-plan-segment.alternative-route { z-index: 0; height: 1px; opacity: .3; background: transparent; border-top: 2px dashed var(--route-color, #66cef4); box-shadow: none; }
 .field-plan-segment.alternative-route::before { display: none; }

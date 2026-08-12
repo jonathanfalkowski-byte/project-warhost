@@ -33,6 +33,11 @@ export const pointAlongRoute = (points, progress) => {
   return validPoints.at(-1);
 };
 
+export const splitAuthoredRouteAtActionStop = (points) => ({
+  approach: points.slice(0, 2),
+  continuation: points.slice(1),
+});
+
 export const buildAuthoredFormationRoutes = ({
   plan,
   landmarks,

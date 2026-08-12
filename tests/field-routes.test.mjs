@@ -5,6 +5,7 @@ import {
   buildAuthoredFormationRoutes,
   pointAlongRoute,
   positionAlongAuthoredRoute,
+  splitAuthoredRouteAtActionStop,
 } from "../src/fieldRoutes.js";
 
 const plan = {
@@ -64,6 +65,16 @@ test("a formation arrives at its authored action stop at the action time", () =>
   const points = routeFixture()[1].points;
   const position = positionAlongAuthoredRoute({ points, battleTime: 60, actionAt: 60, completeAt: 180 });
   assert.deepEqual(position, plan.positions[1]);
+});
+
+test("an authored route separates the assigned action stop from its continuation", () => {
+  const points = routeFixture()[1].points;
+  const { approach, continuation } = splitAuthoredRouteAtActionStop(points);
+  assert.deepEqual(approach, points.slice(0, 2));
+  assert.deepEqual(continuation, points.slice(1));
+  assert.deepEqual(approach.at(-1), plan.positions[1]);
+  assert.deepEqual(continuation[0], plan.positions[1]);
+  assert.deepEqual(continuation.at(-1), { x: 90, y: 15 });
 });
 
 test("route interpolation clamps before deployment and after extraction", () => {
