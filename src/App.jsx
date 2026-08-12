@@ -636,18 +636,18 @@ const enemyPlanFor = (operation) => ENEMY_PLANS[operation?.id] ?? DEAD_CIRCUIT_E
 const FIELD_PLANS = {
   trapline: {
     positions: [
-      { x: 35, y: 32 },
-      { x: 49, y: 38 },
-      { x: 62, y: 32 },
-      { x: 70, y: 25 },
-      { x: 73, y: 47 },
+      { x: 30, y: 50 },
+      { x: 40, y: 59 },
+      { x: 55, y: 52 },
+      { x: 65, y: 35 },
+      { x: 70, y: 66 },
     ],
     routes: [
-      { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha", "alphaTransfer"] },
-      { role: 1, start: { x: 26, y: 80 }, points: [1, "alphaTransfer", "sabotageLane", { x: 67, y: 46 }] },
-      { role: 2, start: { x: 35, y: 76 }, points: [2, "sabotageLane"], breakpoint: "beta" },
-      { role: 3, start: { x: 44, y: 80 }, points: [3, "beta"] },
-      { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
+      { role: 0, start: { x: 20, y: 88 }, points: [0, "alphaTransfer", "sabotageLane", "reactor"] },
+      { role: 1, start: { x: 32, y: 88 }, points: [1, "alphaTransfer", "sabotageLane", "reactor"] },
+      { role: 2, start: { x: 44, y: 88 }, points: [2, "sabotageLane"], breakpoint: "beta" },
+      { role: 3, start: { x: 56, y: 88 }, points: [3, "beta", "reactor"] },
+      { role: 4, start: { x: 68, y: 88 }, points: [4, "reactor"], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 2, rescue: 4 },
     branchRoutes: {
@@ -663,18 +663,18 @@ const FIELD_PLANS = {
   },
   spear: {
     positions: [
-      { x: 34, y: 36 },
-      { x: 49, y: 27 },
-      { x: 61, y: 36 },
-      { x: 54, y: 43 },
-      { x: 73, y: 48 },
+      { x: 34, y: 58 },
+      { x: 45, y: 51 },
+      { x: 58, y: 49 },
+      { x: 57, y: 67 },
+      { x: 70, y: 67 },
     ],
     routes: [
-      { role: 0, start: { x: 17, y: 76 }, points: [0, "screenedConcentration", "alpha"] },
-      { role: 1, start: { x: 26, y: 80 }, points: [1, "screenedConcentration", "assaultLaunch", "beta"] },
-      { role: 2, start: { x: 35, y: 76 }, points: [2, "assaultLaunch"], breakpoint: "beta" },
-      { role: 3, start: { x: 44, y: 80 }, points: [3, { x: 66, y: 43 }] },
-      { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
+      { role: 0, start: { x: 20, y: 88 }, points: [0, "screenedConcentration", "assaultLaunch", "reactor"] },
+      { role: 1, start: { x: 32, y: 88 }, points: [1, "screenedConcentration", "assaultLaunch", "reactor"] },
+      { role: 2, start: { x: 44, y: 88 }, points: [2, "assaultLaunch"], breakpoint: "beta" },
+      { role: 3, start: { x: 56, y: 88 }, points: [3, "assaultLaunch", "reactor"] },
+      { role: 4, start: { x: 68, y: 88 }, points: [4, "reactor"], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 2, rescue: 4 },
     branchRoutes: {
@@ -690,18 +690,18 @@ const FIELD_PLANS = {
   },
   pressure: {
     positions: [
-      { x: 34, y: 32 },
-      { x: 60, y: 18 },
-      { x: 48, y: 40 },
-      { x: 64, y: 38 },
-      { x: 73, y: 48 },
+      { x: 30, y: 50 },
+      { x: 67, y: 29 },
+      { x: 49, y: 51 },
+      { x: 60, y: 57 },
+      { x: 71, y: 68 },
     ],
     routes: [
-      { role: 0, start: { x: 17, y: 76 }, points: [0, "alpha"] },
-      { role: 1, start: { x: 26, y: 80 }, points: [1, "eastInterdiction", "beta"] },
-      { role: 2, start: { x: 35, y: 76 }, points: [2, "eastInterdiction", "primaryConvergence"] },
-      { role: 3, start: { x: 44, y: 80 }, points: [3, "primaryConvergence"], breakpoint: "beta" },
-      { role: 4, start: { x: 53, y: 76 }, points: [4], breakpoint: "rescue" },
+      { role: 0, start: { x: 20, y: 88 }, points: [0, "alpha", "primaryConvergence"] },
+      { role: 1, start: { x: 32, y: 88 }, points: [1, "beta", "eastInterdiction", "primaryConvergence"] },
+      { role: 2, start: { x: 44, y: 88 }, points: [2, "eastInterdiction", "primaryConvergence"] },
+      { role: 3, start: { x: 56, y: 88 }, points: [3, "primaryConvergence"], breakpoint: "beta" },
+      { role: 4, start: { x: 68, y: 88 }, points: [4, "reactor"], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 3, rescue: 4 },
     branchRoutes: {
@@ -718,17 +718,35 @@ const FIELD_PLANS = {
 };
 
 const FIELD_LANDMARKS = {
-  alpha: { x: 35, y: 24 },
-  beta: { x: 76, y: 12 },
-  reactor: { x: 76, y: 46 },
-  extraction: { x: 91, y: 18 },
-  rescue: { x: 83, y: 75 },
-  alphaTransfer: { x: 45, y: 29 },
-  sabotageLane: { x: 56, y: 36 },
-  screenedConcentration: { x: 43, y: 31 },
-  assaultLaunch: { x: 56, y: 31 },
-  eastInterdiction: { x: 56, y: 29 },
-  primaryConvergence: { x: 64, y: 39 },
+  alpha: { x: 30, y: 50 },
+  beta: { x: 67, y: 29 },
+  reactor: { x: 72, y: 54 },
+  extraction: { x: 89, y: 34 },
+  rescue: { x: 81, y: 76 },
+  alphaTransfer: { x: 41, y: 50 },
+  sabotageLane: { x: 55, y: 52 },
+  screenedConcentration: { x: 44, y: 54 },
+  assaultLaunch: { x: 58, y: 49 },
+  eastInterdiction: { x: 57, y: 38 },
+  primaryConvergence: { x: 63, y: 49 },
+};
+
+const PLAYBOOK_BATTLEFIELD_READ = {
+  trapline: {
+    winsBy: "Keeping one connected column moving through every objective.",
+    commits: "Two formations hold the transfer corridor behind the lead.",
+    risks: "A slower objective clock if the column is stalled or split.",
+  },
+  spear: {
+    winsBy: "Concentrating the army at the Reactor before relief arrives.",
+    commits: "Four routes collapse into one decisive assault corridor.",
+    risks: "Alpha and the rear guard receive less protection.",
+  },
+  pressure: {
+    winsBy: "Taking Alpha and Beta in parallel, then converging on the Reactor.",
+    commits: "The army fights as two separated wings until the center link.",
+    risks: "Either wing can be isolated before the convergence.",
+  },
 };
 
 const ASHEN_PASSAGE_FIELD_PLANS = {
@@ -1731,6 +1749,32 @@ function ObjectiveMarker({ className, number, title, description, state = "activ
   );
 }
 
+function TabletopBattlefieldOverlay({ landmarks, operation }) {
+  const objectiveZones = [
+    { id: "alpha", label: "OBJECTIVE ALPHA", point: landmarks.alpha, tone: "control" },
+    { id: "beta", label: "OBJECTIVE BETA", point: landmarks.beta, tone: "control" },
+    { id: "reactor", label: operation.primaryTitle, point: landmarks.reactor, tone: "primary" },
+    { id: "extraction", label: operation.extractionTitle, point: landmarks.extraction, tone: "extraction" },
+  ];
+  return (
+    <div className="tabletop-battlefield-overlay" aria-hidden="true">
+      <div className="tabletop-deployment-zone"><span>WARHOST DEPLOYMENT EDGE</span></div>
+      <div className="tabletop-extraction-edge"><span>EXTRACTION EDGE</span></div>
+      <div className="tabletop-terrain terrain-west"><span>BLOCKED FOUNDRY</span></div>
+      <div className="tabletop-terrain terrain-center"><span>REACTOR WORKS</span></div>
+      <div className="tabletop-terrain terrain-east"><span>GANTRY WALL</span></div>
+      <div className="tabletop-corridor corridor-west"><span>WEST TRANSIT</span></div>
+      <div className="tabletop-corridor corridor-center"><span>CENTRAL APPROACH</span></div>
+      {objectiveZones.map((zone) => (
+        <div className={`tabletop-objective-zone ${zone.tone}`} style={{ left: `${zone.point.x}%`, top: `${zone.point.y}%` }} key={zone.id}>
+          <b>{zone.id === "reactor" ? "P" : zone.id === "extraction" ? "X" : zone.id === "alpha" ? "A" : "B"}</b>
+          <span>{zone.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const resolveFieldPoint = (plan, landmarks, reference) => {
   if (typeof reference === "number") return plan.positions[reference];
   if (typeof reference === "string") return landmarks[reference];
@@ -1755,6 +1799,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const operationField = operationFieldFor(operation);
   const plan = fieldPlanForPressure(operationField.plans[playbook.id], condition, playbook.id);
+  const battlefieldRead = PLAYBOOK_BATTLEFIELD_READ[playbook.id];
   const breakpoints = breakpointsFor(operation);
   const execution = phase === "battle" || phase === "complete";
   const resolvedFates = new Map((execution ? formationFates : [])
@@ -1889,6 +1934,14 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
           <span><i className="continuation" />THEN CONTINUES</span>
         </div>
       </div>
+      {battlefieldRead && (
+        <div className="field-plan-strategy-read panel-surface">
+          <span>STRATEGIC TRADEOFF</span>
+          <div><small>WINS BY</small><b>{battlefieldRead.winsBy}</b></div>
+          <div><small>COMMITS TO</small><b>{battlefieldRead.commits}</b></div>
+          <div><small>LEAVES EXPOSED</small><b>{battlefieldRead.risks}</b></div>
+        </div>
+      )}
       {[...baseSegments, ...branchSegments].map((segment) => (
         <div className={`field-plan-segment ${segment.className}`} style={fieldSegmentStyle(segment.start, segment.end, layerSize)} key={segment.id}>
           <ArrowRight weight="bold" />
@@ -2448,6 +2501,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
+      <TabletopBattlefieldOverlay landmarks={operationField.landmarks} operation={operation} />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
       <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} handoffs={handoffs} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} profile={profile} />
       {showingRouteMap && (
