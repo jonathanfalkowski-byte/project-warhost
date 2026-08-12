@@ -441,8 +441,8 @@ const DEAD_CIRCUIT_BREAKPOINTS = [
     description: "Helioch fire has the planned transit lane ranged. Your authored response is ready for execution.",
     trigger: "IF Beta lane is ranged",
     options: [
-      { id: "tempo", label: "PRESERVE TEMPO", effect: "Cross exposed; keep reactor timing.", routeLabel: "DIRECT CROSSING", path: ["BETA LANE", "REACTOR"] },
-      { id: "protect", label: "PROTECT BREACHER", effect: "Lay smoke and divert the thrust.", routeLabel: "COVERED DIVERSION", path: ["SMOKE LINE", "COVERED ARC", "REACTOR"] },
+      { id: "tempo", label: "CROSS NOW", effect: "No delay. The assault crosses exposed and keeps the reactor timetable.", routeLabel: "DIRECT CROSSING", path: ["BETA LANE", "REACTOR"] },
+      { id: "protect", label: "COVER THE BREACHER", effect: "+00:15 delay. Smoke protects one formation on the longer crossing.", routeLabel: "COVERED DIVERSION", path: ["SMOKE LINE", "COVERED ARC", "REACTOR"] },
     ],
     defaultOption: "tempo",
   },
@@ -452,8 +452,8 @@ const DEAD_CIRCUIT_BREAKPOINTS = [
     description: "The optional rescue now conflicts with the reactor timetable. Your playbook already contains a response.",
     trigger: "IF salvage crew is located",
     options: [
-      { id: "clock", label: "PRESERVE CLOCK", effect: "Leave the crew; secure extraction.", routeLabel: "BYPASS SALVAGE", path: ["REACTOR", "EXTRACTION"] },
-      { id: "recover", label: "RECOVER CREW", effect: "Divert the Hauler before sabotage.", routeLabel: "RECOVERY LOOP", path: ["REACTOR", "SALVAGE PEN", "EXTRACTION"] },
+      { id: "clock", label: "LEAVE THE CREW", effect: "No delay. The army continues directly to extraction; the crew is abandoned.", routeLabel: "BYPASS SALVAGE", path: ["REACTOR", "EXTRACTION"] },
+      { id: "recover", label: "DIVERT TO RESCUE", effect: "+00:15 delay. Rescue the crew and protect the recovery formation.", routeLabel: "RECOVERY LOOP", path: ["REACTOR", "SALVAGE PEN", "EXTRACTION"] },
     ],
     defaultOption: "clock",
   },
@@ -2068,6 +2068,12 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
         const progress = inBattle ? Math.min(1, battleTime / formation.actionAt) : 0;
         const route = routeForClash(formation, clash, index);
         const position = pointAlongFieldRoute(route, progress);
+        const convergenceSpread = Math.pow(progress, 2);
+        const convergenceOffsets = [{ x: -3.8, y: -3.2 }, { x: 4.2, y: .8 }, { x: -2.5, y: 4.1 }];
+        const displayPosition = {
+          x: position.x + convergenceOffsets[index].x * convergenceSpread,
+          y: position.y + convergenceOffsets[index].y * convergenceSpread,
+        };
         const endpoint = route.at(-1);
         const resolved = inBattle && battleTime >= formation.actionAt;
         return (
@@ -2080,7 +2086,7 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
             <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
               <b>{formation.number}</b><span>{clash.label}</span>
             </div>
-            <div className={`enemy-plan-formation ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass} ${counterRevealClass}`} style={{ left: `${position.x}%`, top: `${position.y}%` }}>
+            <div className={`enemy-plan-formation ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass} ${counterRevealClass}`} style={{ left: `${displayPosition.x}%`, top: `${displayPosition.y}%` }}>
               <img src="/assets/helioch-sentinels.png" alt={`${formation.name} executing ${clash.label}`} />
               <span>{formation.number}</span>
               <small>{resolved ? clash.routeState === "starved" ? "CHAIN STARVED" : clash.routeState === "diverted" || clash.routeState === "redirected" ? "REROUTED" : clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
@@ -2553,6 +2559,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
+      <div className="battlefield-map-stage">
       <TabletopBattlefieldOverlay landmarks={operationField.landmarks} operation={operation} />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
       <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} handoffs={handoffs} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} profile={profile} />
@@ -2661,6 +2668,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       )}
 
       {playbackActive && <BattleStateLegend />}
+      </div>
       {!showingRouteMap && <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} inspected={inspected} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onClearRole={onClearRole} onFormationDragStart={onFormationDragStart} onInspectFormation={onInspect} onSelectFormation={onSelect} onStaffExercise={onStaffExercise} onViewRouteMap={() => setRouteMapOpen(true)} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} />}
       {phase === "drill" && (
         <div className="drill-status" role="status">
@@ -2959,12 +2967,12 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
         </div>
       </div>
       <div className="seals-block">
-        <span className="panel-label">COMMAND SEALS</span>
+        <span className="panel-label">COMMAND SEALS · CHANGE AN AUTHORED ORDER</span>
         <div className="seals-visual">
           <strong>{seals}</strong>
           <div>{[0, 1].map((index) => <Seal key={index} weight={index < seals ? "duotone" : "thin"} />)}</div>
         </div>
-        <small>Override one order when contact changes the mission.</small>
+        <small><b>TIME IS SURVIVAL.</b> Beat the enemy wave to extraction to preserve formations and Warhost Integrity. Speed awards no bonus resources.</small>
       </div>
       <div className="primary-controls">
         {phase === "plan" || phase === "drill" ? (
