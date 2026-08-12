@@ -717,6 +717,24 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .doctrine-battle-readout.triggered span, .doctrine-battle-readout.triggered b { color: #9bd079; }
 .playbook-board { position: absolute; z-index: 15; left: 2%; right: 2%; bottom: 1.5%; width: auto; max-height: 29%; overflow-y: auto; display: flex; flex-direction: column; padding: 7px 10px; background: rgba(8, 14, 14, .96); border-color: #4c8296; box-shadow: 0 -8px 26px rgba(0, 0, 0, .58); }
 .playbook-board.execution-view { max-height: 30%; border-color: #739a63; background: rgba(7, 14, 11, .97); }
+.playbook-board.compact-execution { max-height: none; overflow: hidden; padding: 5px 8px; gap: 4px; }
+.compact-execution-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.compact-execution-heading > div { display: grid; gap: 0; }
+.compact-execution-heading b, .compact-execution-heading strong { color: #dceae3; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .08em; }
+.compact-execution-heading strong { color: #8bcf68; }
+.compact-route-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.compact-route-strip > div { min-width: 0; display: grid; gap: 1px; padding: 3px 5px; border: 1px solid #365765; background: #0c1b20; }
+.compact-route-strip > div.empty { opacity: .48; }
+.compact-route-strip span { overflow: hidden; color: #71bfd9; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .07em; text-overflow: ellipsis; white-space: nowrap; }
+.compact-route-strip b { overflow: hidden; color: #e1e8e3; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
+.compact-rendezvous-strip { display: grid; grid-template-columns: auto repeat(2, minmax(0, 1fr)); align-items: center; gap: 4px; }
+.compact-rendezvous-strip > span { color: #7396a2; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .1em; }
+.compact-rendezvous-strip > div { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 5px; border-left: 2px solid #856d35; background: #17170f; }
+.compact-rendezvous-strip > div.live { border-color: #80b85d; background: #142016; }
+.compact-rendezvous-strip > div.resolved { border-color: #4e7d60; background: #101a16; }
+.compact-rendezvous-strip > div.empty { opacity: .48; }
+.compact-rendezvous-strip b { overflow: hidden; color: #d8c17b; font-family: "Barlow Condensed"; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.compact-rendezvous-strip small { color: #9eb2aa; font-size: 7px; white-space: nowrap; }
 .playbook-board.incomplete { box-shadow: inset 0 0 0 1px rgba(41, 169, 232, .1), 0 14px 32px rgba(0, 0, 0, .48); }
 .playbook-board.ready { border-color: #5b8b53; }
 .playbook-board-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }

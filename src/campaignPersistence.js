@@ -98,6 +98,7 @@ export const formationFatesFor = ({
   campaignDestroyed = false,
   extractionAt = 0,
   completeAt = extractionAt,
+  protectedFormationIds = [],
 } = {}) => {
   const validFormations = Array.isArray(formations)
     ? formations.filter((formation) => formation && typeof formation.id === "string")
@@ -114,7 +115,12 @@ export const formationFatesFor = ({
   }));
   const safeExtractedCount = Math.max(0, Math.min(ordered.length, Math.floor(Number(extractedCount) || 0)));
   const unaccountedCount = ordered.length - safeExtractedCount;
+  const protectedIds = new Set(Array.isArray(protectedFormationIds) ? protectedFormationIds : []);
   const exposedFirst = [...ordered].sort((left, right) => {
+    if (safeExtractedCount > 0) {
+      const protectionDifference = Number(protectedIds.has(left.formation.id)) - Number(protectedIds.has(right.formation.id));
+      if (protectionDifference) return protectionDifference;
+    }
     const combatRisk = (item) => {
       const combat = item.consequence?.combat;
       if (!combat) return 0;

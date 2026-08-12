@@ -229,3 +229,22 @@ test("specific combat exposure decides which formation fails extraction before g
   assert.equal(fates.find(({ formation }) => formation.id === "beta").fate, "missing");
   assert.equal(fates.find(({ formation }) => formation.id === "alpha").fate, "damaged");
 });
+
+test("a staffed recovery element protects its assigned formation when any extraction survives", () => {
+  const formations = [{ id: "lead" }, { id: "assault" }, { id: "recovery" }];
+  const fates = formationFatesFor({
+    formations,
+    formationOrderIds: ["lead", "assault", "recovery"],
+    extractedCount: 1,
+    consequences: {
+      recovery: { state: "cut-off", severity: 5, cause: "GANTRY SEVER" },
+      assault: { state: "damaged", severity: 3, cause: "COUNTERFIRE" },
+    },
+    protectedFormationIds: ["recovery"],
+    extractionAt: 90,
+    completeAt: 105,
+  });
+
+  assert.equal(fates.find(({ formation }) => formation.id === "recovery").fate, "damaged");
+  assert.equal(fates.filter(({ fate }) => fate === "missing").length, 2);
+});

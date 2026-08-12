@@ -1314,7 +1314,12 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
   const completeAt = extractionAt + 15;
   const overrun = Math.max(0, completeAt - reinforcementWave.arrivalAt);
   const protectedCount = total("protects") + protocolTotal("protects") + branchTotal("protects") + doctrine.impact.protects;
-  const enemyRecoveryLoss = Math.ceil(enemyTotal("recoveryLoss"));
+  const rawEnemyRecoveryLoss = Math.ceil(enemyTotal("recoveryLoss"));
+  const recoveryRoleProtection = Object.values(readiness).find((placement) => (
+    placement?.demands.includes("RECOVERY") && placement.capabilities.includes("RECOVERY")
+  )) ?? null;
+  const recoveryLossPrevented = recoveryRoleProtection && rawEnemyRecoveryLoss > 0 ? 1 : 0;
+  const enemyRecoveryLoss = Math.max(0, rawEnemyRecoveryLoss - recoveryLossPrevented);
   const deployedCount = readinessSummary.staffedCount;
   const extraction = resolveExtractionOutcome({
     deployedCount,
@@ -1340,7 +1345,10 @@ const calculateOperationProfile = (handoffs, branchChoices, readiness, condition
     overrun,
     pressureTiming,
     reinforcementLoss,
+    rawEnemyRecoveryLoss,
     enemyRecoveryLoss,
+    recoveryLossPrevented,
+    recoveryRoleProtection,
     enemyClashes,
     enemyCollision: enemyClashes[0]?.collision ?? null,
     branchEffects,
@@ -2231,6 +2239,42 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
     return { ...window, source, receiver, staffed, revealed, handoff, stateLabel };
   });
 
+  if (phase === "battle") {
+    return (
+      <div className="playbook-board execution-view compact-execution panel-surface">
+        <div className="compact-execution-heading">
+          <div><span className="panel-label">{playbook.name} · FORMATION ROUTE PLAN</span><b>ORDERS IN MOTION</b></div>
+          <strong>{Object.values(assignments).filter(Boolean).length} / {formations.length} ROUTES STAFFED</strong>
+        </div>
+        <div className="compact-route-strip">
+          {playbook.roles.map((role, index) => {
+            const formation = formations.find((item) => item.id === assignments[role.id]);
+            return (
+              <div className={formation ? "staffed" : "empty"} key={role.id}>
+                <span>{String(index + 1).padStart(2, "0")} · {role.label}</span>
+                <b>{formation?.name ?? "UNSTAFFED"}</b>
+              </div>
+            );
+          })}
+        </div>
+        <div className="compact-rendezvous-strip">
+          <span>RENDEZVOUS</span>
+          {rendezvousStatuses.map((status) => {
+            const windowAt = timing[status.from] ?? 0;
+            const state = battleTime >= windowAt + 15 ? "resolved" : battleTime >= windowAt ? "live" : "upcoming";
+            return (
+              <div className={`${state} ${status.staffed ? "staffed" : "empty"}`} key={status.id ?? `${status.from}:${status.to}`}>
+                <b>{status.label}</b>
+                <small>{!status.staffed ? "UNSTAFFED" : state === "live" ? "CONTACT NOW" : state === "resolved" ? status.stateLabel : `IN ${fmtDuration(windowAt - battleTime)}`}</small>
+              </div>
+            );
+          })}
+          {rendezvousStatuses.length === 0 && <small>NO AUTHORED MEETING POINTS</small>}
+        </div>
+      </div>
+    );
+  }
+
   if (phase === "complete") {
     return (
       <div className={`combo-panel panel-surface ${active ? "ready" : "broken"}`}>
@@ -2828,7 +2872,7 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
           <div className={`extraction-breakdown ${profile.extractedCount >= operation.requiredExtraction ? "viable" : profile.extractedCount > 0 ? "costly" : "broken"}`}>
             <span>EXTRACTION BREAKDOWN</span>
             <b>{profile.reserveCapacity} CAPACITY − {profile.reinforcementLoss} WAVE − {profile.enemyRecoveryLoss} ROUTE = {profile.extractedCount} CLEAR</b>
-            <small>THE ENEMY WAVE REMOVES ONE RECOVERY SLOT PER COMPLETE 30 SECONDS OF CONTACT.</small>
+            <small>{profile.recoveryLossPrevented > 0 ? `${profile.recoveryRoleProtection.formationName} ABSORBED 1 ROUTE LOSS AT THE RECOVERY ELEMENT.` : "THE ENEMY WAVE REMOVES ONE RECOVERY SLOT PER COMPLETE 30 SECONDS OF CONTACT."}</small>
           </div>
         )}
         {!planningSealed && profile.protocols.length > 0 && (
@@ -3213,7 +3257,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
         <div className="after-action-grid">
           <div><span>PRIMARY · COMPLETE</span><b>{operation.primaryResult}</b><CheckCircle weight="fill" /></div>
           <div><span>EXTRACTION · {won ? "PASSED" : "FAILED"}</span><b>{profile.extractedCount} extracted · {operation.requiredExtraction} required</b>{won ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
-          <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{carrierCutOffAfterRescue && <small>ARMOURED RECOVERY VEHICLE was cut off afterward.</small>}{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
+          <div><span>OPTIONAL</span><b>{rescued ? "Crew rescued" : "Crew left behind"}</b>{carrierCutOffAfterRescue && <small>{profile.recoveryRoleProtection ? `${profile.recoveryRoleProtection.formationName} protected one withdrawal route before the remaining reserve was overwhelmed.` : "ARMOURED RECOVERY VEHICLE was cut off afterward."}</small>}{rescued ? <CheckCircle weight="fill" /> : <Warning weight="fill" />}</div>
           <div><span>FORMATION ROUTE PLAN</span><b>{profile.readiness.staffedCount} / {playbook.roles.length} orders staffed</b><small>{profile.effects.length} secondary combo bonuses · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</small><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
@@ -3417,6 +3461,10 @@ export function App() {
     () => playbook.roles.map((role) => assignments[role.id]).filter(Boolean),
     [assignments, playbook.roles],
   );
+  const recoveryProtectedFormationIds = useMemo(
+    () => operationProfile.recoveryRoleProtection?.formationId ? [operationProfile.recoveryRoleProtection.formationId] : [],
+    [operationProfile.recoveryRoleProtection],
+  );
   const operationFormationFates = useMemo(
     () => formationFatesFor({
       formations,
@@ -3426,8 +3474,9 @@ export function App() {
       campaignDestroyed,
       extractionAt: operationProfile.extractionAt,
       completeAt: operationProfile.completeAt,
+      protectedFormationIds: recoveryProtectedFormationIds,
     }),
-    [campaignDestroyed, finalConsequences.player, formationOrderIds, formations, operationProfile.completeAt, operationProfile.extractedCount, operationProfile.extractionAt],
+    [campaignDestroyed, finalConsequences.player, formationOrderIds, formations, operationProfile.completeAt, operationProfile.extractedCount, operationProfile.extractionAt, recoveryProtectedFormationIds],
   );
   const operationEvents = useMemo(
     () => buildOperationEvents(operationProfile, operation),
