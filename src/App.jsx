@@ -2148,6 +2148,21 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
   const staffedRendezvousCount = (playbook.comboWindows ?? []).filter((window) => (
     assignments[playbook.roles[window.from]?.id] && assignments[playbook.roles[window.to]?.id]
   )).length;
+  const rendezvousStatuses = (playbook.comboWindows ?? []).map((window) => {
+    const sourceRole = playbook.roles[window.from];
+    const receiverRole = playbook.roles[window.to];
+    const source = formations.find((formation) => formation.id === assignments[sourceRole?.id]) ?? null;
+    const receiver = formations.find((formation) => formation.id === assignments[receiverRole?.id]) ?? null;
+    const handoff = handoffs.find((item) => item.from === window.from && item.to === window.to) ?? null;
+    const staffed = Boolean(source && receiver);
+    const revealed = phase === "battle";
+    const stateLabel = !staffed
+      ? "STAFF BOTH ROUTES"
+      : revealed
+        ? handoff?.maneuver?.name ?? "MET - NO REACTION"
+        : "PAIR STAFFED - RESULT SEALED";
+    return { ...window, source, receiver, staffed, revealed, handoff, stateLabel };
+  });
 
   if (phase === "complete") {
     return (
@@ -2223,34 +2238,6 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
         <small>EXPOSURE · {doctrine.exposure}</small>
         <em>DOCTRINE RESULT UNRESOLVED</em>
       </div>
-      <details className="secondary-combo-drawer" open>
-        <summary>
-          <span><Radio weight="fill" /> OPTIONAL COMBO BONUSES</span>
-          <small>{authoredRendezvousCount} authored meeting points · {staffedRendezvousCount} pairs staffed</small>
-        </summary>
-      {inspectingInteractions && (
-        <section className="formation-interaction-inspector" aria-live="polite" aria-label={`${inspectedFormation.name} potential formation interactions`}>
-          <header>
-            <span><Radio weight="fill" /> SELECTED FORMATION</span>
-            <b>{inspectedFormation.name}</b>
-            <small>CREATES <strong>{inspectedFormation.creates}</strong> · CAN REACT TO <strong>{inspectedFormation.uses.join(" / ")}</strong></small>
-            <div className="interaction-legend"><span className="source">CYAN: INSPECTED</span><span className="outgoing">YELLOW: IT FEEDS THEM</span><span className="incoming">PURPLE: THEY FEED IT</span></div>
-          </header>
-          <div className="formation-interaction-partners">
-            {activeInteractions.length > 0 ? activeInteractions.map((interaction) => (
-              <button className={`active ${interactionDirectionFor(interaction)}`} key={interaction.partnerId} onClick={() => onSelectFormation(interaction.partnerId)}>
-                <b>{interaction.partnerName}<em>ACTIVE RENDEZVOUS</em></b>
-                {interaction.outgoing && <small><ArrowRight weight="bold" /> {inspectedFormation.name} creates <strong>{tacticalTerm(interaction.outgoing.condition)}</strong>; {interaction.partnerName} reacts</small>}
-                {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.partnerName} creates <strong>{tacticalTerm(interaction.incoming.condition)}</strong>; {inspectedFormation.name} reacts</small>}
-              </button>
-            )) : <p>No staffed route meets this formation at a named rendezvous. It is operating independently.</p>}
-            {inspectedAssigned && activeInteractions.length === 0 && <p className="independent-state">OPERATING INDEPENDENTLY - its route shares no active rendezvous. This is valid when the responsibility matters more than a bonus.</p>}
-          </div>
-          <em>Color shows direction, not quality. A combo can arm only where the authored routes share a named rendezvous.</em>
-        </section>
-      )}
-      {!inspectingInteractions && <div className="combo-empty-guide"><Radio weight="fill" /><span><b>SELECT OR HOVER A STAFFED FORMATION</b><small>Only its real partner at an authored rendezvous will highlight. No highlight means the routes never meet.</small></span></div>}
-      </details>
       <div className="route-terminals" aria-hidden="true"><span>PRIMARY · ROUTE RESPONSIBILITIES</span><span>SECONDARY · RENDEZVOUS BONUSES</span></div>
       <div className="playbook-route">
         {playbook.roles.map((role, index) => {
@@ -2334,11 +2321,55 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
           );
         })}
       </div>
-      <details className="secondary-combo-drawer combo-window-drawer" open>
+      <section className="rendezvous-status-strip" aria-label="Authored rendezvous staffing">
+        <span className="rendezvous-strip-title"><Radio weight="fill" /><b>RENDEZVOUS</b><small>{staffedRendezvousCount}/{authoredRendezvousCount} staffed</small></span>
+        {rendezvousStatuses.map((rendezvous) => {
+          const inspectedAtMeeting = inspected && (rendezvous.source?.id === inspected || rendezvous.receiver?.id === inspected);
+          const inspectId = rendezvous.source?.id ?? rendezvous.receiver?.id ?? null;
+          return (
+            <button
+              type="button"
+              className={`${rendezvous.staffed ? "staffed" : "unstaffed"} ${rendezvous.revealed && rendezvous.handoff?.maneuver ? "resolved" : ""} ${inspectedAtMeeting ? "inspected" : ""}`}
+              key={rendezvous.rendezvous}
+              disabled={!inspectId}
+              onMouseEnter={() => inspectId && onInspectFormation(inspectId)}
+              onMouseLeave={() => onInspectFormation(null)}
+              onClick={() => inspectId && onSelectFormation(inspectId)}
+            >
+              <span><b>{rendezvous.label}</b><small>ROUTES {rendezvous.from + 1} + {rendezvous.to + 1}</small></span>
+              <em>{rendezvous.stateLabel}</em>
+            </button>
+          );
+        })}
+        <span className="rendezvous-separated">{Math.max(0, playbook.roles.length - 1 - authoredRendezvousCount)} ROUTE GAPS STAY SEPARATE</span>
+      </section>
+      <details className="secondary-combo-drawer combo-window-drawer">
         <summary>
-          <span><Lightning weight="fill" /> OPTIONAL COMBO WINDOWS</span>
-          <small>{phase === "battle" ? "Live battle result · a meeting does not guarantee a reaction" : "Inspect every real meeting point; separated routes are marked NO SHARED ROUTE EVENT."}</small>
+          <span><Lightning weight="fill" /> COMBO DETAILS · OPTIONAL BONUS</span>
+          <small>{phase === "battle" ? `${discoveredHandoffs.length}/${authoredRendezvousCount} rendezvous produced a reaction` : "Open to inspect formation interactions and every authored meeting point"}</small>
         </summary>
+        {inspectingInteractions && (
+          <section className="formation-interaction-inspector" aria-live="polite" aria-label={`${inspectedFormation.name} potential formation interactions`}>
+            <header>
+              <span><Radio weight="fill" /> SELECTED FORMATION</span>
+              <b>{inspectedFormation.name}</b>
+              <small>CREATES <strong>{inspectedFormation.creates}</strong> · CAN REACT TO <strong>{inspectedFormation.uses.join(" / ")}</strong></small>
+              <div className="interaction-legend"><span className="source">CYAN: INSPECTED</span><span className="outgoing">YELLOW: IT FEEDS THEM</span><span className="incoming">PURPLE: THEY FEED IT</span></div>
+            </header>
+            <div className="formation-interaction-partners">
+              {activeInteractions.length > 0 ? activeInteractions.map((interaction) => (
+                <button className={`active ${interactionDirectionFor(interaction)}`} key={interaction.partnerId} onClick={() => onSelectFormation(interaction.partnerId)}>
+                  <b>{interaction.partnerName}<em>ACTIVE RENDEZVOUS</em></b>
+                  {interaction.outgoing && <small><ArrowRight weight="bold" /> {inspectedFormation.name} creates <strong>{tacticalTerm(interaction.outgoing.condition)}</strong>; {interaction.partnerName} reacts</small>}
+                  {interaction.incoming && <small><ArrowRight weight="bold" /> {interaction.partnerName} creates <strong>{tacticalTerm(interaction.incoming.condition)}</strong>; {inspectedFormation.name} reacts</small>}
+                </button>
+              )) : <p>No staffed route meets this formation at a named rendezvous. It is operating independently.</p>}
+              {inspectedAssigned && activeInteractions.length === 0 && <p className="independent-state">OPERATING INDEPENDENTLY - its route shares no active rendezvous. This is valid when the responsibility matters more than a bonus.</p>}
+            </div>
+            <em>Color shows direction, not quality. A combo can arm only where the authored routes share a named rendezvous.</em>
+          </section>
+        )}
+        {!inspectingInteractions && <div className="combo-empty-guide"><Radio weight="fill" /><span><b>SELECT OR HOVER A STAFFED FORMATION</b><small>Only its real partner at an authored rendezvous will highlight. No highlight means the routes never meet.</small></span></div>}
         <TacticalHandoffBoard feedback={feedback} formations={formations} handoffs={handoffs} profile={profile} staffExerciseIndex={staffExerciseIndex} onStaffExercise={onStaffExercise} />
       </details>
     </div>

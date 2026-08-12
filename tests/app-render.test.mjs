@@ -16,8 +16,9 @@ test("the planning screen renders without an undefined runtime binding", async (
     const markup = renderToString(React.createElement(App));
     assert.match(markup, /PLACE THE FORMATIONS/);
     assert.match(markup, /VIEW ROUTE MAP/);
-    assert.match(markup, /OPTIONAL COMBO BONUSES/);
-    assert.match(markup, /OPTIONAL COMBO WINDOWS/);
+    assert.match(markup, /RENDEZVOUS/);
+    assert.match(markup, /COMBO DETAILS · OPTIONAL BONUS/);
+    assert.match(markup, /STAFF BOTH ROUTES/);
     assert.match(markup, /PRIMARY DECISION/);
     assert.match(markup, /ROUTE RESPONSIBILITY/);
     assert.match(markup, /SECONDARY BONUS/);
