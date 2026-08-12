@@ -4,6 +4,10 @@ const isPoint = (value) => Number.isFinite(value?.x) && Number.isFinite(value?.y
 
 const samePoint = (left, right) => left?.x === right?.x && left?.y === right?.y;
 
+const pushDistinctPoint = (points, point) => {
+  if (isPoint(point) && !samePoint(points.at(-1), point)) points.push(point);
+};
+
 export const resolveAuthoredPoint = (plan, landmarks, reference) => {
   if (typeof reference === "number") return plan.positions[reference] ?? null;
   if (typeof reference === "string") return landmarks[reference] ?? null;
@@ -54,8 +58,11 @@ export const buildAuthoredFormationRoutes = ({
     // Staffing changes which formation travels a route, never the authored
     // geometry of the army plan itself.
     const formationStart = authoredStart;
-    const points = [formationStart, ...route.points.map((reference) => resolveAuthoredPoint(plan, landmarks, reference))]
-      .filter(isPoint);
+    const points = [];
+    pushDistinctPoint(points, formationStart);
+    route.points
+      .map((reference) => resolveAuthoredPoint(plan, landmarks, reference))
+      .forEach((point) => pushDistinctPoint(points, point));
 
     if (route.breakpoint) {
       const selectedBranch = branches[route.breakpoint];
@@ -63,13 +70,11 @@ export const buildAuthoredFormationRoutes = ({
       branchReferences
         .map((reference) => resolveAuthoredPoint(plan, landmarks, reference))
         .filter(isPoint)
-        .forEach((point) => {
-          if (!samePoint(points.at(-1), point)) points.push(point);
-        });
+        .forEach((point) => pushDistinctPoint(points, point));
     }
 
     const extraction = landmarks.extraction;
-    if (isPoint(extraction) && !samePoint(points.at(-1), extraction)) points.push(extraction);
+    pushDistinctPoint(points, extraction);
 
     return {
       roleIndex: route.role,

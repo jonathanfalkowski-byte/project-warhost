@@ -643,17 +643,17 @@ const FIELD_PLANS = {
       { x: 70, y: 66 },
     ],
     routes: [
-      { role: 0, start: { x: 20, y: 88 }, points: [0, "alphaTransfer", "sabotageLane", "reactor"] },
-      { role: 1, start: { x: 32, y: 88 }, points: [1, "alphaTransfer", "sabotageLane", "reactor"] },
-      { role: 2, start: { x: 44, y: 88 }, points: [2, "sabotageLane"], breakpoint: "beta" },
-      { role: 3, start: { x: 56, y: 88 }, points: [3, "beta", "reactor"] },
-      { role: 4, start: { x: 68, y: 88 }, points: [4, "reactor"], breakpoint: "rescue" },
+      { role: 0, start: { x: 20, y: 88 }, points: [0, "alphaTransfer", "sabotageLane", "reactor", "extraction"] },
+      { role: 1, start: { x: 32, y: 88 }, points: [1, "alphaTransfer", "sabotageLane", "reactor", "extraction"] },
+      { role: 2, start: { x: 44, y: 88 }, points: [2], breakpoint: "beta" },
+      { role: 3, start: { x: 56, y: 88 }, points: [3, "beta", "reactor", "extraction"] },
+      { role: 4, start: { x: 68, y: 88 }, points: [4], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 2, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [2, "reactor"],
-        protect: [2, { x: 67, y: 20 }, { x: 72, y: 34 }, "reactor"],
+        tempo: [2, "sabotageLane", "reactor", "extraction"],
+        protect: [2, "beta", { x: 72, y: 40 }, "reactor", "extraction"],
       },
       rescue: {
         clock: [4, "extraction"],
@@ -663,24 +663,24 @@ const FIELD_PLANS = {
   },
   spear: {
     positions: [
-      { x: 34, y: 58 },
+      { x: 30, y: 50 },
       { x: 45, y: 51 },
       { x: 58, y: 49 },
       { x: 57, y: 67 },
       { x: 70, y: 67 },
     ],
     routes: [
-      { role: 0, start: { x: 20, y: 88 }, points: [0, "screenedConcentration", "assaultLaunch", "reactor"] },
-      { role: 1, start: { x: 32, y: 88 }, points: [1, "screenedConcentration", "assaultLaunch", "reactor"] },
-      { role: 2, start: { x: 44, y: 88 }, points: [2, "assaultLaunch"], breakpoint: "beta" },
-      { role: 3, start: { x: 56, y: 88 }, points: [3, "assaultLaunch", "reactor"] },
-      { role: 4, start: { x: 68, y: 88 }, points: [4, "reactor"], breakpoint: "rescue" },
+      { role: 0, start: { x: 20, y: 88 }, points: [0, "screenedConcentration", "assaultLaunch", "reactor", "extraction"] },
+      { role: 1, start: { x: 32, y: 88 }, points: [1, "screenedConcentration", "assaultLaunch", "reactor", "extraction"] },
+      { role: 2, start: { x: 44, y: 88 }, points: [2], breakpoint: "beta" },
+      { role: 3, start: { x: 56, y: 88 }, points: [3, "assaultLaunch", "reactor", "extraction"] },
+      { role: 4, start: { x: 68, y: 88 }, points: [4], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 2, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [2, "reactor"],
-        protect: [2, { x: 65, y: 23 }, { x: 72, y: 34 }, "reactor"],
+        tempo: [2, "assaultLaunch", "reactor", "extraction"],
+        protect: [2, "beta", { x: 72, y: 40 }, "reactor", "extraction"],
       },
       rescue: {
         clock: [4, "extraction"],
@@ -691,23 +691,23 @@ const FIELD_PLANS = {
   pressure: {
     positions: [
       { x: 30, y: 50 },
-      { x: 67, y: 29 },
+      { x: 52, y: 42 },
       { x: 49, y: 51 },
       { x: 60, y: 57 },
       { x: 71, y: 68 },
     ],
     routes: [
-      { role: 0, start: { x: 20, y: 88 }, points: [0, "alpha", "primaryConvergence"] },
-      { role: 1, start: { x: 32, y: 88 }, points: [1, "beta", "eastInterdiction", "primaryConvergence"] },
-      { role: 2, start: { x: 44, y: 88 }, points: [2, "eastInterdiction", "primaryConvergence"] },
-      { role: 3, start: { x: 56, y: 88 }, points: [3, "primaryConvergence"], breakpoint: "beta" },
-      { role: 4, start: { x: 68, y: 88 }, points: [4, "reactor"], breakpoint: "rescue" },
+      { role: 0, start: { x: 20, y: 88 }, points: [0, "primaryConvergence", "reactor", "extraction"] },
+      { role: 1, start: { x: 32, y: 88 }, points: [1, "eastInterdiction", "beta", "primaryConvergence", "reactor", "extraction"] },
+      { role: 2, start: { x: 44, y: 88 }, points: [2, "eastInterdiction", "primaryConvergence", "reactor", "extraction"] },
+      { role: 3, start: { x: 56, y: 88 }, points: [3], breakpoint: "beta" },
+      { role: 4, start: { x: 68, y: 88 }, points: [4], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 3, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [3, "reactor"],
-        protect: [3, { x: 68, y: 25 }, { x: 73, y: 35 }, "reactor"],
+        tempo: [3, "primaryConvergence", "reactor", "extraction"],
+        protect: [3, "beta", { x: 72, y: 40 }, "reactor", "extraction"],
       },
       rescue: {
         clock: [4, "extraction"],
@@ -725,26 +725,26 @@ const FIELD_LANDMARKS = {
   rescue: { x: 81, y: 76 },
   alphaTransfer: { x: 41, y: 50 },
   sabotageLane: { x: 55, y: 52 },
-  screenedConcentration: { x: 44, y: 54 },
+  screenedConcentration: { x: 42, y: 50 },
   assaultLaunch: { x: 58, y: 49 },
   eastInterdiction: { x: 57, y: 38 },
-  primaryConvergence: { x: 63, y: 49 },
+  primaryConvergence: { x: 64, y: 50 },
 };
 
 const PLAYBOOK_BATTLEFIELD_READ = {
   trapline: {
-    winsBy: "Keeping one connected column moving through every objective.",
-    commits: "Two formations hold the transfer corridor behind the lead.",
-    risks: "A slower objective clock if the column is stalled or split.",
+    winsBy: "Sweeping from Alpha through the Reactor, then reforming at extraction.",
+    commits: "The army follows one connected objective-to-objective column.",
+    risks: "A stalled lead element delays every formation behind it.",
   },
   spear: {
-    winsBy: "Concentrating the army at the Reactor before relief arrives.",
-    commits: "Four routes collapse into one decisive assault corridor.",
-    risks: "Alpha and the rear guard receive less protection.",
+    winsBy: "Screening Alpha while the assault mass drives straight into the Reactor.",
+    commits: "Four formations collapse into one decisive corridor before extraction.",
+    risks: "The screening element and extraction corridor receive less protection.",
   },
   pressure: {
-    winsBy: "Taking Alpha and Beta in parallel, then converging on the Reactor.",
-    commits: "The army fights as two separated wings until the center link.",
+    winsBy: "Taking Alpha and Beta in parallel, then converging at the Reactor.",
+    commits: "Two separated wings must reunite before the final extraction push.",
     risks: "Either wing can be isolated before the convergence.",
   },
 };
@@ -759,17 +759,17 @@ const ASHEN_PASSAGE_FIELD_PLANS = {
       { x: 79, y: 24 },
     ],
     routes: [
-      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha", "alphaTransfer"] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, "alphaTransfer", "sabotageLane", "beta"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2, "sabotageLane"], breakpoint: "beta" },
-      { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor"] },
+      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha", "alphaTransfer", "sabotageLane", "beta", "reactor", "extraction"] },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, "alphaTransfer", "sabotageLane", "beta", "reactor", "extraction"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2], breakpoint: "beta" },
+      { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor", "extraction"] },
       { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 2, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [2, "reactor"],
-        protect: [2, { x: 59, y: 27 }, { x: 68, y: 22 }, "reactor"],
+        tempo: [2, "sabotageLane", "beta", "reactor", "extraction"],
+        protect: [2, { x: 59, y: 27 }, { x: 68, y: 22 }, "reactor", "extraction"],
       },
       rescue: {
         clock: [4, "extraction"],
@@ -786,17 +786,17 @@ const ASHEN_PASSAGE_FIELD_PLANS = {
       { x: 79, y: 25 },
     ],
     routes: [
-      { role: 0, start: { x: 15, y: 73 }, points: [0, "screenedConcentration", "alpha"] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, "screenedConcentration", "assaultLaunch", "beta"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2, "assaultLaunch"], breakpoint: "beta" },
-      { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor"] },
+      { role: 0, start: { x: 15, y: 73 }, points: [0, "screenedConcentration", "assaultLaunch", "reactor", "extraction"] },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, "screenedConcentration", "assaultLaunch", "reactor", "extraction"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2], breakpoint: "beta" },
+      { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor", "extraction"] },
       { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 2, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [2, "reactor"],
-        protect: [2, { x: 58, y: 30 }, { x: 67, y: 23 }, "reactor"],
+        tempo: [2, "assaultLaunch", "reactor", "extraction"],
+        protect: [2, "beta", { x: 67, y: 23 }, "reactor", "extraction"],
       },
       rescue: {
         clock: [4, "extraction"],
@@ -813,17 +813,17 @@ const ASHEN_PASSAGE_FIELD_PLANS = {
       { x: 79, y: 25 },
     ],
     routes: [
-      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha"] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, "eastInterdiction", "beta"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2, "eastInterdiction", "primaryConvergence"] },
-      { role: 3, start: { x: 44, y: 81 }, points: [3, "primaryConvergence"], breakpoint: "beta" },
+      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha", "primaryConvergence", "reactor", "extraction"] },
+      { role: 1, start: { x: 24, y: 79 }, points: [1, "eastInterdiction", "beta", "primaryConvergence", "reactor", "extraction"] },
+      { role: 2, start: { x: 34, y: 75 }, points: [2, "eastInterdiction", "primaryConvergence", "reactor", "extraction"] },
+      { role: 3, start: { x: 44, y: 81 }, points: [3], breakpoint: "beta" },
       { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
     ],
     breakpointRoles: { beta: 3, rescue: 4 },
     branchRoutes: {
       beta: {
-        tempo: [3, "reactor"],
-        protect: [3, { x: 60, y: 28 }, { x: 68, y: 22 }, "reactor"],
+        tempo: [3, "primaryConvergence", "reactor", "extraction"],
+        protect: [3, "beta", { x: 68, y: 22 }, "reactor", "extraction"],
       },
       rescue: {
         clock: [4, "extraction"],
@@ -1942,6 +1942,14 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
           <div><small>LEAVES EXPOSED</small><b>{battlefieldRead.risks}</b></div>
         </div>
       )}
+      <div
+        className="field-plan-extraction-convergence"
+        style={{ left: `${operationField.landmarks.extraction.x}%`, top: `${operationField.landmarks.extraction.y}%` }}
+      >
+        <Flag weight="fill" />
+        <span>ALL SURVIVING ROUTES</span>
+        <b>REFORM &amp; EXTRACT</b>
+      </div>
       {[...baseSegments, ...branchSegments].map((segment) => (
         <div className={`field-plan-segment ${segment.className}`} style={fieldSegmentStyle(segment.start, segment.end, layerSize)} key={segment.id}>
           <ArrowRight weight="bold" />

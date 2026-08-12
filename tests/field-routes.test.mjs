@@ -77,6 +77,27 @@ test("an authored route separates the assigned action stop from its continuation
   assert.deepEqual(continuation.at(-1), { x: 90, y: 15 });
 });
 
+test("a complete authored journey reaches extraction exactly once", () => {
+  const completePlan = {
+    positions: [{ x: 30, y: 40 }],
+    routes: [{ role: 0, start: { x: 10, y: 80 }, points: [0, "reactor", "extraction"] }],
+  };
+  const [route] = buildAuthoredFormationRoutes({
+    plan: completePlan,
+    landmarks: { reactor: { x: 75, y: 40 }, extraction: { x: 90, y: 15 } },
+    roles: [{ id: "assault" }],
+    assignments: { assault: "walker" },
+    formationStarts: {},
+    branches: {},
+  });
+  assert.deepEqual(route.points, [
+    { x: 10, y: 80 },
+    { x: 30, y: 40 },
+    { x: 75, y: 40 },
+    { x: 90, y: 15 },
+  ]);
+});
+
 test("route interpolation clamps before deployment and after extraction", () => {
   const points = [{ x: 10, y: 80 }, { x: 40, y: 40 }, { x: 90, y: 10 }];
   assert.deepEqual(pointAlongRoute(points, -5), points[0]);
