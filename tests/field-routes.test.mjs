@@ -2,11 +2,63 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  actionStopBadge,
+  actionStopLabel,
+  actionStopPairLabel,
   buildAuthoredFormationRoutes,
   pointAlongRoute,
   positionAlongAuthoredRoute,
   splitAuthoredRouteAtActionStop,
 } from "../src/fieldRoutes.js";
+
+test("tactical stop labels are canonical and distinct from roster numbers", () => {
+  assert.equal(actionStopBadge(0), "S01");
+  assert.equal(actionStopLabel(1), "STOP 02");
+  assert.equal(actionStopPairLabel(1, 2), "STOP 02 + STOP 03");
+});
+
+test("staffing selects a visible movement-specific authored corridor", () => {
+  const movementPlan = {
+    points: {
+      vehicleStreet: { x: 40, y: 70 },
+      walkerRuin: { x: 25, y: 50 },
+      objective: { x: 60, y: 35 },
+    },
+    routes: [{
+      role: 0,
+      start: { x: 10, y: 90 },
+      points: ["vehicleStreet", "objective"],
+      movementRoutes: {
+        walker: ["walkerRuin", "objective"],
+      },
+    }],
+  };
+  const roles = [{ id: "lead" }];
+  const movementLandmarks = movementPlan.points;
+  const vehicleRoute = buildAuthoredFormationRoutes({
+    plan: movementPlan,
+    roles,
+    assignments: { lead: "tank" },
+    formationMovementProfiles: { tank: "tracked" },
+    landmarks: movementLandmarks,
+    branches: {},
+  })[0];
+  const walkerRoute = buildAuthoredFormationRoutes({
+    plan: movementPlan,
+    roles,
+    assignments: { lead: "walker" },
+    formationMovementProfiles: { walker: "walker" },
+    landmarks: movementLandmarks,
+    branches: {},
+  })[0];
+
+  assert.equal(vehicleRoute.movementRouteKind, "vehicle");
+  assert.equal(vehicleRoute.movementRouteLabel, "VEHICLE STREET ROUTE");
+  assert.deepEqual(vehicleRoute.points[1], { x: 40, y: 70 });
+  assert.equal(walkerRoute.movementRouteKind, "walker");
+  assert.equal(walkerRoute.movementRouteLabel, "WALKER CUT-THROUGH");
+  assert.deepEqual(walkerRoute.points[1], { x: 25, y: 50 });
+});
 
 const plan = {
   positions: [{ x: 30, y: 40 }, { x: 50, y: 30 }],

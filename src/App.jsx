@@ -63,6 +63,9 @@ import {
   playbackTimeForIndex,
 } from "./battlePlayback.js";
 import {
+  actionStopBadge,
+  actionStopLabel,
+  actionStopPairLabel,
   buildAuthoredFormationRoutes,
   pointAlongRoute as pointAlongFieldRoute,
   positionAlongAuthoredRoute,
@@ -1776,7 +1779,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
       id: `route-${route.roleIndex}-${index}`,
       start: point,
       end: points[index + 1],
-      className: `base lane-${route.roleIndex + 1} ${index < routeParts.approach.length - 1 ? "action-stop-approach" : "route-continuation"} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
+      className: `base lane-${route.roleIndex + 1} ${index < routeParts.approach.length - 1 ? "action-stop-approach" : "route-continuation"} ${routePresentation?.formation ? `staffed movement-${route.movementRouteKind}` : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
     }));
   });
   const objectiveIds = new Set(DEAD_CIRCUIT_MISSION.objectives.map((objective) => objective.id));
@@ -1901,7 +1904,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
       ))}
       {tacticalLinks.map((link) => (
         <div className={`field-plan-rendezvous ${link.staffed ? "staffed" : ""} ${execution ? `execution-${link.state}` : ""}`} style={{ left: `${link.at.x}%`, top: `${link.at.y}%` }} key={`rendezvous-${link.fromIndex}-${link.toIndex}`}>
-          <Radio weight="fill" /><span>{link.status}</span><small>{link.label} · ROUTES {link.fromIndex + 1} + {link.toIndex + 1}</small>
+          <Radio weight="fill" /><span>{link.status}</span><small>{link.label} · {actionStopPairLabel(link.fromIndex, link.toIndex)}</small>
         </div>
       ))}
       {branchTurns.map((turn) => (
@@ -1912,8 +1915,8 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
       {routes.map((route) => (
         <div className={`field-plan-entry lane-${route.roleIndex + 1} ${route.formation ? "staffed" : ""} ${route.playbackClass} ${route.consequenceClass} ${route.fateClass}`} style={{ left: `${route.start.x}%`, top: `${route.start.y}%` }} key={`origin-${route.roleIndex}`}>
           <Flag weight="fill" />
-          <span>{route.formation ? route.formation.number : String(route.roleIndex + 1).padStart(2, "0")}</span>
-          <small>{route.formation ? route.formation.name : `ROUTE ${String(route.roleIndex + 1).padStart(2, "0")}`}</small>
+          <span>{actionStopBadge(route.roleIndex)}</span>
+          <small>{route.formation ? `${actionStopLabel(route.roleIndex)} · ${route.formation.name}` : actionStopLabel(route.roleIndex)}</small>
         </div>
       ))}
       {plan.positions.map((position, index) => {
@@ -2399,7 +2402,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
               onMouseLeave={() => onInspectFormation(null)}
               onClick={() => inspectId && onSelectFormation(inspectId)}
             >
-              <span><b>{rendezvous.label}</b><small>ROUTES {rendezvous.from + 1} + {rendezvous.to + 1}</small></span>
+              <span><b>{rendezvous.label}</b><small>{actionStopPairLabel(rendezvous.from, rendezvous.to)}</small></span>
               <em>{rendezvous.stateLabel}</em>
             </button>
           );
@@ -2548,7 +2551,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
         const assignedRoleIndex = playbook.roles.findIndex((role) => assignments[role.id] === formation.id);
         const assignedRole = assignedRoleIndex >= 0 ? playbook.roles[assignedRoleIndex] : null;
         const assignedStop = assignedRole && staffedFieldPlan?.positions[assignedRoleIndex]
-          ? { left: staffedFieldPlan.positions[assignedRoleIndex].x, top: staffedFieldPlan.positions[assignedRoleIndex].y, label: `Stop ${String(assignedRoleIndex + 1).padStart(2, "0")} · ${assignedRole.label}` }
+          ? { left: staffedFieldPlan.positions[assignedRoleIndex].x, top: staffedFieldPlan.positions[assignedRoleIndex].y, label: `${actionStopLabel(assignedRoleIndex)} · ${assignedRole.label}` }
           : null;
         const node = assignedStop ?? STAGING_NODES[formation.id];
         const active = selected === formation.id;
@@ -2592,12 +2595,13 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             aria-label={`${formation.name}, ${assignedStop ? tacticalTerm(formation.role) : "unassigned"}, at ${node.label}${formationFate ? `, ${formationFate.battleLabel}` : consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
           >
             <FormationPortrait formation={formation} />
-            <span className="map-formation-number">{formation.number}</span>
+            <span className="map-formation-number">{assignedRoleIndex >= 0 ? actionStopBadge(assignedRoleIndex) : "—"}</span>
             <span className="map-formation-label">{formation.name}</span>
               {routeReadiness && (phase === "plan" || phase === "drill") && (
                 <span className="map-route-fit assigned">
                   <b>ASSIGNED ACTION STOP</b>
-                  <small>STOP {String(assignedRoleIndex + 1).padStart(2, "0")} · {routeReadiness.roleLabel}</small>
+                  <small>{actionStopLabel(assignedRoleIndex)} · {routeReadiness.roleLabel}</small>
+                  {authoredRoute && <em className={`movement-route-chip movement-${authoredRoute.movementRouteKind}`}>{authoredRoute.movementRouteLabel}</em>}
                 </span>
               )}
             {activeInteraction && interaction && <span className={`map-formation-interaction active ${interactionDirection}`}><Radio weight="fill" /> ACTIVE AT RENDEZVOUS<small>{interactionDirection === "outgoing" ? `${inspectedFormation.name} FEEDS ${formation.name}` : interactionDirection === "incoming" ? `${formation.name} FEEDS ${inspectedFormation.name}` : "TWO-WAY LINK"} · {[interaction.outgoing?.condition, interaction.incoming?.condition].filter(Boolean).map(tacticalTerm).join(" / ")}</small></span>}

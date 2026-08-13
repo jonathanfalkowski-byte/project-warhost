@@ -8,6 +8,10 @@ const pushDistinctPoint = (points, point) => {
   if (isPoint(point) && !samePoint(points.at(-1), point)) points.push(point);
 };
 
+export const actionStopLabel = (index) => `STOP ${String(index + 1).padStart(2, "0")}`;
+export const actionStopBadge = (index) => `S${String(index + 1).padStart(2, "0")}`;
+export const actionStopPairLabel = (from, to) => `${actionStopLabel(from)} + ${actionStopLabel(to)}`;
+
 export const resolveAuthoredPoint = (plan, landmarks, reference) => {
   if (typeof reference === "number") return plan.positions[reference] ?? null;
   if (typeof reference === "string") return landmarks[reference] ?? null;
@@ -57,15 +61,31 @@ export const buildAuthoredFormationRoutes = ({
     const formationId = role ? assignments[role.id] : null;
     const movementProfile = formationMovementProfiles[formationId] ?? "tracked";
     const authoredStart = resolveAuthoredPoint(plan, landmarks, route.start);
-    // Staffing changes which formation travels a route, never the authored
-    // geometry of the army plan itself.
+    // The playbook owns every legal corridor. Staffing selects the authored
+    // corridor permitted by that formation's movement profile.
     const formationStart = authoredStart;
     const points = [];
     pushDistinctPoint(points, formationStart);
-    const routeReferences = route.movementRoutes?.[movementProfile]
-      ?? route.movementRoutes?.[movementProfile.replace(/^(light|heavy|support)-/, "")]
-      ?? route.movementRoutes?.tracked
-      ?? route.points;
+    const genericMovementProfile = movementProfile.replace(/^(light|heavy|support)-/, "");
+    const movementRoutes = route.movementRoutes ?? {};
+    const movementRouteKey = movementRoutes[movementProfile]
+      ? movementProfile
+      : movementRoutes[genericMovementProfile]
+        ? genericMovementProfile
+        : movementRoutes.tracked
+          ? "tracked"
+          : null;
+    const routeReferences = movementRouteKey ? movementRoutes[movementRouteKey] : route.points;
+    const movementRouteKind = movementRouteKey === "walker"
+      ? "walker"
+      : formationId
+        ? "vehicle"
+        : "standard";
+    const movementRouteLabel = movementRouteKind === "walker"
+      ? "WALKER CUT-THROUGH"
+      : movementRouteKind === "vehicle"
+        ? "VEHICLE STREET ROUTE"
+        : "STANDARD AUTHORED ROUTE";
     routeReferences
       .map((reference) => resolveAuthoredPoint(plan, landmarks, reference))
       .forEach((point) => pushDistinctPoint(points, point));
@@ -88,6 +108,9 @@ export const buildAuthoredFormationRoutes = ({
       roleId: role?.id ?? null,
       formationId,
       movementProfile,
+      movementRouteKey,
+      movementRouteKind,
+      movementRouteLabel,
       extractionLandmark,
       breakpoint: route.breakpoint ?? null,
       points,
