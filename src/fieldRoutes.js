@@ -48,19 +48,25 @@ export const buildAuthoredFormationRoutes = ({
   roles,
   assignments,
   formationStarts,
+  formationMovementProfiles = {},
   branches,
 }) => {
   if (!plan) return [];
   return plan.routes.map((route) => {
     const role = roles[route.role];
     const formationId = role ? assignments[role.id] : null;
+    const movementProfile = formationMovementProfiles[formationId] ?? "tracked";
     const authoredStart = resolveAuthoredPoint(plan, landmarks, route.start);
     // Staffing changes which formation travels a route, never the authored
     // geometry of the army plan itself.
     const formationStart = authoredStart;
     const points = [];
     pushDistinctPoint(points, formationStart);
-    route.points
+    const routeReferences = route.movementRoutes?.[movementProfile]
+      ?? route.movementRoutes?.[movementProfile.replace(/^(light|heavy|support)-/, "")]
+      ?? route.movementRoutes?.tracked
+      ?? route.points;
+    routeReferences
       .map((reference) => resolveAuthoredPoint(plan, landmarks, reference))
       .forEach((point) => pushDistinctPoint(points, point));
 
@@ -73,13 +79,16 @@ export const buildAuthoredFormationRoutes = ({
         .forEach((point) => pushDistinctPoint(points, point));
     }
 
-    const extraction = landmarks.extraction;
+    const extractionLandmark = route.extractionLandmark ?? plan.extractionLandmark ?? "extraction";
+    const extraction = landmarks[extractionLandmark] ?? landmarks.extraction;
     pushDistinctPoint(points, extraction);
 
     return {
       roleIndex: route.role,
       roleId: role?.id ?? null,
       formationId,
+      movementProfile,
+      extractionLandmark,
       breakpoint: route.breakpoint ?? null,
       points,
     };

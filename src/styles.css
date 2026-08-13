@@ -241,20 +241,22 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playbook-map-preview button { margin-top: 5px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid #4d9bb8; background: #102d38; color: #91ddf8; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .07em; cursor: pointer; }
 .playbook-map-preview button:hover, .playbook-map-preview button:focus-visible { border-color: #78d5f4; background: #163b49; }
 .playbook-map-preview button svg { width: 13px; }
-.battlefield-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(.82) saturate(.82) contrast(1.08); }
+.battlefield-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity .45s ease, filter .45s ease; }
+.battlefield-art-planning { opacity: 1; object-position: center; filter: brightness(.72) saturate(.7) contrast(1.14); }
+.battlefield-art-execution { opacity: 0; filter: brightness(.82) saturate(.82) contrast(1.08); }
 .battlefield-wash { position: absolute; inset: 0; background: rgba(5, 8, 8, .22); pointer-events: none; }
 .battlefield-operation-veil { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
+.battlefield-view-mode { position: absolute; z-index: 18; top: 12px; left: 50%; display: flex; align-items: center; gap: 8px; padding: 5px 9px; border: 1px solid rgba(102, 200, 241, .46); background: rgba(5, 15, 18, .92); box-shadow: 0 4px 16px rgba(0, 0, 0, .38); transform: translateX(-50%); pointer-events: none; }
+.battlefield-view-mode span { color: #69c9ef; font-family: "Barlow Condensed"; font-size: 8px; font-weight: 700; letter-spacing: .14em; }
+.battlefield-view-mode strong { color: #d7edf5; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .09em; }
+.phase-battle .battlefield-view-mode, .phase-complete .battlefield-view-mode { border-color: rgba(225, 145, 48, .5); }
+.phase-battle .battlefield-view-mode span, .phase-complete .battlefield-view-mode span { color: #e49332; }
 .tabletop-battlefield-overlay { position: absolute; z-index: 2; inset: 0; overflow: hidden; pointer-events: none; }
 .tabletop-deployment-zone { position: absolute; left: 3%; right: 9%; bottom: 4%; height: 13%; border: 1px dashed rgba(74, 185, 225, .28); border-bottom: 3px solid rgba(74, 185, 225, .62); background: linear-gradient(180deg, transparent, rgba(35, 132, 169, .09)); }
 .tabletop-deployment-zone span, .tabletop-extraction-edge span { position: absolute; padding: 3px 6px; border: 1px solid currentColor; background: rgba(6, 16, 19, .92); font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .12em; }
 .tabletop-deployment-zone span { left: 2%; bottom: 8px; color: #68c9ed; }
 .tabletop-extraction-edge { position: absolute; right: 2.5%; top: 22%; width: 4%; height: 26%; border-right: 4px solid rgba(127, 204, 88, .7); background: linear-gradient(90deg, transparent, rgba(91, 164, 59, .12)); }
 .tabletop-extraction-edge span { right: 8px; top: 50%; color: #93d26d; transform: translateY(-50%) rotate(-90deg); transform-origin: right center; white-space: nowrap; }
-.tabletop-terrain { position: absolute; display: grid; place-items: center; border: 1px solid rgba(122, 132, 126, .3); background: repeating-linear-gradient(135deg, rgba(12, 16, 16, .72) 0 9px, rgba(36, 42, 39, .55) 10px 13px); box-shadow: inset 0 0 22px rgba(0, 0, 0, .72), 0 8px 18px rgba(0, 0, 0, .32); clip-path: polygon(8% 0, 100% 7%, 92% 100%, 0 88%); }
-.tabletop-terrain span { color: rgba(173, 181, 176, .5); font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .12em; }
-.terrain-west { left: 38%; top: 31%; width: 14%; height: 14%; transform: rotate(-5deg); }
-.terrain-center { left: 45%; top: 59%; width: 14%; height: 13%; transform: rotate(7deg); }
-.terrain-east { left: 72%; top: 35%; width: 9%; height: 17%; transform: rotate(3deg); }
 .tabletop-corridor { position: absolute; height: 0; border-top: 1px dashed rgba(199, 169, 94, .36); transform-origin: left center; }
 .tabletop-corridor span { position: absolute; left: 50%; top: -10px; padding: 2px 4px; background: rgba(11, 14, 13, .88); color: rgba(210, 184, 116, .62); font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .1em; white-space: nowrap; }
 .corridor-west { left: 24%; top: 58%; width: 34%; transform: rotate(-8deg); }
@@ -268,24 +270,36 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .tabletop-objective-zone.extraction { width: 102px; height: 102px; border-color: rgba(125, 198, 85, .62); background: radial-gradient(circle, rgba(71, 139, 45, .17), transparent 64%); }
 .tabletop-objective-zone.extraction b { color: rgba(144, 211, 104, .52); }
 .tabletop-objective-zone.extraction span { border-color: rgba(91, 151, 62, .44); color: rgba(156, 216, 116, .78); }
-.operation-ashen-passage .battlefield-art { object-position: 73% center; transform: scale(1.08); filter: brightness(.65) saturate(.56) contrast(1.18) hue-rotate(145deg); }
+.operation-ashen-passage .battlefield-art-execution { object-position: 73% center; transform: scale(1.08); filter: brightness(.65) saturate(.56) contrast(1.18) hue-rotate(145deg); }
+.operation-ashen-passage .battlefield-art-planning { filter: brightness(.63) saturate(.58) contrast(1.18) hue-rotate(118deg); }
 .operation-ashen-passage .battlefield-wash { z-index: 1; background: linear-gradient(125deg, rgba(5, 13, 17, .58), rgba(20, 22, 18, .18) 42%, rgba(2, 8, 12, .68)); }
 .operation-ashen-passage .battlefield-operation-veil { background: radial-gradient(ellipse at 61% 34%, rgba(126, 178, 183, .12), transparent 24%), repeating-linear-gradient(165deg, transparent 0 48px, rgba(170, 205, 205, .035) 50px 56px, transparent 58px 104px); mix-blend-mode: screen; opacity: .78; }
-.operation-ashen-passage.phase-battle .battlefield-art { filter: brightness(.7) saturate(.66) contrast(1.18) hue-rotate(145deg); }
-.operation-ashen-passage.phase-complete .battlefield-art { filter: brightness(.58) saturate(.45) contrast(1.12) hue-rotate(145deg); }
-.phase-battle .battlefield-art { filter: brightness(.86) saturate(.96) contrast(1.08); }
-.phase-complete .battlefield-art { filter: brightness(.8) saturate(.68) contrast(1.05); }
+.phase-battle .battlefield-art-planning, .phase-complete .battlefield-art-planning { opacity: 0; }
+.phase-battle .battlefield-art-execution, .phase-complete .battlefield-art-execution { opacity: 1; }
+.operation-ashen-passage.phase-battle .battlefield-art-execution { filter: brightness(.7) saturate(.66) contrast(1.18) hue-rotate(145deg); }
+.operation-ashen-passage.phase-complete .battlefield-art-execution { filter: brightness(.58) saturate(.45) contrast(1.12) hue-rotate(145deg); }
+.phase-battle .battlefield-art-execution { filter: brightness(.86) saturate(.96) contrast(1.08); }
+.phase-complete .battlefield-art-execution { filter: brightness(.8) saturate(.68) contrast(1.05); }
 .field-plan-layer { position: absolute; z-index: 5; inset: 0; overflow: hidden; pointer-events: none; }
 .field-plan-caption { position: absolute; z-index: 3; left: 27%; top: 2.5%; width: min(330px, 42%); min-height: 45px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border-color: #39748d; background: rgba(7, 18, 22, .94); }
 .field-plan-caption > div:first-child { display: grid; }
 .field-plan-caption > div:first-child span { font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .13em; color: #66c8f1; }
 .field-plan-caption > div:first-child b { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; color: #d7edf5; }
-.field-plan-strategy-read { position: absolute; z-index: 4; left: 29%; top: 15%; width: min(620px, 54%); display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); align-items: stretch; border-color: #6e623b; background: rgba(12, 16, 14, .95); }
+.field-plan-strategy-read { position: absolute; z-index: 4; left: 54%; top: 2.5%; width: min(500px, 43%); display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); align-items: stretch; border-color: #6e623b; background: rgba(12, 16, 14, .91); }
 .field-plan-strategy-read > span { display: grid; place-items: center; padding: 7px 9px; border-right: 1px solid #554c31; color: #d9b55e; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .11em; text-align: center; }
 .field-plan-strategy-read > div { display: grid; gap: 2px; align-content: center; padding: 6px 8px; border-right: 1px solid #303b36; }
 .field-plan-strategy-read > div:last-child { border-right: 0; }
 .field-plan-strategy-read small { color: #6fc9ea; font-family: "Barlow Condensed"; font-size: 8px; font-weight: 700; letter-spacing: .09em; }
 .field-plan-strategy-read b { color: #c7cfca; font-size: 9px; line-height: 1.25; }
+.field-plan-battle-sequence { position: absolute; z-index: 5; left: 29%; top: 10%; width: min(790px, 67%); min-height: 38px; display: grid; grid-template-columns: 108px repeat(4, minmax(0, 1fr)); border-color: #49616a; background: rgba(7, 15, 18, .9); }
+.field-plan-battle-sequence header, .field-plan-battle-sequence > div { display: grid; align-content: center; gap: 1px; padding: 4px 7px; border-right: 1px solid #2c3e43; }
+.field-plan-battle-sequence header span, .field-plan-battle-sequence small { color: #71c9e8; font-family: "Barlow Condensed"; font-size: 7px; font-weight: 700; letter-spacing: .1em; }
+.field-plan-battle-sequence header b, .field-plan-battle-sequence > div b { color: #eef3ef; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .05em; }
+.field-plan-battle-sequence > div span { display: none; }
+.field-plan-contact-zone { position: absolute; z-index: 6; width: 104px; display: grid; grid-template-columns: 14px 1fr; gap: 1px 4px; padding: 4px 6px; transform: translate(-50%, -50%); border: 1px solid rgba(225, 114, 67, .62); background: rgba(36, 15, 10, .88); color: #ee875d; box-shadow: 0 0 14px rgba(220, 84, 45, .18); }
+.field-plan-contact-zone svg { grid-row: 1 / 3; width: 15px; height: 15px; }
+.field-plan-contact-zone b { font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .07em; }
+.field-plan-contact-zone span { color: #c5a493; font-size: 7px; line-height: 1.15; }
 .field-plan-branch-state { display: grid; justify-items: end; gap: 2px; }
 .field-plan-branch-state span { padding: 2px 4px; border-left: 2px solid #4d8095; background: #10242b; color: #8aa8b2; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .06em; }
 .field-plan-branch-state span.changed { border-color: #f19339; background: #2b1a0f; color: #ffc17c; box-shadow: 0 0 10px rgba(241, 147, 57, .16); }
@@ -299,13 +313,25 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-segment > svg { position: absolute; right: -8px; top: -7px; width: 15px; height: 15px; padding: 2px; border: 1px solid var(--route-color, #66cef4); border-radius: 50%; background: #0c181c; color: var(--route-color, #66cef4); }
 .field-plan-segment.staffed { height: 3px; box-shadow: 0 0 11px rgba(var(--route-rgb, 102, 206, 244), .5); }
 .field-plan-segment.action-stop-approach { z-index: 2; height: 4px; box-shadow: 0 0 13px rgba(var(--route-rgb, 102, 206, 244), .64); }
-.field-plan-segment.route-continuation { height: 1px; opacity: .42; background: transparent; border-top: 2px dashed rgba(var(--route-rgb, 102, 206, 244), .72); box-shadow: none; }
+.field-plan-segment.route-continuation { height: 3px; opacity: .82; background: var(--route-color, #66cef4); border: 0; box-shadow: 0 0 8px rgba(var(--route-rgb, 102, 206, 244), .32); }
 .field-plan-segment.route-continuation::before { display: none; }
-.field-plan-segment.route-continuation > svg { right: -6px; top: -6px; width: 13px; height: 13px; opacity: .7; background: rgba(8, 15, 16, .92); }
+.field-plan-segment.route-continuation > svg { right: -7px; top: -7px; width: 15px; height: 15px; opacity: 1; background: rgba(8, 15, 16, .96); }
+.field-plan-layer.planning .field-plan-segment { height: 1px; opacity: .48; box-shadow: 0 0 4px rgba(var(--route-rgb, 102, 206, 244), .24); }
+.field-plan-layer.planning .field-plan-segment.action-stop-approach { height: 2px; opacity: .72; }
+.field-plan-layer.planning .field-plan-segment.terminates-at-objective { height: 4px; opacity: 1; box-shadow: 0 0 13px rgba(var(--route-rgb, 102, 206, 244), .72); }
+.field-plan-operation-corridor { position: absolute; z-index: 0; height: 11px; transform-origin: 0 50%; border-top: 1px solid rgba(220, 185, 105, .5); border-bottom: 1px solid rgba(220, 185, 105, .24); background: linear-gradient(90deg, rgba(194, 151, 65, .05), rgba(224, 194, 121, .2), rgba(194, 151, 65, .05)); box-shadow: 0 0 18px rgba(210, 168, 82, .16); }
+.field-plan-operation-corridor span { position: absolute; left: 50%; top: -17px; padding: 2px 5px; transform: translateX(-50%); border: 1px solid rgba(174, 137, 64, .54); background: rgba(23, 19, 12, .96); color: #e4bd70; font-family: "Barlow Condensed"; font-size: 8px; font-weight: 700; letter-spacing: .09em; white-space: nowrap; }
+.field-plan-operation-corridor small { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); color: #b79b65; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .06em; white-space: nowrap; }
+.field-plan-objective-order { position: absolute; z-index: 13; min-width: 112px; display: grid; gap: 1px; padding: 5px 7px; transform: translate(-50%, calc(-100% - 50px)); border: 1px solid #b88940; background: rgba(28, 20, 10, .96); box-shadow: 0 0 17px rgba(193, 139, 50, .24), 0 5px 14px rgba(0, 0, 0, .5); font-family: "Barlow Condensed"; }
+.field-plan-objective-order b { color: #e5aa4a; font-size: 7px; letter-spacing: .12em; }
+.field-plan-objective-order strong { color: #f1eadc; font-size: 10px; letter-spacing: .06em; }
+.field-plan-objective-order span { color: #bda981; font-size: 7px; letter-spacing: .04em; white-space: nowrap; }
+.field-plan-objective-order.objective-extraction { transform: translate(-104%, 42%); border-color: #68a94f; background: rgba(13, 31, 15, .96); }
+.field-plan-objective-order.objective-extraction b { color: #8fd267; }
 .field-plan-route-key { flex: 0 0 auto; display: grid; gap: 3px; padding-left: 8px; border-left: 1px solid #31535e; }
 .field-plan-route-key span { display: flex; align-items: center; gap: 5px; color: #9badad; font-family: "Barlow Condensed"; font-size: 7px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; }
 .field-plan-route-key i { width: 22px; height: 0; border-top: 3px solid #6bcdf2; box-shadow: 0 0 6px rgba(102, 206, 244, .48); }
-.field-plan-route-key i.continuation { border-top-width: 1px; border-top-style: dashed; box-shadow: none; opacity: .62; }
+.field-plan-route-key i.continuation { border-top-width: 3px; border-top-style: solid; box-shadow: 0 0 6px rgba(102, 206, 244, .38); opacity: .86; }
 .field-plan-segment.selected-route { z-index: 2; }
 .field-plan-segment.alternative-route { z-index: 0; height: 1px; opacity: .3; background: transparent; border-top: 2px dashed var(--route-color, #66cef4); box-shadow: none; }
 .field-plan-segment.alternative-route::before { display: none; }
@@ -326,6 +352,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-extraction-convergence b { font-family: "Barlow Condensed"; line-height: 1; white-space: nowrap; }
 .field-plan-extraction-convergence span { font-size: 7px; font-weight: 700; letter-spacing: .1em; }
 .field-plan-extraction-convergence b { color: #d0efbd; font-size: 9px; letter-spacing: .05em; }
+.field-plan-extraction-convergence small { grid-column: 2; color: #8fc87a; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .08em; white-space: nowrap; }
 .field-plan-turn { position: absolute; z-index: 3; display: flex; align-items: center; gap: 3px; padding: 3px 5px; transform: translate(-50%, -50%); border: 1px solid #a35e26; background: rgba(45, 23, 10, .96); color: #ffb36d; box-shadow: 0 0 12px rgba(230, 126, 40, .35); }
 .field-plan-turn svg { width: 12px; height: 12px; flex: 0 0 auto; }
 .field-plan-turn span { font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .06em; white-space: nowrap; }
@@ -334,6 +361,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-position { position: absolute; z-index: 2; min-width: 58px; display: grid; justify-items: center; transform: translate(-50%, -50%); }
 .field-plan-position > b { width: 31px; height: 31px; display: grid; place-items: center; border: 2px solid var(--route-color, #61c9f4); border-radius: 50%; background: rgba(7, 21, 25, .96); color: var(--route-color, #bdeeff); box-shadow: 0 0 13px rgba(var(--route-rgb, 102, 206, 244), .42); font-family: "Barlow Condensed"; font-size: 13px; }
 .field-plan-position > span { margin-top: 2px; padding: 2px 5px; border: 1px solid var(--route-color, #315e70); background: rgba(6, 16, 19, .94); color: #d0dee1; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .07em; white-space: nowrap; }
+.field-plan-position > small { max-width: 150px; margin-top: 2px; padding: 2px 4px; border-left: 2px solid var(--route-color, #315e70); background: rgba(5, 13, 16, .92); color: #afc5ca; font-family: "Barlow Condensed"; font-size: 7px; font-weight: 700; letter-spacing: .045em; line-height: 1.15; text-align: center; white-space: nowrap; }
 .field-plan-position > em { max-width: 92px; margin-top: 2px; padding: 1px 4px; background: rgba(12, 31, 20, .94); color: #91d26d; font-family: "Barlow Condensed"; font-size: 8px; font-style: normal; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .field-plan-position.staffed > b { background: rgba(13, 33, 24, .97); box-shadow: 0 0 16px rgba(var(--route-rgb, 102, 206, 244), .58); }
 .field-plan-entry { position: absolute; z-index: 2; display: grid; justify-items: center; transform: translate(-50%, -50%); color: var(--route-color, #68c9f3); }
@@ -376,6 +404,10 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .enemy-plan-formation img { width: 100%; height: 100%; object-fit: cover; border: 2px solid #d66b40; border-radius: 50%; filter: brightness(1.12) contrast(1.18); box-shadow: 0 0 13px rgba(219, 89, 44, .5), 0 6px 12px rgba(0,0,0,.72); }
 .enemy-plan-formation > span { position: absolute; left: -6px; top: -6px; min-width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid #ed9166; background: #5b2514; color: #ffd1b6; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; }
 .enemy-plan-formation > small { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); padding: 2px 4px; background: rgba(24, 10, 7, .94); color: #f39a71; font-family: "Barlow Condensed"; font-size: 8px; letter-spacing: .05em; white-space: nowrap; }
+.enemy-plan-formation.contact-forecast { width: 48px; height: 48px; opacity: .82; }
+.enemy-plan-formation.contact-forecast img { border-style: dashed; filter: grayscale(.25) brightness(.82) contrast(1.18); box-shadow: 0 0 0 5px rgba(210, 98, 55, .1), 0 0 14px rgba(219, 89, 44, .34); }
+.enemy-plan-formation.contact-forecast > span { background: #381c13; }
+.enemy-plan-formation.contact-forecast > small { bottom: -18px; border: 1px solid #7c3e27; font-size: 7px; }
 .enemy-plan-formation.disrupted { opacity: .32; filter: grayscale(.8); }
 .enemy-plan-formation.disrupted img { border-color: #7da25e; }
 .enemy-plan-formation.disrupted > small { color: #a4d17f; }
@@ -564,10 +596,12 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .battle-state-legend small { color: #7c8883; font-size: 7px; line-height: 1.15; }
 
 .warhost-app.battle .left-rail, .warhost-app.battle .right-rail { opacity: .34; filter: saturate(.45); transition: opacity .35s ease, filter .35s ease; }
-.battlefield.playback-active .battlefield-art { filter: brightness(.48) saturate(.52) contrast(1.14); }
-.battlefield.playback-active.operation-ashen-passage .battlefield-art { filter: brightness(.43) saturate(.42) contrast(1.22) hue-rotate(145deg); }
+.battlefield.playback-active .battlefield-art-execution { filter: brightness(.48) saturate(.52) contrast(1.14); }
+.battlefield.playback-active.operation-ashen-passage .battlefield-art-execution { filter: brightness(.43) saturate(.42) contrast(1.22) hue-rotate(145deg); }
 .field-plan-layer.executing .field-plan-caption,
 .field-plan-layer.executing .field-plan-strategy-read,
+.field-plan-layer.executing .field-plan-battle-sequence,
+.field-plan-layer.executing .field-plan-contact-zone,
 .field-plan-layer.executing .field-plan-entry,
 .field-plan-layer.executing .field-plan-turn,
 .field-plan-layer.executing .field-plan-position { opacity: .18; transition: opacity .3s ease; }

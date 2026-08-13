@@ -23,8 +23,13 @@ test("the planning screen renders without an undefined runtime binding", async (
     assert.match(markup, /ROUTE RESPONSIBILITY/);
     assert.match(markup, /SECONDARY BONUS/);
     assert.match(markup, /PROJECT WARHOST/);
+    assert.match(markup, /dead-circuit-command-map\.png/);
+    assert.match(markup, /dead-circuit-foundry\.png/);
+    assert.match(markup, /TOP-DOWN PLANNING/);
     assert.match(markup, /FORCE MOVE/);
     assert.match(markup, /OUT OF POSITION/);
+    assert.match(markup, /CONTACT/);
+    assert.doesNotMatch(markup, /enemy-plan-segment/);
     assert.match(markup, /Seize, transfer, sabotage, withdraw\./);
     assert.doesNotMatch(markup, /hand off/i);
     assert.match(markup, /AVAILABLE · DRAG TO STOP/);

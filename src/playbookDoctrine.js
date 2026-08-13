@@ -10,8 +10,8 @@ const EMPTY_IMPACT = Object.freeze({
 export const PLAYBOOK_DOCTRINES = Object.freeze({
   trapline: Object.freeze({
     name: "OVERLAPPING FIRES",
-    strength: "An armed opening combo catches the enemy between formations and preserves one recovery slot.",
-    exposure: "Without that opening combo, the force waits on a trap that never closes and loses 00:15.",
+    strength: "Leapfrog security keeps the objective column moving and preserves one recovery slot.",
+    exposure: "The connected column can lose time if its lead formation is stopped.",
   }),
   spear: Object.freeze({
     name: "DECISIVE THRUST",
@@ -21,7 +21,7 @@ export const PLAYBOOK_DOCTRINES = Object.freeze({
   pressure: Object.freeze({
     name: "TWO-AXIS ASSAULT",
     strength: "Split pressure resolves Alpha and Beta 00:15 sooner each.",
-    exposure: "Fewer than two automatic combos leave the force separated and add 00:15 to regroup.",
+    exposure: "The separated wings require 00:15 to regroup before extraction.",
   }),
 });
 
@@ -33,17 +33,13 @@ const NEUTRAL_DOCTRINE = Object.freeze({
 
 export const resolvePlaybookDoctrine = (playbookId, handoffs = []) => {
   const doctrine = PLAYBOOK_DOCTRINES[playbookId] ?? NEUTRAL_DOCTRINE;
-  const comboCount = handoffs.filter((handoff) => Boolean(handoff?.maneuver)).length;
 
   if (playbookId === "trapline") {
-    const triggered = Boolean(handoffs[0]?.maneuver);
     return {
       ...doctrine,
-      triggered,
-      impact: { ...EMPTY_IMPACT, missionDelay: triggered ? 0 : 15, protects: triggered ? 1 : 0 },
-      result: triggered
-        ? "OPENING COMBO ARMED · ONE RECOVERY SLOT PRESERVED"
-        : "TRAP NEVER CLOSED · +00:15 MISSION DELAY",
+      triggered: true,
+      impact: { ...EMPTY_IMPACT, alpha: 15, protects: 1 },
+      result: "LEAPFROG ADVANCE · ALPHA -00:15 · ONE RECOVERY SLOT PRESERVED",
     };
   }
 
@@ -57,14 +53,11 @@ export const resolvePlaybookDoctrine = (playbookId, handoffs = []) => {
   }
 
   if (playbookId === "pressure") {
-    const triggered = comboCount >= 2;
     return {
       ...doctrine,
-      triggered,
-      impact: { ...EMPTY_IMPACT, alpha: 15, beta: 15, missionDelay: triggered ? 0 : 15 },
-      result: triggered
-        ? "BOTH AXES LINKED · ALPHA / BETA -00:15"
-        : "AXES SEPARATED · ALPHA / BETA -00:15 · REGROUP +00:15",
+      triggered: true,
+      impact: { ...EMPTY_IMPACT, alpha: 15, beta: 15, missionDelay: 15 },
+      result: "PARALLEL CAPTURE · ALPHA / BETA -00:15 · CONVERGENCE +00:15",
     };
   }
 

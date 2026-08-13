@@ -8,9 +8,10 @@ const armed = (count) => Array.from({ length: count }, (_, index) => ({
   maneuver: { name: `COMBO ${index + 1}` },
 }));
 
-test("Trapline preserves recovery only when its first handoff is armed", () => {
+test("Trapline doctrine is inherent to the army plan, while combos remain bonuses", () => {
   assert.equal(resolvePlaybookDoctrine("trapline", armed(1)).impact.protects, 1);
-  assert.equal(resolvePlaybookDoctrine("trapline", []).impact.missionDelay, 15);
+  assert.equal(resolvePlaybookDoctrine("trapline", []).impact.alpha, 15);
+  assert.equal(resolvePlaybookDoctrine("trapline", []).impact.missionDelay, 0);
 });
 
 test("Armored Spear trades reactor speed for extraction exposure", () => {
@@ -19,12 +20,12 @@ test("Armored Spear trades reactor speed for extraction exposure", () => {
   assert.equal(doctrine.impact.missionDelay, 15);
 });
 
-test("Divided Pressure must link two handoffs to avoid regroup delay", () => {
+test("Twin Seizure always gains parallel capture and pays a convergence cost", () => {
   const linked = resolvePlaybookDoctrine("pressure", armed(2));
   const separated = resolvePlaybookDoctrine("pressure", armed(1));
   assert.equal(linked.impact.alpha, 15);
   assert.equal(linked.impact.beta, 15);
-  assert.equal(linked.impact.missionDelay, 0);
+  assert.equal(linked.impact.missionDelay, 15);
   assert.equal(separated.impact.missionDelay, 15);
 });
 

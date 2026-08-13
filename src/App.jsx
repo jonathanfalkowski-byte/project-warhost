@@ -32,6 +32,9 @@ import {
 } from "@phosphor-icons/react";
 import { resolveAshenCollision } from "./enemyCollision.js";
 import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
+import { enemyContactForecastVisibleFor, enemyExactRoutesVisibleFor } from "./enemyPlanVisibility.js";
+import { battlefieldDoctrineFor } from "./battleDoctrineData.js";
+import { DEAD_CIRCUIT_FIELD_LANDMARKS, DEAD_CIRCUIT_FIELD_PLANS, DEAD_CIRCUIT_MISSION } from "./fieldPlanData.js";
 import { resolveExtractionOutcome } from "./extractionResolution.js";
 import { resolveDispositionMatchup } from "./missionDisposition.js";
 import { claimStaffExercise, planningResultRevealed } from "./planningIntel.js";
@@ -83,6 +86,7 @@ const FORMATIONS = [
     number: "1",
     name: "RECON TANK",
     role: "DISPLACE",
+    movementProfile: "light-tracked",
     endurance: { armor: 3, cohesion: 3, mobility: 5 },
     capabilities: ["CONTROL", "MOBILITY"],
     refits: [
@@ -101,6 +105,7 @@ const FORMATIONS = [
     number: "2",
     name: "FLAME SUPPORT VEHICLE",
     role: "DENY",
+    movementProfile: "tracked",
     endurance: { armor: 2, cohesion: 4, mobility: 3 },
     capabilities: ["DENIAL", "AREA"],
     refits: [
@@ -119,6 +124,7 @@ const FORMATIONS = [
     number: "3",
     name: "ASSAULT WALKER",
     role: "BREACH",
+    movementProfile: "walker",
     endurance: { armor: 5, cohesion: 3, mobility: 2 },
     capabilities: ["BREACH", "SHOCK"],
     refits: [
@@ -137,6 +143,7 @@ const FORMATIONS = [
     number: "4",
     name: "MAIN BATTLE TANK",
     role: "HOLD",
+    movementProfile: "heavy-tracked",
     endurance: { armor: 4, cohesion: 5, mobility: 2 },
     capabilities: ["HOLD", "COVER"],
     refits: [
@@ -155,6 +162,7 @@ const FORMATIONS = [
     number: "5",
     name: "ARMOURED RECOVERY VEHICLE",
     role: "EXTRACT",
+    movementProfile: "support-tracked",
     endurance: { armor: 3, cohesion: 4, mobility: 4 },
     capabilities: ["RECOVERY", "SUPPORT"],
     refits: [
@@ -283,7 +291,7 @@ const PLAYBOOKS = [
       { id: "beta", label: "EAST OBJECTIVE GROUP", brief: "Seize the eastern control objective in parallel.", node: "betaLane", demands: ["MOBILITY", "SHOCK"] },
       { id: "deny", label: "INTERDICTION ELEMENT", brief: "Prevent enemy movement between the two objective fights.", node: "fireLine", demands: ["DENIAL", "COVER"] },
       { id: "reactor", label: "CONVERGENCE ELEMENT", brief: "Unite both groups at the primary objective.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
-      { id: "recover", label: "EXTRACTION ELEMENT", brief: "Collect the reunited army and clear the battlefield.", node: "recoveryLine", demands: ["RECOVERY", "HOLD"] },
+      { id: "recover", label: "EXTRACTION GUARD", brief: "Hold the extraction corridor, recover stragglers, and leave last.", node: "recoveryLine", demands: ["RECOVERY", "HOLD"] },
     ],
   },
 ];
@@ -441,8 +449,8 @@ const DEAD_CIRCUIT_BREAKPOINTS = [
     description: "Helioch fire has the planned transit lane ranged. Your authored response is ready for execution.",
     trigger: "IF Beta lane is ranged",
     options: [
-      { id: "tempo", label: "CROSS NOW", effect: "No delay. The assault crosses exposed and keeps the reactor timetable.", routeLabel: "DIRECT CROSSING", path: ["BETA LANE", "REACTOR"] },
-      { id: "protect", label: "COVER THE BREACHER", effect: "+00:15 delay. Smoke protects one formation on the longer crossing.", routeLabel: "COVERED DIVERSION", path: ["SMOKE LINE", "COVERED ARC", "REACTOR"] },
+      { id: "tempo", label: "CROSS NOW", effect: "No delay. The eastern group crosses exposed, joins the army at assembly, then advances through the Reactor to extraction.", routeLabel: "DIRECT TO ASSEMBLY", path: ["BETA", "ASSEMBLY", "REACTOR", "EXTRACTION"] },
+      { id: "protect", label: "COVER THE BREACHER", effect: "+00:15 delay. The eastern group takes a covered arc, joins the army at assembly, then advances through the Reactor to extraction.", routeLabel: "COVERED TO ASSEMBLY", path: ["BETA", "COVERED ARC", "ASSEMBLY", "REACTOR", "EXTRACTION"] },
     ],
     defaultOption: "tempo",
   },
@@ -452,8 +460,8 @@ const DEAD_CIRCUIT_BREAKPOINTS = [
     description: "The optional rescue now conflicts with the reactor timetable. Your playbook already contains a response.",
     trigger: "IF salvage crew is located",
     options: [
-      { id: "clock", label: "LEAVE THE CREW", effect: "No delay. The army continues directly to extraction; the crew is abandoned.", routeLabel: "BYPASS SALVAGE", path: ["REACTOR", "EXTRACTION"] },
-      { id: "recover", label: "DIVERT TO RESCUE", effect: "+00:15 delay. Rescue the crew and protect the recovery formation.", routeLabel: "RECOVERY LOOP", path: ["REACTOR", "SALVAGE PEN", "EXTRACTION"] },
+      { id: "clock", label: "LEAVE THE CREW", effect: "No delay. The recovery element joins the Reactor assault and continues forward to extraction; the crew is abandoned.", routeLabel: "CONTINUE TO REACTOR", path: ["RECOVERY POSITION", "REACTOR", "EXTRACTION"] },
+      { id: "recover", label: "DIVERT TO RESCUE", effect: "+00:15 delay. The recovery element rescues the crew before joining the Reactor assault and continuing to extraction.", routeLabel: "RESCUE BEFORE REACTOR", path: ["RECOVERY POSITION", "SALVAGE CREW", "REACTOR", "EXTRACTION"] },
     ],
     defaultOption: "clock",
   },
@@ -633,103 +641,9 @@ const ENEMY_PLANS = {
 
 const enemyPlanFor = (operation) => ENEMY_PLANS[operation?.id] ?? DEAD_CIRCUIT_ENEMY_PLAN;
 
-const FIELD_PLANS = {
-  trapline: {
-    positions: [
-      { x: 30, y: 50 },
-      { x: 40, y: 59 },
-      { x: 55, y: 52 },
-      { x: 65, y: 35 },
-      { x: 70, y: 66 },
-    ],
-    routes: [
-      { role: 0, start: { x: 20, y: 88 }, points: [0, "alphaTransfer", "sabotageLane", "reactor", "extraction"] },
-      { role: 1, start: { x: 32, y: 88 }, points: [1, "alphaTransfer", "sabotageLane", "reactor", "extraction"] },
-      { role: 2, start: { x: 44, y: 88 }, points: [2], breakpoint: "beta" },
-      { role: 3, start: { x: 56, y: 88 }, points: [3, "beta", "reactor", "extraction"] },
-      { role: 4, start: { x: 68, y: 88 }, points: [4], breakpoint: "rescue" },
-    ],
-    breakpointRoles: { beta: 2, rescue: 4 },
-    branchRoutes: {
-      beta: {
-        tempo: [2, "sabotageLane", "reactor", "extraction"],
-        protect: [2, "beta", { x: 72, y: 40 }, "reactor", "extraction"],
-      },
-      rescue: {
-        clock: [4, "extraction"],
-        recover: [4, "rescue", "extraction"],
-      },
-    },
-  },
-  spear: {
-    positions: [
-      { x: 30, y: 50 },
-      { x: 45, y: 51 },
-      { x: 58, y: 49 },
-      { x: 57, y: 67 },
-      { x: 70, y: 67 },
-    ],
-    routes: [
-      { role: 0, start: { x: 20, y: 88 }, points: [0, "screenedConcentration", "assaultLaunch", "reactor", "extraction"] },
-      { role: 1, start: { x: 32, y: 88 }, points: [1, "screenedConcentration", "assaultLaunch", "reactor", "extraction"] },
-      { role: 2, start: { x: 44, y: 88 }, points: [2], breakpoint: "beta" },
-      { role: 3, start: { x: 56, y: 88 }, points: [3, "assaultLaunch", "reactor", "extraction"] },
-      { role: 4, start: { x: 68, y: 88 }, points: [4], breakpoint: "rescue" },
-    ],
-    breakpointRoles: { beta: 2, rescue: 4 },
-    branchRoutes: {
-      beta: {
-        tempo: [2, "assaultLaunch", "reactor", "extraction"],
-        protect: [2, "beta", { x: 72, y: 40 }, "reactor", "extraction"],
-      },
-      rescue: {
-        clock: [4, "extraction"],
-        recover: [4, "rescue", "extraction"],
-      },
-    },
-  },
-  pressure: {
-    positions: [
-      { x: 30, y: 50 },
-      { x: 52, y: 42 },
-      { x: 49, y: 51 },
-      { x: 60, y: 57 },
-      { x: 71, y: 68 },
-    ],
-    routes: [
-      { role: 0, start: { x: 20, y: 88 }, points: [0, "primaryConvergence", "reactor", "extraction"] },
-      { role: 1, start: { x: 32, y: 88 }, points: [1, "eastInterdiction", "beta", "primaryConvergence", "reactor", "extraction"] },
-      { role: 2, start: { x: 44, y: 88 }, points: [2, "eastInterdiction", "primaryConvergence", "reactor", "extraction"] },
-      { role: 3, start: { x: 56, y: 88 }, points: [3], breakpoint: "beta" },
-      { role: 4, start: { x: 68, y: 88 }, points: [4], breakpoint: "rescue" },
-    ],
-    breakpointRoles: { beta: 3, rescue: 4 },
-    branchRoutes: {
-      beta: {
-        tempo: [3, "primaryConvergence", "reactor", "extraction"],
-        protect: [3, "beta", { x: 72, y: 40 }, "reactor", "extraction"],
-      },
-      rescue: {
-        clock: [4, "extraction"],
-        recover: [4, "rescue", "extraction"],
-      },
-    },
-  },
-};
+const FIELD_PLANS = DEAD_CIRCUIT_FIELD_PLANS;
 
-const FIELD_LANDMARKS = {
-  alpha: { x: 30, y: 50 },
-  beta: { x: 67, y: 29 },
-  reactor: { x: 72, y: 54 },
-  extraction: { x: 89, y: 34 },
-  rescue: { x: 81, y: 76 },
-  alphaTransfer: { x: 41, y: 50 },
-  sabotageLane: { x: 55, y: 52 },
-  screenedConcentration: { x: 42, y: 50 },
-  assaultLaunch: { x: 58, y: 49 },
-  eastInterdiction: { x: 57, y: 38 },
-  primaryConvergence: { x: 64, y: 50 },
-};
+const FIELD_LANDMARKS = DEAD_CIRCUIT_FIELD_LANDMARKS;
 
 const PLAYBOOK_BATTLEFIELD_READ = {
   trapline: {
@@ -1747,9 +1661,9 @@ function MissionRoute({ phase, battleTime, operation, profile }) {
   );
 }
 
-function ObjectiveMarker({ className, number, title, description, state = "active", icon: Icon = MapPin }) {
+function ObjectiveMarker({ className, number, title, description, state = "active", icon: Icon = MapPin, style }) {
   return (
-    <div className={`objective-marker ${className} ${state}`}>
+    <div className={`objective-marker ${className} ${state}`} style={style}>
       <span className="objective-pin"><Icon weight="fill" /></span>
       <div><b>{title}</b><small>{description}</small></div>
       {number && <span className="objective-number">{number}</span>}
@@ -1757,20 +1671,19 @@ function ObjectiveMarker({ className, number, title, description, state = "activ
   );
 }
 
-function TabletopBattlefieldOverlay({ landmarks, operation }) {
+function TabletopBattlefieldOverlay({ landmarks, operation, plan }) {
+  const extractionLandmark = plan?.extractionLandmark ?? "extraction";
+  const extractionPoint = landmarks[extractionLandmark] ?? landmarks.extraction;
   const objectiveZones = [
     { id: "alpha", label: "OBJECTIVE ALPHA", point: landmarks.alpha, tone: "control" },
     { id: "beta", label: "OBJECTIVE BETA", point: landmarks.beta, tone: "control" },
     { id: "reactor", label: operation.primaryTitle, point: landmarks.reactor, tone: "primary" },
-    { id: "extraction", label: operation.extractionTitle, point: landmarks.extraction, tone: "extraction" },
+    { id: "extraction", label: plan?.extractionLabel ?? operation.extractionTitle, point: extractionPoint, tone: "extraction" },
   ];
   return (
     <div className="tabletop-battlefield-overlay" aria-hidden="true">
       <div className="tabletop-deployment-zone"><span>WARHOST DEPLOYMENT EDGE</span></div>
       <div className="tabletop-extraction-edge"><span>EXTRACTION EDGE</span></div>
-      <div className="tabletop-terrain terrain-west"><span>BLOCKED FOUNDRY</span></div>
-      <div className="tabletop-terrain terrain-center"><span>REACTOR WORKS</span></div>
-      <div className="tabletop-terrain terrain-east"><span>GANTRY WALL</span></div>
       <div className="tabletop-corridor corridor-west"><span>WEST TRANSIT</span></div>
       <div className="tabletop-corridor corridor-center"><span>CENTRAL APPROACH</span></div>
       {objectiveZones.map((zone) => (
@@ -1808,6 +1721,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
   const operationField = operationFieldFor(operation);
   const plan = fieldPlanForPressure(operationField.plans[playbook.id], condition, playbook.id);
   const battlefieldRead = PLAYBOOK_BATTLEFIELD_READ[playbook.id];
+  const battlefieldDoctrine = battlefieldDoctrineFor(playbook.id);
   const breakpoints = breakpointsFor(operation);
   const execution = phase === "battle" || phase === "complete";
   const resolvedFates = new Map((execution ? formationFates : [])
@@ -1850,11 +1764,12 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
     assignments,
     formationStarts: Object.fromEntries(routes.filter((route) => route.formation).map((route) => [route.formation.id, route.start])),
     branches,
+    formationMovementProfiles: Object.fromEntries(formations.map((formation) => [formation.id, formation.movementProfile])),
   });
-  const baseSegments = (execution ? executionRoutes : routes).flatMap((route) => {
-    const points = execution
-      ? route.points
-      : [route.start, ...route.points].map((point) => resolveFieldPoint(plan, operationField.landmarks, point));
+  // Setup and execution share the same selected, end-to-end geometry so the
+  // player can read all five journeys before committing the playbook.
+  const baseSegments = executionRoutes.flatMap((route) => {
+    const points = route.points;
     const routePresentation = routes.find((item) => item.roleIndex === route.roleIndex);
     const routeParts = splitAuthoredRouteAtActionStop(points);
     return points.slice(0, -1).map((point, index) => ({
@@ -1864,34 +1779,20 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
       className: `base lane-${route.roleIndex + 1} ${index < routeParts.approach.length - 1 ? "action-stop-approach" : "route-continuation"} ${routePresentation?.formation ? "staffed" : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
     }));
   });
-  const branchSegments = execution ? [] : breakpoints.flatMap((breakpoint, breakpointIndex) => {
-    const selectedOptionId = branches[breakpoint.id];
-    const roleIndex = plan.breakpointRoles[breakpoint.id];
-    const role = playbook.roles[roleIndex];
-    const staffed = Boolean(assignments[role.id]);
-    const orderedOptions = execution
-      ? breakpoint.options.filter((option) => option.id === selectedOptionId)
-      : [
-          ...breakpoint.options.filter((option) => option.id !== selectedOptionId),
-          ...breakpoint.options.filter((option) => option.id === selectedOptionId),
-        ];
-    return orderedOptions.flatMap((option) => {
-      const route = plan.branchRoutes[breakpoint.id][option.id];
-      const selectedRoute = option.id === selectedOptionId;
-      const changed = selectedRoute && option.id !== breakpoint.defaultOption;
-      return route.slice(0, -1).map((point, index) => ({
-        id: `${breakpoint.id}-${option.id}-${index}`,
-        start: resolveFieldPoint(plan, operationField.landmarks, point),
-        end: resolveFieldPoint(plan, operationField.landmarks, route[index + 1]),
-        className: `branch route-continuation breakpoint-${breakpointIndex + 1} lane-${roleIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"} ${staffed ? "staffed" : ""} ${changed ? "changed" : ""} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(assignments[role.id]) ? "playback-focused" : "playback-muted" : ""}`,
-      }));
-    });
-  });
+  const objectiveIds = new Set(DEAD_CIRCUIT_MISSION.objectives.map((objective) => objective.id));
+  const objectiveStops = (plan.objectivePhases ?? []).map((objectivePhase) => ({
+    ...objectivePhase,
+    point: operationField.landmarks[objectivePhase.objectiveId ?? objectivePhase.target],
+    objective: DEAD_CIRCUIT_MISSION.objectives.find((item) => item.id === (objectivePhase.objectiveId ?? objectivePhase.target)),
+  }));
+  const objectiveCorridors = (plan.objectiveCorridors ?? []).map((corridor) => ({
+    ...corridor,
+    start: operationField.landmarks[corridor.from],
+    end: operationField.landmarks[corridor.to],
+  }));
   const branchTurns = breakpoints.flatMap((breakpoint, breakpointIndex) => {
     const selectedOptionId = branches[breakpoint.id];
-    const visibleOptions = execution
-      ? breakpoint.options.filter((option) => option.id === selectedOptionId)
-      : breakpoint.options;
+    const visibleOptions = breakpoint.options.filter((option) => option.id === selectedOptionId);
     return visibleOptions.flatMap((option) => {
       const selectedRoute = option.id === selectedOptionId;
       return plan.branchRoutes[breakpoint.id][option.id]
@@ -1900,8 +1801,8 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
         .map((point, index) => ({
           id: `${breakpoint.id}-${option.id}-turn-${index}`,
           point: resolveFieldPoint(plan, operationField.landmarks, point),
-          label: `${selectedRoute ? "" : "ALT · "}${option.routeLabel}`,
-          className: `breakpoint-${breakpointIndex + 1} ${selectedRoute ? "selected-route" : "alternative-route"}`,
+          label: option.routeLabel,
+          className: `breakpoint-${breakpointIndex + 1} selected-route`,
         }));
     });
   });
@@ -1929,7 +1830,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
   return (
     <div className={`field-plan-layer ${execution ? "executing" : "planning"}`} ref={layerRef} aria-label={`${playbook.name} authored battlefield plan`}>
       <div className="field-plan-caption panel-surface" aria-live="polite">
-        <div><span>5 FORMATION ROUTES</span><b>{playbook.name}</b></div>
+        <div><span>{DEAD_CIRCUIT_MISSION.playerDisposition} MISSION</span><b>{playbook.name}</b></div>
         <div className="field-plan-branch-state">
           {breakpoints.map((breakpoint, index) => {
             const option = breakpoint.options.find((item) => item.id === branches[breakpoint.id]);
@@ -1938,8 +1839,8 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
           })}
         </div>
         <div className="field-plan-route-key" aria-label="Route line key">
-          <span><i className="approach" />TO ACTION STOP</span>
-          <span><i className="continuation" />THEN CONTINUES</span>
+          <span><i className="approach" />ORDER TO OBJECTIVE</span>
+          <span><i className="continuation" />FOLLOW-ON MOVEMENT</span>
         </div>
       </div>
       {battlefieldRead && (
@@ -1950,16 +1851,51 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
           <div><small>LEAVES EXPOSED</small><b>{battlefieldRead.risks}</b></div>
         </div>
       )}
+      {battlefieldDoctrine && (
+        <div className="field-plan-battle-sequence panel-surface">
+          <header><span>BATTLE SEQUENCE</span><b>{battlefieldDoctrine.pattern}</b></header>
+          {battlefieldDoctrine.phases.map((step, index) => (
+            <div key={step.label}><small>0{index + 1} · {step.roles}</small><b>{step.label}</b><span>{step.detail}</span></div>
+          ))}
+        </div>
+      )}
+      {!execution && objectiveCorridors.map((corridor) => (
+        <div
+          className="field-plan-operation-corridor"
+          style={fieldSegmentStyle(corridor.start, corridor.end, layerSize)}
+          key={`operation-${corridor.id}`}
+        >
+          <span>{corridor.label}</span>
+          <small>UNITS {corridor.roles.map((role) => role + 1).join(" / ")}</small>
+        </div>
+      ))}
+      {!execution && objectiveStops.map((stop) => (
+        <div
+          className={`field-plan-objective-order objective-${stop.target}`}
+          style={{ left: `${stop.point.x}%`, top: `${stop.point.y}%` }}
+          key={stop.id}
+        >
+          <b>PHASE {stop.number}</b>
+          <strong>{stop.label}</strong>
+          <span>{stop.objective?.instruction} · UNITS {stop.roles.map((role) => role + 1).join(" / ")}</span>
+        </div>
+      ))}
+      {!execution && battlefieldDoctrine?.contacts.map((contact) => (
+        <div className="field-plan-contact-zone" style={{ left: `${contact.x}%`, top: `${contact.y}%` }} key={contact.label}>
+          <Crosshair weight="bold" /><b>{contact.label}</b><span>{contact.detail}</span>
+        </div>
+      ))}
       <div
         className="field-plan-extraction-convergence"
         style={{ left: `${operationField.landmarks.extraction.x}%`, top: `${operationField.landmarks.extraction.y}%` }}
       >
         <Flag weight="fill" />
-        <span>ALL SURVIVING ROUTES</span>
+        <span>{execution ? "ALL SURVIVING ROUTES" : "ALL 5 ROUTES END HERE"}</span>
         <b>REFORM &amp; EXTRACT</b>
+        {!execution && <small>01 · 02 · 03 · 04 · 05</small>}
       </div>
-      {[...baseSegments, ...branchSegments].map((segment) => (
-        <div className={`field-plan-segment ${segment.className}`} style={fieldSegmentStyle(segment.start, segment.end, layerSize)} key={segment.id}>
+      {baseSegments.map((segment) => (
+        <div className={`field-plan-segment ${segment.className} ${Object.entries(operationField.landmarks).some(([id, point]) => objectiveIds.has(id) && point.x === segment.end.x && point.y === segment.end.y) ? "terminates-at-objective" : ""}`} style={fieldSegmentStyle(segment.start, segment.end, layerSize)} key={segment.id}>
           <ArrowRight weight="bold" />
         </div>
       ))}
@@ -1989,6 +1925,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
           <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${consequenceClass} ${fateClass} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
             <b>{String(index + 1).padStart(2, "0")}</b>
             <span>{role.label.split(" / ")[0]}</span>
+            {routes[index]?.afterLabel && <small>{routes[index].afterLabel}</small>}
             {formation && <em>{formation.name}</em>}
           </div>
         );
@@ -2010,6 +1947,8 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
     x: (firstPosition.x + secondPosition.x) / 2,
     y: (firstPosition.y + secondPosition.y) / 2,
   };
+  const exactRoutesVisible = enemyExactRoutesVisibleFor(phase);
+  const contactForecastVisible = enemyContactForecastVisibleFor(phase);
 
   useEffect(() => {
     if (!layerRef.current) return undefined;
@@ -2025,14 +1964,14 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
   }, []);
 
   const waveApproachAt = reinforcementWave.arrivalAt - reinforcementWave.approachDuration;
-  const waveProgress = phase === "battle" || phase === "complete"
+  const waveProgress = exactRoutesVisible
     ? Math.max(0, Math.min(1, (battleTime - waveApproachAt) / reinforcementWave.approachDuration))
     : 0;
   const wavePosition = {
     x: reinforcementWave.start.x + (reinforcementWave.intercept.x - reinforcementWave.start.x) * waveProgress,
     y: reinforcementWave.start.y + (reinforcementWave.intercept.y - reinforcementWave.start.y) * waveProgress,
   };
-  const waveArrived = (phase === "battle" || phase === "complete") && battleTime >= reinforcementWave.arrivalAt;
+  const waveArrived = exactRoutesVisible && battleTime >= reinforcementWave.arrivalAt;
   const clearsBeforeWave = planReady && profile.overrun === 0;
   const routeForClash = (formation, clash, index) => {
     if (operation.id !== "ashen-passage") return [formation.start, formation.end];
@@ -2057,7 +1996,7 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
     <div className={`enemy-plan-layer phase-${phase} doctrine-${doctrinePhase}`} ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
       {enemyPlan.formations.map((formation, index) => {
         const clash = clashes[index];
-        const inBattle = phase === "battle" || phase === "complete";
+        const inBattle = exactRoutesVisible;
         const playbackFocused = focusedEnemyIndices.includes(index);
         const playbackClass = inBattle
           ? collisionFocus
@@ -2070,44 +2009,51 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
         const position = pointAlongFieldRoute(route, progress);
         const convergenceSpread = Math.pow(progress, 2);
         const convergenceOffsets = [{ x: -3.8, y: -3.2 }, { x: 4.2, y: .8 }, { x: -2.5, y: 4.1 }];
-        const displayPosition = {
+        const movingPosition = {
           x: position.x + convergenceOffsets[index].x * convergenceSpread,
           y: position.y + convergenceOffsets[index].y * convergenceSpread,
         };
         const endpoint = route.at(-1);
+        const displayPosition = contactForecastVisible ? endpoint : movingPosition;
+        const intelligence = enemyPlan.stages[index]?.intelligence ?? "UNKNOWN";
+        const forecastLabel = intelligence === "KNOWN"
+          ? `KNOWN CONTACT · ${formation.name}`
+          : intelligence === "UNCERTAIN"
+            ? `UNCERTAIN CONTACT · ${formation.name}`
+            : "UNKNOWN CONTACT";
         const resolved = inBattle && battleTime >= formation.actionAt;
         return (
           <Fragment key={formation.id}>
-            {route.slice(0, -1).map((start, segmentIndex) => (
+            {exactRoutesVisible && route.slice(0, -1).map((start, segmentIndex) => (
               <div className={`enemy-plan-segment enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={fieldSegmentStyle(start, route[segmentIndex + 1], layerSize)} key={`${formation.id}-segment-${segmentIndex}`}>
                 <ArrowRight weight="bold" />
               </div>
             ))}
-            <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
+            {exactRoutesVisible && <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
               <b>{formation.number}</b><span>{clash.label}</span>
-            </div>
-            <div className={`enemy-plan-formation ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass} ${counterRevealClass}`} style={{ left: `${displayPosition.x}%`, top: `${displayPosition.y}%` }}>
+            </div>}
+            <div className={`enemy-plan-formation ${contactForecastVisible ? "contact-forecast" : ""} ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass} ${counterRevealClass}`} style={{ left: `${displayPosition.x}%`, top: `${displayPosition.y}%` }}>
               <img src="/assets/helioch-sentinels.png" alt={`${formation.name} executing ${clash.label}`} />
               <span>{formation.number}</span>
-              <small>{resolved ? clash.routeState === "starved" ? "CHAIN STARVED" : clash.routeState === "diverted" || clash.routeState === "redirected" ? "REROUTED" : clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
+              <small>{contactForecastVisible ? forecastLabel : resolved ? clash.routeState === "starved" ? "CHAIN STARVED" : clash.routeState === "diverted" || clash.routeState === "redirected" ? "REROUTED" : clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
             </div>
           </Fragment>
         );
       })}
-      {operation.id === "ashen-passage" && (
+      {exactRoutesVisible && operation.id === "ashen-passage" && (
         <div className={`enemy-collision-marker ${profile.enemyCollision?.outcome ?? "unread"} ${playbackBeat?.kind === "contact" ? "playback-focused" : ""}`} style={{ left: `${collisionPoint.x}%`, top: `${collisionPoint.y}%` }}>
           <Crosshair weight="duotone" />
           <span>{profile.enemyCollision?.revealed ? profile.enemyCollision.title : "STOP 01/02 CONTACT WINDOW"}</span>
         </div>
       )}
-      <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"} ${reinforcementPlaybackClass}`} style={fieldSegmentStyle(reinforcementWave.start, reinforcementWave.intercept, layerSize)}>
+      {exactRoutesVisible && <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"} ${reinforcementPlaybackClass}`} style={fieldSegmentStyle(reinforcementWave.start, reinforcementWave.intercept, layerSize)}>
         <ArrowRight weight="bold" />
-      </div>
+      </div>}
       <div className={`reinforcement-intercept ${clearsBeforeWave ? "avoided" : "threat"} ${reinforcementPlaybackClass}`} style={{ left: `${reinforcementWave.intercept.x}%`, top: `${reinforcementWave.intercept.y}%` }}>
         <Crosshair weight="duotone" />
         <span>{!planReady ? `ENEMY WAVE · T+${fmtDuration(reinforcementWave.arrivalAt)}` : clearsBeforeWave ? "WARHOST CLEARS FIRST" : `${fmtDuration(profile.overrun)} INTERCEPT WINDOW`}</span>
       </div>
-      <div className={`enemy-plan-formation reinforcement-wave ${waveArrived ? "landed" : waveProgress > 0 ? "advancing" : "queued"} ${clearsBeforeWave ? "avoided" : ""} ${reinforcementPlaybackClass}`} style={{ left: `${wavePosition.x}%`, top: `${wavePosition.y}%` }}>
+      <div className={`enemy-plan-formation reinforcement-wave ${contactForecastVisible ? "contact-forecast" : ""} ${waveArrived ? "landed" : waveProgress > 0 ? "advancing" : "queued"} ${clearsBeforeWave ? "avoided" : ""} ${reinforcementPlaybackClass}`} style={{ left: `${contactForecastVisible ? reinforcementWave.intercept.x : wavePosition.x}%`, top: `${contactForecastVisible ? reinforcementWave.intercept.y : wavePosition.y}%` }}>
         <img src="/assets/helioch-sentinels.png" alt={`${reinforcementWave.name} approaching ${operation.extractionTitle}`} />
         <span>{reinforcementWave.number}</span>
         <small>{waveArrived ? reinforcementWave.order : `WAVE · T+${fmtDuration(reinforcementWave.arrivalAt)}`}</small>
@@ -2530,7 +2476,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
   const operationField = operationFieldFor(operation);
   const staffedFieldPlan = fieldPlanForPressure(operationField.plans[playbook.id], condition, playbook.id);
   const authoredRoutes = buildAuthoredFormationRoutes({
-    plan: operationField.plans[playbook.id],
+    plan: staffedFieldPlan,
     landmarks: operationField.landmarks,
     roles: playbook.roles,
     assignments,
@@ -2539,6 +2485,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       return [formation.id, { x: staging.left, y: staging.top - 3 }];
     })),
     branches,
+    formationMovementProfiles: Object.fromEntries(formations.map((formation) => [formation.id, formation.movementProfile])),
   });
   const roleActionTimes = [profile.alphaAt, profile.betaAt, profile.reactorExposeAt, profile.reactorAt, profile.extractionAt];
   const inspectedFormation = formations.find((formation) => formation.id === inspected) ?? null;
@@ -2553,14 +2500,22 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
   const mapPlaybook = previewPlaybook ?? playbook;
   const previewingPlaybook = Boolean(previewPlaybook);
   const showingRouteMap = previewingPlaybook || routeMapOpen;
+  const activeFieldPlan = fieldPlanForPressure(operationField.plans[mapPlaybook.id], condition, mapPlaybook.id);
+  const extractionLandmark = activeFieldPlan?.extractionLandmark ?? "extraction";
+  const extractionPoint = operationField.landmarks[extractionLandmark] ?? operationField.landmarks.extraction;
 
   return (
     <section className={`battlefield phase-${phase} operation-${operation.id} doctrine-${playbackBeat?.doctrinePhase ?? "none"} ${playbackActive ? "playback-active" : ""} ${collisionFocus ? "collision-focus" : ""} ${inspectingInteractions ? "interaction-inspecting" : ""}`} aria-label={`${operation.name} mission map`}>
-      <img className="battlefield-art" src="/assets/dead-circuit-foundry.png" alt={operation.battlefieldAlt} />
+      <img className="battlefield-art battlefield-art-planning" src="/assets/dead-circuit-command-map.png" alt="" aria-hidden="true" />
+      <img className="battlefield-art battlefield-art-execution" src="/assets/dead-circuit-foundry.png" alt="" aria-hidden="true" />
       <div className="battlefield-wash" />
       <div className="battlefield-operation-veil" aria-hidden="true" />
+      <div className="battlefield-view-mode" aria-hidden="true">
+        <span>{phase === "plan" || phase === "drill" ? "COMMAND MAP" : "BATTLE VIEW"}</span>
+        <strong>{phase === "plan" || phase === "drill" ? "TOP-DOWN PLANNING" : "ISOMETRIC EXECUTION"}</strong>
+      </div>
       <div className="battlefield-map-stage">
-      <TabletopBattlefieldOverlay landmarks={operationField.landmarks} operation={operation} />
+      <TabletopBattlefieldOverlay landmarks={operationField.landmarks} operation={operation} plan={activeFieldPlan} />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
       <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} handoffs={handoffs} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} profile={profile} />
       {showingRouteMap && (
@@ -2579,7 +2534,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <ObjectiveMarker className="alpha-objective" number="1" title={operation.controlTitles[0]} description={alphaState === "secured" ? "SECURED · western route open" : "Seize and hold"} state={alphaState} />
       <ObjectiveMarker className="beta-objective" number="1" title={operation.controlTitles[1]} description={betaState === "secured" ? "SECURED · transit lane open" : "Seize and hold"} state={betaState} />
       <ObjectiveMarker className="reactor-objective" number="2" title={operation.primaryTitle} description={reactorState === "secured" ? operation.primaryDone : operation.primaryDescription} state={reactorState} icon={Factory} />
-      <ObjectiveMarker className="extraction-objective" number="3" title={operation.extractionTitle} description={`Extract ${operation.requiredExtraction}+ formations`} state={extractionState} icon={Flag} />
+      <ObjectiveMarker className="extraction-objective" number="3" title={activeFieldPlan?.extractionLabel ?? operation.extractionTitle} description={`Extract ${operation.requiredExtraction}+ formations`} state={extractionState} icon={Flag} style={{ left: `${extractionPoint.x}%`, top: `${extractionPoint.y}%`, right: "auto" }} />
       <ObjectiveMarker className="rescue-objective" title={operation.optionalTitle} description={operation.optionalDescription} state="optional" icon={Wrench} />
 
       <div className="mission-path path-one" aria-hidden="true" />
