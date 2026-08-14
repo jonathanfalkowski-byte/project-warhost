@@ -73,6 +73,14 @@ test("every control on the planning screen exposes an accessible name", async ()
   assert.deepEqual(unnamed, [], `buttons without an accessible name: ${unnamed.join(" | ")}`);
 });
 
+test("the placement cost stays sealed until the operation is over", async () => {
+  const markup = await planningScreen();
+  // AGENTS.md: reveal output only after placement, and never grade the plan before
+  // commitment. The debrief readback must not appear on the planning screen.
+  assert.doesNotMatch(markup, /placement-cost/);
+  assert.doesNotMatch(markup, /stop demands went unanswered/);
+});
+
 test("the planning screen never overrides document focus order", async () => {
   const markup = await planningScreen();
   const positive = (markup.match(/tabindex="(\d+)"/gi) ?? []).filter((match) => Number(match.match(/\d+/)[0]) > 0);

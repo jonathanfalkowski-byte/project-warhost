@@ -2069,6 +2069,19 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
 function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, strategyTrial, blindTestActive, blindPrediction, won, onAction }) {
   const dialogRef = useModalFocus(true);
   const lostCount = formations.length - profile.extractedCount;
+  // Placement is the deciding lever, so the debrief has to say plainly what it cost.
+  // Concealment belongs before commitment; after the fact an unexplained loss is just
+  // an unexplained loss.
+  const placementCostTotal = profile.readiness.placements.reduce((sum, placement) => sum + (placement.taskDelay ?? 0), 0);
+  const placementCost = {
+    total: placementCostTotal,
+    // Counted in demands rather than formations: most stops ask for two capabilities
+    // that no single formation carries, so "formations that fell short" would read as
+    // total failure even for a well matched plan.
+    unanswered: profile.readiness.placements.reduce((sum, placement) => sum + placement.unansweredDemands.length, 0),
+    demanded: profile.readiness.placements.reduce((sum, placement) => sum + placement.demands.length, 0),
+    extractionsLost: Math.floor(placementCostTotal / 30),
+  };
   const recoveryCarrierFate = formationFates.find(({ formation }) => formation.id === "hauler");
   const carrierCutOffAfterRescue = rescued && recoveryCarrierFate?.history?.some(({ state }) => state === "cut-off");
   const disruptedEnemyOrders = profile.enemyClashes.filter((clash) => clash.disrupted).length;
@@ -2140,6 +2153,38 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
           <div><span>FORMATION ROUTE PLAN</span><b>{profile.readiness.staffedCount} / {playbook.roles.length} orders staffed</b><small>{profile.effects.length} secondary combo bonuses · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</small><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
+        <section className="placement-cost" aria-label="What your formation placement cost the operation">
+          <header>
+            <span>PLACEMENT COST · WHAT EACH ORDER DEMANDED</span>
+            <small>
+              {placementCost.total > 0
+                ? `${fmtDuration(placementCost.total)} conceded · ${placementCost.unanswered} of ${placementCost.demanded} stop demands went unanswered`
+                : "Every demand was answered. No time conceded to placement."}
+            </small>
+          </header>
+          <ol>
+            {profile.readiness.placements.map((placement) => (
+              <li className={placement.taskAligned ? "answered" : "unanswered"} key={placement.stopNumber}>
+                <span>STOP {String(placement.stopNumber).padStart(2, "0")}</span>
+                <b>{placement.formationName}</b>
+                <small>
+                  {placement.roleLabel} demanded {placement.demands.map(tacticalTerm).join(" / ")}.{" "}
+                  {placement.taskAligned
+                    ? "Answered in full."
+                    : `Could not answer ${placement.unansweredDemands.map(tacticalTerm).join(" and ")}.`}
+                </small>
+                <strong>{placement.taskDelay > 0 ? `+${placement.taskDelay}s` : "—"}</strong>
+              </li>
+            ))}
+          </ol>
+          {placementCost.extractionsLost > 0 && (
+            <p className="placement-cost-total">
+              That delay reached the extraction gantry <b>{fmtDuration(placementCost.total)}</b> late,
+              costing <b>{placementCost.extractionsLost}</b> {placementCost.extractionsLost === 1 ? "formation" : "formations"} at the wave.
+              Better matched placement was worth {placementCost.extractionsLost} {placementCost.extractionsLost === 1 ? "extraction" : "extractions"}.
+            </p>
+          )}
+        </section>
         <section className="strategy-outcome-story" aria-label="How your choices produced the mission result">
           <header><span>WHY YOUR PLAN {won ? "WORKED" : "FAILED"}</span><small>ROUTE ASSIGNMENTS → ENEMY RESPONSE → MISSION COST</small></header>
           <div>

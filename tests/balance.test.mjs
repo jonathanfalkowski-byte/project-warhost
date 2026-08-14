@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { OPERATIONS } from "../src/operationData.js";
+import { FORMATIONS, defaultRefits, resolveFormations } from "../src/formationData.js";
+import { PLAYBOOKS, playbookForOperation } from "../src/playbookData.js";
+import { missionPressureFor } from "../src/missionPressure.js";
+import {
+  calculatePlacementReadiness,
+  evaluateTacticalSequence,
+  summarizePlacementReadiness,
+} from "../src/operationResolution.js";
 import { sweepOperation, sweepRefitSpace } from "../scripts/balance-sweep.mjs";
 
 // The outcome pipeline is deterministic, so these resolve the entire decision space
@@ -216,4 +224,29 @@ test("every fight stays winnable across every loadout", () => {
     }
   }
   assert.deepEqual(dead, [], `matchups no loadout or placement can win: ${dead.join(", ")}`);
+});
+
+test("the debrief can explain what placement cost", () => {
+  // Placement is the deciding lever, so a loss has to be explicable afterwards. The
+  // resolution must carry, per stop, which demands went unanswered and the seconds
+  // conceded — otherwise the player loses time to an invisible number.
+  const formations = resolveFormations(defaultRefits());
+  const playbook = playbookForOperation(PLAYBOOKS[0], operation);
+  const condition = missionPressureFor("fractured-transit", operation.id);
+  const order = ["hauler", "railjack", "furnace", "breaker", "harpoon"];
+  const assignments = Object.fromEntries(playbook.roles.map((role, i) => [role.id, order[i]]));
+  const sequence = evaluateTacticalSequence(playbook, assignments, formations);
+  const readiness = calculatePlacementReadiness(playbook, assignments, sequence.handoffs, condition, formations);
+  const summary = summarizePlacementReadiness(readiness);
+
+  assert.equal(summary.placements.length, 5);
+  for (const placement of summary.placements) {
+    assert.ok(Array.isArray(placement.unansweredDemands), "each stop must report which demands went unanswered");
+    assert.equal(typeof placement.taskDelay, "number", "each stop must report what it cost");
+    assert.equal(placement.unansweredDemands.length + placement.matchedCapabilities.length, placement.demands.length);
+  }
+  // A deliberately mismatched plan must concede real, attributable time.
+  assert.ok(summary.delay > 0, "a mismatched plan conceded no time, so the debrief has nothing to explain");
+  assert.equal(summary.delay, summary.placements.reduce((sum, p) => sum + p.taskDelay, 0),
+    "the total must be the sum of the per-stop costs, or the debrief will not add up");
 });

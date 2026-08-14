@@ -186,6 +186,24 @@ They are currently a difficulty dial with a small reshaping effect, rather than 
 choice that changes where a formation belongs. That is the open design question, and
 it is a design decision rather than a bug: the mechanism works, it is just quiet.
 
+## Making the mechanic legible (15 Aug 2026)
+
+Placement became the deciding lever, but the cost was invisible: the planning board
+shows a sealed `?` by design, and the debrief said only "5 / 5 orders staffed". A
+player could concede 80 seconds to mismatched placement and never learn why — worse
+than the old behaviour, where placement at least did nothing consistently.
+
+The debrief now opens with a `PLACEMENT COST` readback: per stop, what the role
+demanded, which demands went unanswered, and the seconds conceded; then the total and
+how many extractions it cost. Verified by playing two operations to completion in a
+browser — a deliberately mismatched plan reports `01:20 conceded · 10 of 10 stop
+demands went unanswered ... costing 2 formations at the wave`, a well-matched one
+`00:48 conceded · 6 of 10`. Evidence: `docs/audit/audit-42-placement-cost-debrief.png`.
+
+Nothing about placement quality appears before commitment; a regression guard asserts
+the readback is absent from the planning render, and all nine new colours clear WCAG AA
+(6.9:1 to 15.6:1).
+
 ## Residual, and still open
 
 - **`early-relief` × `pressure` is thin** — 2 of 120 placements win it (0.4%). Alive,

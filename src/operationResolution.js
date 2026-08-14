@@ -138,13 +138,18 @@ export const summarizePlacementReadiness = (readiness) => {
     improvisedCount: staffed.filter((item) => !item.taskAligned).length,
     average: staffed.length > 0 ? Math.round(totalScore / staffed.length) : 0,
     delay: staffed.reduce((sum, item) => sum + (item.taskDelay ?? 0), 0),
-    placements: staffed.map(({ formationName, roleLabel, stopNumber, taskAligned, demands, matchedCapabilities }) => ({
+    placements: staffed.map(({ formationName, roleLabel, stopNumber, taskAligned, demands, matchedCapabilities, taskDelay }) => ({
       formationName,
       roleLabel,
       stopNumber,
       taskAligned,
       demands,
       matchedCapabilities,
+      // Carried so the debrief can state, per stop, which demands went unanswered and
+      // what that cost. Placement decides the mission, so the player has to be able to
+      // read back why afterwards, even though it stays sealed before commitment.
+      taskDelay,
+      unansweredDemands: demands.filter((demand) => !matchedCapabilities.includes(demand)),
     })),
   };
 };

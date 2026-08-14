@@ -1517,3 +1517,22 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
   .playbook-slot { min-height: 86px; }
   .rendezvous-status-strip { grid-template-columns: 110px repeat(2, minmax(0, 1fr)) 125px; }
 }
+
+/* Placement cost — the debrief's readback of what mismatched placement cost. Placement
+   decides the mission, so this is the surface that keeps a loss explicable. It is
+   completion-only; nothing here is revealed before the playbook is committed. */
+.placement-cost { grid-column: 1 / -1; display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #4a5a52; background: rgba(10, 18, 16, .92); }
+.placement-cost header { display: grid; gap: 2px; }
+.placement-cost header span { color: #e0c473; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .11em; }
+.placement-cost header small { color: #9fb0a7; font-family: "Barlow Condensed"; font-size: 9px; letter-spacing: .05em; }
+.placement-cost ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.placement-cost li { display: grid; grid-template-columns: 58px minmax(0, 150px) minmax(0, 1fr) 46px; align-items: center; gap: 8px; padding: 4px 6px; border-left: 2px solid #3d4b44; background: rgba(16, 24, 21, .8); }
+.placement-cost li.unanswered { border-left-color: #c8874a; }
+.placement-cost li.answered { border-left-color: #7fb069; }
+.placement-cost li span { color: #8fa39a; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .09em; }
+.placement-cost li b { color: #e6ede9; font-size: 11px; font-weight: 700; }
+.placement-cost li small { color: #a8b8ae; font-family: "Barlow Condensed"; font-size: 9px; line-height: 1.25; }
+.placement-cost li strong { color: #d99a5b; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; text-align: right; }
+.placement-cost li.answered strong { color: #7fb069; }
+.placement-cost-total { margin: 0; padding: 6px 8px; border: 1px dashed #6f5a3a; color: #ddc691; font-family: "Barlow Condensed"; font-size: 10px; line-height: 1.35; }
+.placement-cost-total b { color: #f0d79b; }
