@@ -158,7 +158,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .disposition-versus { margin-top: 6px; display: grid; grid-template-columns: 1fr 24px 1fr; align-items: center; gap: 4px; }
 .disposition-versus > div { display: grid; gap: 1px; padding: 5px; border: 1px solid #32677b; background: #10242d; }
 .disposition-versus > div:last-child { border-color: #7f512d; background: #281910; text-align: right; }
-.disposition-versus small { color: #718991; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .08em; }
+.disposition-versus small { color: #778e96; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .08em; }
 .disposition-versus b { color: #61c8ef; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .06em; }
 .disposition-versus > div:last-child b { color: #ed9b4f; }
 .disposition-versus em { color: #8c928e; font-family: "Barlow Condensed"; font-size: 9px; font-style: normal; text-align: center; }
@@ -173,7 +173,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .mission-matchup-brief .mission-pressure-order b { color: #f0ca68; }
 .strategy-test-panel { margin: 6px; padding: 8px; border: 1px solid #546545; background: #101814; }
 .strategy-test-panel header { display: flex; justify-content: space-between; gap: 6px; color: #9bcf78; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
-.strategy-test-panel header small { color: #728078; font-size: 7px; }
+.strategy-test-panel header small { color: #76847c; font-size: 7px; }
 .strategy-test-panel > p { margin: 6px 0; color: #9ba49f; font-size: 8px; line-height: 1.3; }
 .strategy-test-panel > p b { color: #d9e3dd; }
 .start-blind-test { width: 100%; margin-bottom: 5px; padding: 7px; display: grid; grid-template-columns: 25px 1fr; align-items: center; gap: 7px; border: 1px solid #6e9a53; background: #17241a; color: #9ee277; text-align: left; cursor: pointer; }
@@ -187,7 +187,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .strategy-trial-list button > strong { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid #68756e; color: #d4ddd8; font-family: "Barlow Condensed"; font-size: 11px; }
 .strategy-trial-list button span { min-width: 0; display: grid; gap: 1px; }
 .strategy-trial-list button b { overflow: hidden; color: #bac4bf; font-family: "Barlow Condensed"; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.strategy-trial-list button small { color: #717b76; font-family: "Barlow Condensed"; font-size: 6px; line-height: 1.1; }
+.strategy-trial-list button small { color: #7c8580; font-family: "Barlow Condensed"; font-size: 6px; line-height: 1.1; }
 .strategy-trial-list button.selected { border-color: #8ac862; background: #19261a; box-shadow: inset 0 0 12px rgba(123, 191, 81, .08); }
 .strategy-trial-list button.selected > strong, .strategy-trial-list button.selected b { color: #9ee277; border-color: #80bd5d; }
 .strategy-trial-list button:disabled { cursor: not-allowed; opacity: .35; }
@@ -211,7 +211,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .playbook-row > svg { width: 24px; height: 24px; color: #858c89; }
 .playbook-row span { display: grid; }
 .playbook-row b { font-family: "Barlow Condensed"; letter-spacing: .08em; font-size: 13px; }
-.playbook-row small { color: #7d8581; font-size: 10px; line-height: 1.2; }
+.playbook-row small { color: #848b87; font-size: 10px; line-height: 1.2; }
 .playbook-row em { margin-top: 2px; color: #8f8060; font-family: "Barlow Condensed"; font-size: 8px; font-style: normal; letter-spacing: .1em; }
 .playbook-row.selected { border-color: var(--blue); background: #102331; box-shadow: inset 3px 0 #1688bd; }
 .playbook-row.previewing:not(.selected) { border-color: #53879a; background: #142126; box-shadow: inset 3px 0 #6db9d2; }
@@ -223,7 +223,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .doctrine-row > svg { width: 26px; height: 26px; color: #858c89; }
 .doctrine-row span { display: grid; }
 .doctrine-row b { font-family: "Barlow Condensed"; letter-spacing: .08em; font-size: 14px; }
-.doctrine-row small { color: #7d8581; font-size: 11px; }
+.doctrine-row small { color: #848b87; font-size: 11px; }
 .doctrine-row.selected { border-color: var(--blue); background: #102331; }
 .doctrine-row.selected > svg, .doctrine-row.selected b { color: #59c2f4; }
 .doctrine-row:disabled { cursor: default; }
@@ -322,6 +322,61 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-layer.planning .field-plan-segment.staffed.movement-walker { height: 2px; background: transparent; border-top: 3px dashed var(--route-color); box-shadow: 0 0 8px rgba(var(--route-rgb, 102, 206, 244), .48); }
 .field-plan-layer.planning .field-plan-segment.staffed.movement-walker::before { display: none; }
 .field-plan-layer.planning .field-plan-segment.staffed.movement-vehicle { height: 5px; border-top: 1px solid rgba(var(--route-rgb, 102, 206, 244), .72); border-bottom: 1px solid rgba(var(--route-rgb, 102, 206, 244), .72); }
+.field-plan-layer.planning .field-plan-segment.route-preview { --route-color: #ffd45e; --route-rgb: 255, 212, 94; z-index: 8; height: 7px; opacity: 1; pointer-events: none; background: #ffd45e; box-shadow: 0 0 8px #071013, 0 0 20px rgba(255, 212, 94, .9); }
+.field-plan-layer.planning .field-plan-segment.route-preview::before { display: none; }
+.field-plan-layer.planning .field-plan-segment.route-preview.movement-walker { height: 5px; background: transparent; border-top: 5px dashed #ffd45e; }
+.field-plan-layer.planning .field-plan-segment.route-preview.movement-vehicle { height: 7px; background: #ffd45e; border: 1px solid #fff0a0; }
+.field-route-preview-label { position: absolute; z-index: 10; transform: translate(-50%, -120%); display: grid; gap: 2px; min-width: 180px; padding: 7px 9px; border: 1px solid #ffd45e; background: rgba(10, 18, 19, .96); color: #fff3b8; box-shadow: 0 0 18px rgba(255, 212, 94, .35); pointer-events: none; }
+.field-route-preview-label b { color: #ffd45e; }
+.field-route-preview-label span { font-weight: 800; }
+.field-route-preview-label small { color: #d5c98f; }
+.field-route-preview-label.movement-walker { border-style: dashed; }
+
+/* Visually hidden, but present in the accessibility tree. Used for the route-preview
+   announcement, which has no readable equivalent because the preview is drawn purely
+   as map geometry. Must not use display:none or visibility:hidden - either would
+   remove the element from the accessibility tree and silence the live region. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Route-preview readability pass (design-qa P3).
+   While a preview route is drawn, secondary battlefield chrome steps back so the
+   previewed geometry is legible at 1280x720. Objectives, action stops and the
+   preview itself stay at full strength; nothing is removed from the DOM, so the
+   accessible reading order is unchanged. */
+.field-plan-layer.previewing-route .field-plan-route-key,
+.field-plan-layer.previewing-route .field-plan-strategy-read,
+.field-plan-layer.previewing-route .field-plan-battle-sequence { opacity: .32; transition: opacity .12s ease-out; }
+.field-plan-layer.previewing-route .field-plan-rendezvous,
+.field-plan-layer.previewing-route .field-plan-contact-zone { opacity: .2; filter: grayscale(.6); transition: opacity .12s ease-out; }
+.field-plan-layer.previewing-route .field-plan-segment:not(.route-preview) { opacity: .34; }
+.field-plan-layer.previewing-route .field-plan-operation-corridor span,
+.field-plan-layer.previewing-route .field-plan-operation-corridor small { opacity: .3; }
+@media (max-width: 1439px) {
+  .field-plan-layer.previewing-route .field-plan-rendezvous,
+  .field-plan-layer.previewing-route .field-plan-contact-zone { opacity: .08; }
+  .field-plan-layer.previewing-route .field-plan-route-key,
+  .field-plan-layer.previewing-route .field-plan-strategy-read,
+  .field-plan-layer.previewing-route .field-plan-battle-sequence { opacity: .18; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-plan-layer.previewing-route .field-plan-route-key,
+  .field-plan-layer.previewing-route .field-plan-strategy-read,
+  .field-plan-layer.previewing-route .field-plan-battle-sequence,
+  .field-plan-layer.previewing-route .field-plan-rendezvous,
+  .field-plan-layer.previewing-route .field-plan-contact-zone { transition: none; }
+}
+
 .field-plan-operation-corridor { position: absolute; z-index: 0; height: 11px; transform-origin: 0 50%; border-top: 1px solid rgba(220, 185, 105, .5); border-bottom: 1px solid rgba(220, 185, 105, .24); background: linear-gradient(90deg, rgba(194, 151, 65, .05), rgba(224, 194, 121, .2), rgba(194, 151, 65, .05)); box-shadow: 0 0 18px rgba(210, 168, 82, .16); }
 .field-plan-operation-corridor span { position: absolute; left: 50%; top: -17px; padding: 2px 5px; transform: translateX(-50%); border: 1px solid rgba(174, 137, 64, .54); background: rgba(23, 19, 12, .96); color: #e4bd70; font-family: "Barlow Condensed"; font-size: 8px; font-weight: 700; letter-spacing: .09em; white-space: nowrap; }
 .field-plan-operation-corridor small { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); color: #b79b65; font-family: "Barlow Condensed"; font-size: 7px; letter-spacing: .06em; white-space: nowrap; }
@@ -1059,12 +1114,12 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .condition-options button.selected { border-color: #5ebee5; background: #10252d; box-shadow: inset 3px 0 #29a9e8; }
 .condition-options button:disabled { cursor: default; }
 .condition-options b { color: #b9d8e3; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .07em; }
-.condition-options small { color: #778580; font-size: 8px; line-height: 1.2; }
+.condition-options small { color: #818e8a; font-size: 8px; line-height: 1.2; }
 .condition-effect { display: grid !important; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 6px; padding: 7px; border-left: 3px solid #d17a37; background: #20170f; }
 .condition-effect > svg { width: 16px; color: #e69a51; }
 .condition-effect > span { display: grid; gap: 2px; color: #a9a49b; font-size: 9px; line-height: 1.25; }
 .condition-effect > span b { color: #eca663; font-size: 10px; }
-.prototype-note { color: #66736e; font-family: "Barlow Condensed"; font-size: 7px; line-height: 1.2; letter-spacing: .06em; }
+.prototype-note { color: #75817d; font-family: "Barlow Condensed"; font-size: 7px; line-height: 1.2; letter-spacing: .06em; }
 .readiness-impact { margin-top: 9px; display: grid; gap: 2px; padding: 7px; border-left: 3px solid #61954b; background: #142018; font-family: "Barlow Condensed"; }
 .doctrine-outlook { margin-top: 8px; display: grid; gap: 2px; padding: 7px; border-left: 3px solid #b17b45; background: #21170f; font-family: "Barlow Condensed"; }
 .doctrine-outlook > span { color: #c99a5f; font-size: 8px; letter-spacing: .09em; }
@@ -1113,7 +1168,7 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .enemy-chain-step { min-width: 0; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 3px 6px; padding: 6px; border: 1px solid #4c352b; background: #17110e; }
 .enemy-step-number { grid-row: 1 / 3; align-self: center; color: #e1784d; font-family: "Barlow Condensed"; font-size: 14px; font-weight: 700; }
 .enemy-step-copy { min-width: 0; display: grid; }
-.enemy-step-copy em { color: #8f6d5f; font-family: "Barlow Condensed"; font-size: 7px; font-style: normal; letter-spacing: .1em; }
+.enemy-step-copy em { color: #97786b; font-family: "Barlow Condensed"; font-size: 7px; font-style: normal; letter-spacing: .1em; }
 .enemy-step-copy b { color: #e99772; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .06em; }
 .enemy-step-copy small { color: #8e817b; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .enemy-step-result { grid-column: 1 / -1; padding-top: 3px; border-top: 1px solid #3e302a; color: #8e817a; font-family: "Barlow Condensed"; font-size: 8px; line-height: 1.2; }

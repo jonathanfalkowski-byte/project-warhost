@@ -43,7 +43,6 @@ const routesFor = (plan, beta, rescue, movementProfile = "tracked") => buildAuth
   landmarks: DEAD_CIRCUIT_FIELD_LANDMARKS,
   roles,
   assignments,
-  formationStarts: {},
   formationMovementProfiles: Object.fromEntries(roles.map((role, index) => [`formation-${index}`, movementProfile])),
   branches: { beta, rescue },
 });

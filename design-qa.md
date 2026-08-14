@@ -1,11 +1,11 @@
 **Source visual truth**
 
-- `C:\Users\Admin\AppData\Local\Temp\codex-clipboard-cc8a5c69-17de-4d2e-92a8-5ffeb8301376.png`
+- Source mock supplied by the user at review time (local clipboard capture, not tracked in the repository).
 - The source establishes the existing industrial command-map language and identifies the Twin Seizure route-crossing problem.
 
 **Implementation evidence**
 
-- `C:\Users\Admin\Documents\Project-Warhost\implementation-twin-seizure.png`
+- `docs/audit/implementation-twin-seizure.png`
 - Local URL: `http://127.0.0.1:4173/`
 - Browser viewport: 1280 x 720 CSS pixels at device scale 1.
 - Source pixels: 1978 x 1413. Implementation pixels: 1280 x 720. The images are different browser crops, so the comparison was normalized around the battlefield route region rather than pixel-perfect outer chrome.
@@ -56,7 +56,7 @@
 
 **Follow-up polish**
 
-- Reduce secondary battlefield label density during route-preview mode at 1280 x 720.
+- [DONE 14 Aug 2026] Reduce secondary battlefield label density during route-preview mode at 1280 x 720.
 
 final result: passed
 
@@ -130,13 +130,21 @@ final result: passed
 - The battlefield sequence and contact forecasts remain visible during formation assignment, so unit responsibilities can be judged against the army plan before secondary combinations.
 - Doctrine effects are inherent to the selected play; rendezvous combinations remain optional bonuses.
 - No browser console errors or failed rendering states were observed.
-- [P3] At 1280 x 720 the upper battlefield remains information-dense. A future readability pass should progressively reveal secondary labels when the relevant phase or route is focused.
+- [P3 - RESOLVED 14 Aug 2026] At 1280 x 720 the upper battlefield was information-dense while a route preview was drawn. Resolved by a route-preview readability pass: while a preview route is on the map, the route key, strategy read, battle sequence, rendezvous markers, contact forecasts and corridor captions step back, and non-previewed route segments drop to 34% so the previewed geometry reads first. Objectives, numbered action stops and the preview label stay at full strength, and nothing is removed from the DOM, so the accessible reading order is unchanged. Suppression is stronger below 1440 px, where the density actually bites, and the transition is disabled under `prefers-reduced-motion`.
+
+**Route-preview readability evidence (14 Aug 2026)**
+
+- `docs/audit/audit-40-route-preview-suppressed-1280.png` - 1280 x 720 planning state with a RECON TANK preview drawn from the first action stop.
+- `docs/audit/audit-39-route-preview-baseline-1280.png` - the same viewport and state with no preview active, for comparison.
+- Browser readback during preview: `field-plan-layer` carries `previewing-route`, 16 preview segments and 1 preview label are present, and the computed opacity of a rendezvous marker is 0.08.
+- Before the pass, the same region carried LIKELY COUNTERATTACK, PRIMARY DEFENCE, two ROUTES MEET HERE markers and the phase strip at full strength, competing with the previewed route.
 
 **Validation**
 
 - [x] Production build.
-- [x] 98 game tests.
+- [x] 118 game tests.
 - [x] 5 Sites checks.
 - [x] Twin Seizure browser replay and route-sequence readback.
+- [x] Route-preview browser readback at 1280 x 720.
 
 final result: passed

@@ -46,12 +46,56 @@ export const splitAuthoredRouteAtActionStop = (points) => ({
   continuation: points.slice(1),
 });
 
+export const movementRouteKeyFor = (route, movementProfile = "tracked") => {
+  const genericMovementProfile = movementProfile.replace(/^(light|heavy|support)-/, "");
+  const movementRoutes = route.movementRoutes ?? {};
+  return movementRoutes[movementProfile]
+    ? movementProfile
+    : movementRoutes[genericMovementProfile]
+      ? genericMovementProfile
+      : movementRoutes.tracked
+        ? "tracked"
+        : null;
+};
+
+export const movementRoutePresentation = ({ movementRouteKey = null, staffed = false } = {}) => {
+  const kind = movementRouteKey === "walker" ? "walker" : staffed ? "vehicle" : "standard";
+  return {
+    kind,
+    label: kind === "walker"
+      ? "WALKER CUT-THROUGH"
+      : kind === "vehicle"
+        ? "VEHICLE STREET ROUTE"
+        : "STANDARD AUTHORED ROUTE",
+    terrainLabel: kind === "walker"
+      ? "THROUGH RUINS"
+      : kind === "vehicle"
+        ? "AROUND RUINS"
+        : "OPEN APPROACH",
+  };
+};
+
+// A route preview is drawn as map geometry, which conveys nothing to a screen
+// reader. Focusing an action stop produces the same preview as hovering it, so this
+// sentence is the keyboard-and-screen-reader equivalent of reading the drawn route.
+// Returns "" when there is nothing to announce, which clears the live region.
+export const routePreviewAnnouncement = ({ formationName, movementRouteKind, roleIndex, roleLabel } = {}) => {
+  if (!formationName || !roleLabel || !Number.isInteger(roleIndex) || roleIndex < 0) return "";
+  const terrain = movementRouteKind === "walker"
+    ? "walker route, cutting through ruins"
+    : "vehicle route, avoiding blocked terrain";
+  return `Route preview only, not assigned. ${formationName} would take the ${terrain}, to action stop ${roleIndex + 1}, ${roleLabel}.`;
+};
+
+// Deliberately takes no formation staging coordinates. The playbook owns every
+// legal corridor, so a route's origin is always its authored start; staffing only
+// selects which authored corridor that formation's movement profile permits.
+// Callers that still pass staging positions are ignored by design.
 export const buildAuthoredFormationRoutes = ({
   plan,
   landmarks,
   roles,
   assignments,
-  formationStarts,
   formationMovementProfiles = {},
   branches,
 }) => {
@@ -61,31 +105,15 @@ export const buildAuthoredFormationRoutes = ({
     const formationId = role ? assignments[role.id] : null;
     const movementProfile = formationMovementProfiles[formationId] ?? "tracked";
     const authoredStart = resolveAuthoredPoint(plan, landmarks, route.start);
-    // The playbook owns every legal corridor. Staffing selects the authored
-    // corridor permitted by that formation's movement profile.
-    const formationStart = authoredStart;
     const points = [];
-    pushDistinctPoint(points, formationStart);
-    const genericMovementProfile = movementProfile.replace(/^(light|heavy|support)-/, "");
+    pushDistinctPoint(points, authoredStart);
     const movementRoutes = route.movementRoutes ?? {};
-    const movementRouteKey = movementRoutes[movementProfile]
-      ? movementProfile
-      : movementRoutes[genericMovementProfile]
-        ? genericMovementProfile
-        : movementRoutes.tracked
-          ? "tracked"
-          : null;
+    const movementRouteKey = movementRouteKeyFor(route, movementProfile);
     const routeReferences = movementRouteKey ? movementRoutes[movementRouteKey] : route.points;
-    const movementRouteKind = movementRouteKey === "walker"
-      ? "walker"
-      : formationId
-        ? "vehicle"
-        : "standard";
-    const movementRouteLabel = movementRouteKind === "walker"
-      ? "WALKER CUT-THROUGH"
-      : movementRouteKind === "vehicle"
-        ? "VEHICLE STREET ROUTE"
-        : "STANDARD AUTHORED ROUTE";
+    const movementRoutePresentationData = movementRoutePresentation({
+      movementRouteKey,
+      staffed: Boolean(formationId),
+    });
     routeReferences
       .map((reference) => resolveAuthoredPoint(plan, landmarks, reference))
       .forEach((point) => pushDistinctPoint(points, point));
@@ -109,8 +137,9 @@ export const buildAuthoredFormationRoutes = ({
       formationId,
       movementProfile,
       movementRouteKey,
-      movementRouteKind,
-      movementRouteLabel,
+      movementRouteKind: movementRoutePresentationData.kind,
+      movementRouteLabel: movementRoutePresentationData.label,
+      movementTerrainLabel: movementRoutePresentationData.terrainLabel,
       extractionLandmark,
       breakpoint: route.breakpoint ?? null,
       points,

@@ -35,7 +35,6 @@ test("every selected Twin Seizure order is a complete journey ending at extracti
         landmarks,
         roles,
         assignments,
-        formationStarts: {},
         branches: { beta, rescue },
       });
 
@@ -55,7 +54,6 @@ test("the extraction element cannot appear to reach extraction and then reverse"
     landmarks,
     roles,
     assignments,
-    formationStarts: {},
     branches: { beta: "tempo", rescue: "clock" },
   }).find((route) => route.roleIndex === 4);
   const rescue = buildAuthoredFormationRoutes({
@@ -63,7 +61,6 @@ test("the extraction element cannot appear to reach extraction and then reverse"
     landmarks,
     roles,
     assignments,
-    formationStarts: {},
     branches: { beta: "tempo", rescue: "recover" },
   }).find((route) => route.roleIndex === 4);
 

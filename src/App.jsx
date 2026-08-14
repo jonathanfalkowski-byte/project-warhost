@@ -8,13 +8,11 @@ import "@fontsource/barlow-condensed/500.css";
 import "@fontsource/barlow-condensed/600.css";
 import "@fontsource/barlow-condensed/700.css";
 import {
-  Anchor,
   ArrowCounterClockwise,
   ArrowRight,
   CheckCircle,
   Crosshair,
   Factory,
-  Fire,
   Flag,
   Hammer,
   Lightning,
@@ -26,7 +24,6 @@ import {
   Seal,
   Shield,
   Target,
-  Truck,
   Warning,
   Wrench,
 } from "@phosphor-icons/react";
@@ -34,11 +31,11 @@ import { resolveAshenCollision } from "./enemyCollision.js";
 import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
 import { enemyContactForecastVisibleFor, enemyExactRoutesVisibleFor } from "./enemyPlanVisibility.js";
 import { battlefieldDoctrineFor } from "./battleDoctrineData.js";
-import { DEAD_CIRCUIT_FIELD_LANDMARKS, DEAD_CIRCUIT_FIELD_PLANS, DEAD_CIRCUIT_MISSION } from "./fieldPlanData.js";
+import { DEAD_CIRCUIT_MISSION } from "./fieldPlanData.js";
 import { resolveExtractionOutcome } from "./extractionResolution.js";
 import { resolveDispositionMatchup } from "./missionDisposition.js";
 import { claimStaffExercise, planningResultRevealed } from "./planningIntel.js";
-import { adjacentFormationIdsFor, capabilityMatchesFor, formationInteractionsFor, interactionDirectionFor, neighboringInteractionHints } from "./formationInteractions.js";
+import { adjacentFormationIdsFor, formationInteractionsFor, interactionDirectionFor, neighboringInteractionHints } from "./formationInteractions.js";
 import {
   BLIND_PREDICTIONS,
   blindPredictionResult,
@@ -69,9 +66,10 @@ import {
   buildAuthoredFormationRoutes,
   pointAlongRoute as pointAlongFieldRoute,
   positionAlongAuthoredRoute,
+  routePreviewAnnouncement,
   splitAuthoredRouteAtActionStop,
 } from "./fieldRoutes.js";
-import { PLAYBOOK_DOCTRINES, resolvePlaybookDoctrine } from "./playbookDoctrine.js";
+import { resolvePlaybookDoctrine } from "./playbookDoctrine.js";
 import { resolveTacticalEngagement } from "./tacticalResolution.js";
 import { strategyCausalityFor, strategyOutcomeStoryFor } from "./strategyCausality.js";
 import {
@@ -79,770 +77,50 @@ import {
   missionPressureFor,
   missionPressuresForOperation,
   playbookTimingForPressure,
-  roleDemandsForPressure,
-  waveArrivalForPressure,
 } from "./missionPressure.js";
 
-const FORMATIONS = [
-  {
-    id: "harpoon",
-    number: "1",
-    name: "RECON TANK",
-    role: "DISPLACE",
-    movementProfile: "light-tracked",
-    endurance: { armor: 3, cohesion: 3, mobility: 5 },
-    capabilities: ["CONTROL", "MOBILITY"],
-    refits: [
-      { id: "winch", name: "GRAVITIC WINCH", summary: "Control package built for forced movement.", capabilities: ["CONTROL", "MOBILITY"], creates: "DISPLACED" },
-      { id: "magnet", name: "BREACH MAGNET", summary: "Trades transit speed for armor-shearing force.", capabilities: ["CONTROL", "BREACH"], creates: "FRACTURED ARMOR" },
-    ],
-    purpose: "Scouts the advance, controls enemy movement, and forces blockers out of position.",
-    creates: "DISPLACED",
-    uses: ["SCREENED", "SUPPLIED", "FORWARD HOLD"],
-    asset: "/assets/harpoon-rig.png",
-    icon: Anchor,
-    defaultNode: "alphaApproach",
-  },
-  {
-    id: "furnace",
-    number: "2",
-    name: "FLAME SUPPORT VEHICLE",
-    role: "DENY",
-    movementProfile: "tracked",
-    endurance: { armor: 2, cohesion: 4, mobility: 3 },
-    capabilities: ["DENIAL", "AREA"],
-    refits: [
-      { id: "jets", name: "SMELTER JETS", summary: "Wide thermal denial across exposed lanes.", capabilities: ["DENIAL", "AREA"], creates: "OVERHEATED" },
-      { id: "crucible", name: "ASH CRUCIBLE", summary: "Trades area pressure for a moving smoke screen.", capabilities: ["DENIAL", "COVER"], creates: "SCREENED" },
-    ],
-    purpose: "Uses heavy flame weapons to deny ground and seal exposed approach lanes.",
-    creates: "OVERHEATED",
-    uses: ["DISPLACED", "SCREENED", "SUPPLIED", "FORWARD HOLD"],
-    asset: "/assets/furnace-crew.png",
-    icon: Fire,
-    defaultNode: "fireLine",
-  },
-  {
-    id: "breaker",
-    number: "3",
-    name: "ASSAULT WALKER",
-    role: "BREACH",
-    movementProfile: "walker",
-    endurance: { armor: 5, cohesion: 3, mobility: 2 },
-    capabilities: ["BREACH", "SHOCK"],
-    refits: [
-      { id: "ram", name: "RAM FRAME", summary: "Direct shock package for rupturing a fixed target.", capabilities: ["BREACH", "SHOCK"], creates: "BREACHED" },
-      { id: "charge", name: "FRACTURE CHARGE", summary: "Trades shock control for a wider armor break.", capabilities: ["BREACH", "AREA"], creates: "FRACTURED ARMOR" },
-    ],
-    purpose: "Assaults fortified positions and drives defenders off objectives.",
-    creates: "BREACHED",
-    uses: ["DISPLACED", "OVERHEATED", "SCREENED", "SUPPLIED", "KILL ZONE", "SEALED LANE"],
-    asset: "/assets/breaker-exo.png",
-    icon: Hammer,
-    defaultNode: "breachLine",
-  },
-  {
-    id: "railjack",
-    number: "4",
-    name: "MAIN BATTLE TANK",
-    role: "HOLD",
-    movementProfile: "heavy-tracked",
-    endurance: { armor: 4, cohesion: 5, mobility: 2 },
-    capabilities: ["HOLD", "COVER"],
-    refits: [
-      { id: "plates", name: "BASTION PLATES", summary: "Armored screen for holding captured ground.", capabilities: ["HOLD", "COVER"], creates: "SCREENED" },
-      { id: "sled", name: "SUPPLY SLED", summary: "Trades frontal cover for forward sustainment.", capabilities: ["HOLD", "SUPPORT"], creates: "SUPPLIED" },
-    ],
-    purpose: "Provides armored firepower, holds objectives, and screens nearby formations.",
-    creates: "SCREENED",
-    uses: ["DISPLACED", "OVERHEATED", "BREACHED", "SUPPLIED", "OPEN CORE", "FRACTURED ARMOR"],
-    asset: "/assets/railjack.png",
-    icon: Shield,
-    defaultNode: "anchorLine",
-  },
-  {
-    id: "hauler",
-    number: "5",
-    name: "ARMOURED RECOVERY VEHICLE",
-    role: "EXTRACT",
-    movementProfile: "support-tracked",
-    endurance: { armor: 3, cohesion: 4, mobility: 4 },
-    capabilities: ["RECOVERY", "SUPPORT"],
-    refits: [
-      { id: "crane", name: "RECOVERY CRANE", summary: "Sustainment rig for damaged formations and crew.", capabilities: ["RECOVERY", "SUPPORT"], creates: "SUPPLIED" },
-      { id: "shield", name: "EVAC SHIELD", summary: "Trades repair throughput for protected movement.", capabilities: ["RECOVERY", "COVER"], creates: "SCREENED" },
-    ],
-    purpose: "Recovers personnel and keeps damaged vehicles moving toward extraction.",
-    creates: "SUPPLIED",
-    uses: ["OVERHEATED", "BREACHED", "SCREENED", "OPEN CORE", "SECURED BREACH", "SECURED CORRIDOR"],
-    asset: "/assets/salvage-hauler.png",
-    icon: Truck,
-    defaultNode: "recoveryLine",
-  },
-];
-
-const TACTICAL_TERM_LABELS = Object.freeze({
-  DISPLACE: "FORCE MOVE",
-  DISPLACED: "OUT OF POSITION",
-});
-
-const tacticalTerm = (value) => TACTICAL_TERM_LABELS[value] ?? value;
-const tacticalText = (value) => typeof value === "string"
-  ? value.replace(/\bDISPLACED\b/g, TACTICAL_TERM_LABELS.DISPLACED).replace(/\bDISPLACE\b/g, TACTICAL_TERM_LABELS.DISPLACE)
-  : value;
-
-const defaultRefits = () => Object.fromEntries(
-  FORMATIONS.map((formation) => [formation.id, formation.refits[0].id]),
-);
-
-const resolveFormations = (selections) => FORMATIONS.map((formation) => {
-  const activeRefit = formation.refits.find((refit) => refit.id === selections[formation.id]) ?? formation.refits[0];
-  return {
-    ...formation,
-    capabilities: activeRefit.capabilities,
-    creates: activeRefit.creates,
-    activeRefit,
-  };
-});
-
-const NODES = {
-  alphaApproach: { left: 20, top: 63, label: "Alpha approach" },
-  fireLine: { left: 31, top: 72, label: "Thermal firing line" },
-  breachLine: { left: 44, top: 66, label: "Breach route" },
-  anchorLine: { left: 36, top: 82, label: "Anchor line" },
-  recoveryLine: { left: 53, top: 80, label: "Recovery route" },
-  highWalk: { left: 47, top: 34, label: "Elevated transit" },
-  betaLane: { left: 66, top: 28, label: "Beta transit lane" },
-  rescuePen: { left: 69, top: 72, label: "Salvage enclosure" },
-};
-
-const STAGING_NODES = {
-  harpoon: { left: 32, top: 10.5, label: "Formation staging" },
-  furnace: { left: 43, top: 10.5, label: "Formation staging" },
-  breaker: { left: 54, top: 10.5, label: "Formation staging" },
-  railjack: { left: 65, top: 10.5, label: "Formation staging" },
-  hauler: { left: 76, top: 10.5, label: "Formation staging" },
-};
-
-const PLAYBOOKS = [
-  {
-    id: "trapline",
-    name: "ROLLING SABOTAGE",
-    summary: "Seize, transfer, sabotage, withdraw.",
-    intent: "Advance the whole Warhost through both control nodes, transfer security behind the lead, sabotage the primary asset, and reform for extraction.",
-    icon: Anchor,
-    stages: [
-      { label: "SEIZE", detail: "Open first objective.", icon: Anchor },
-      { label: "TRANSFER", detail: "Pass secured ground.", icon: Shield },
-      { label: "SABOTAGE", detail: "Disable primary asset.", icon: Hammer, warm: true },
-      { label: "WITHDRAW", detail: "Reform at extraction.", icon: Truck },
-    ],
-    comboWindows: [
-      { from: 0, to: 1, label: "ALPHA TRANSFER", rendezvous: "alphaTransfer" },
-      { from: 1, to: 2, label: "OPENED SABOTAGE LANE", rendezvous: "sabotageLane" },
-    ],
-    roles: [
-      { id: "pull", label: "LEAD ELEMENT", brief: "Seize the first control node and open the army route.", node: "alphaApproach", demands: ["CONTROL", "SHOCK"] },
-      { id: "burn", label: "RELAY GUARD", brief: "Take responsibility for secured ground as the lead advances.", node: "fireLine", demands: ["DENIAL", "COVER"] },
-      { id: "break", label: "SABOTAGE ELEMENT", brief: "Pass through the opened route and disable the primary asset.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
-      { id: "anchor", label: "CORRIDOR SECURITY", brief: "Hold the route connecting the army to extraction.", node: "anchorLine", demands: ["HOLD", "DENIAL"] },
-      { id: "recover", label: "RECOVERY ELEMENT", brief: "Recover priority personnel and reform the army at extraction.", node: "recoveryLine", demands: ["RECOVERY", "SUPPORT"] },
-    ],
-  },
-  {
-    id: "spear",
-    name: "DECISIVE ASSAULT",
-    summary: "Screen, concentrate, strike, secure.",
-    intent: "Screen the advance, mass the Warhost against the decisive objective, destroy its defenses, and secure the withdrawal corridor.",
-    icon: Shield,
-    stages: [
-      { label: "SCREEN", detail: "Protect concentration.", icon: Shield },
-      { label: "CONCENTRATE", detail: "Mass at decisive point.", icon: Crosshair },
-      { label: "STRIKE", detail: "Destroy objective defense.", icon: Hammer, warm: true },
-      { label: "SECURE", detail: "Hold withdrawal route.", icon: Anchor },
-    ],
-    comboWindows: [
-      { from: 0, to: 1, label: "SCREENED CONCENTRATION", rendezvous: "screenedConcentration" },
-      { from: 1, to: 2, label: "ASSAULT LAUNCH", rendezvous: "assaultLaunch" },
-    ],
-    roles: [
-      { id: "screen", label: "SCREENING ELEMENT", brief: "Protect the army while it concentrates for the assault.", node: "alphaApproach", demands: ["COVER", "SHOCK"] },
-      { id: "point", label: "ADVANCE GUARD", brief: "Secure the narrow approach to the decisive objective.", node: "highWalk", demands: ["MOBILITY", "SHOCK"] },
-      { id: "punch", label: "ASSAULT ELEMENT", brief: "Break the objective defense and strike the primary asset.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
-      { id: "suppress", label: "FLANK SECURITY", brief: "Prevent enemy reinforcements from reaching the assault.", node: "fireLine", demands: ["DENIAL", "COVER"] },
-      { id: "recover", label: "REAR ELEMENT", brief: "Recover the assault force through the secured corridor.", node: "recoveryLine", demands: ["RECOVERY", "SUPPORT"] },
-    ],
-  },
-  {
-    id: "pressure",
-    name: "TWIN SEIZURE",
-    summary: "Divide, capture, converge, extract.",
-    intent: "Divide the Warhost between simultaneous control objectives, prevent mutual support, then converge on the primary asset and extraction.",
-    icon: Crosshair,
-    stages: [
-      { label: "DIVIDE", detail: "Form two objective groups.", icon: Crosshair },
-      { label: "CAPTURE", detail: "Seize both controls.", icon: Target },
-      { label: "CONVERGE", detail: "Reunite on primary.", icon: Factory, warm: true },
-      { label: "EXTRACT", detail: "Recover the split force.", icon: Truck },
-    ],
-    comboWindows: [
-      { from: 1, to: 2, label: "EAST INTERDICTION", rendezvous: "eastInterdiction" },
-      { from: 2, to: 3, label: "PRIMARY CONVERGENCE", rendezvous: "primaryConvergence" },
-    ],
-    roles: [
-      { id: "alpha", label: "WEST OBJECTIVE GROUP", brief: "Seize and maintain the western control objective.", node: "alphaApproach", demands: ["HOLD", "CONTROL"] },
-      { id: "beta", label: "EAST OBJECTIVE GROUP", brief: "Seize the eastern control objective in parallel.", node: "betaLane", demands: ["MOBILITY", "SHOCK"] },
-      { id: "deny", label: "INTERDICTION ELEMENT", brief: "Prevent enemy movement between the two objective fights.", node: "fireLine", demands: ["DENIAL", "COVER"] },
-      { id: "reactor", label: "CONVERGENCE ELEMENT", brief: "Unite both groups at the primary objective.", node: "breachLine", demands: ["BREACH", "CONTROL"] },
-      { id: "recover", label: "EXTRACTION GUARD", brief: "Hold the extraction corridor, recover stragglers, and leave last.", node: "recoveryLine", demands: ["RECOVERY", "HOLD"] },
-    ],
-  },
-];
-
-const OPERATIONS = [
-  {
-    id: "dead-circuit",
-    name: "OPERATION DEAD CIRCUIT",
-    shortName: "Dead Circuit",
-    type: "SABOTAGE & EXTRACT",
-    conditionId: "fractured-transit",
-    conditionLocked: false,
-    requiredExtraction: 3,
-    matchup: {
-      playerDisposition: "disruption",
-      enemyDisposition: "safeguard",
-      title: "BREAK THE CIRCUIT",
-      playerObjective: "Seize both control nodes, sabotage the Reactor Spine, and extract the Warhost.",
-      enemyObjective: "Protect the Reactor Spine, reinforce threatened controls, and sever the extraction gantry.",
-    },
-    orders: ["SEIZE BOTH NODES", "SABOTAGE REACTOR", "EXTRACT 3+ FORMATIONS"],
-    victory: "Sabotage Reactor Spine and extract at least 3 formations.",
-    primaryTitle: "REACTOR SPINE",
-    primaryDescription: "Primary sabotage target",
-    primaryDone: "SABOTAGED",
-    primaryProgress: "Reactor",
-    primaryResult: "Reactor sabotaged",
-    extractionTitle: "EXTRACTION GANTRY",
-    primaryEvent: "Reactor Spine sabotaged. Extraction route open.",
-    primaryApproachEvent: "Reactor Spine exposed. Breach force advancing.",
-    firstDecisionEvent: "Helioch fire closes the Beta transit lane. Breakpoint order required.",
-    secondDecisionEvent: "Salvage crew located below the reactor deck.",
-    controlTitles: ["CONTROL NODE ALPHA", "CONTROL NODE BETA"],
-    controlProgress: ["Alpha", "Beta"],
-    entryPlanTitle: "FORMATION STAGING",
-    entryBattleTitle: "ENTRY / BREACH",
-    optionalTitle: "RESCUE SALVAGE CREW",
-    optionalDescription: "Optional · field repair reward",
-    battlefieldAlt: "Isometric industrial foundry battlefield",
-  },
-  {
-    id: "ashen-passage",
-    name: "OPERATION ASHEN PASSAGE",
-    shortName: "Ashen Passage",
-    type: "HOLD & EVACUATE",
-    conditionId: "blackout",
-    conditionLocked: true,
-    requiredExtraction: 4,
-    matchup: {
-      playerDisposition: "safeguard",
-      enemyDisposition: "dominion",
-      title: "HOLD THE LAST ROUTE",
-      playerObjective: "Open both Ember Gates, hold the Signal Furnace, and evacuate through the Void Lift.",
-      enemyObjective: "Occupy the Ember Gates, silence the relay, and claim the Void Lift approach.",
-    },
-    orders: ["OPEN BOTH EMBER GATES", "HOLD SIGNAL FURNACE", "EXTRACT 4+ FORMATIONS"],
-    victory: "Hold the Signal Furnace relay and extract at least 4 formations.",
-    primaryTitle: "SIGNAL FURNACE",
-    primaryDescription: "Maintain the evacuation uplink",
-    primaryDone: "RELAY HELD",
-    primaryProgress: "Signal Furnace",
-    primaryResult: "Signal Furnace held",
-    extractionTitle: "VOID LIFT GANTRY",
-    primaryEvent: "Signal Furnace relay held. Void Lift corridor open.",
-    primaryApproachEvent: "Signal Furnace contact restored. Relay guard advancing.",
-    firstDecisionEvent: "Black Litany ash closes Ember Gate East. Breakpoint order required.",
-    secondDecisionEvent: "Relay crew broadcasts from the lower furnace deck.",
-    controlTitles: ["EMBER GATE WEST", "EMBER GATE EAST"],
-    controlProgress: ["Ember Gate West", "Ember Gate East"],
-    entryPlanTitle: "ASH DROP STAGING",
-    entryBattleTitle: "SOUTHERN ASH DROP",
-    optionalTitle: "RECOVER RELAY CREW",
-    optionalDescription: "Optional · preserve furnace intelligence",
-    battlefieldAlt: "Smoke-obscured void furnace evacuation battlefield",
-  },
-];
-
-const ASHEN_PASSAGE_PLAYBOOK_COPY = {
-  trapline: {
-    name: "ROLLING EVACUATION",
-    summary: "Open, transfer, hold, evacuate.",
-    intent: "Advance the whole Warhost through both Ember Gates, transfer security behind the lead, hold the relay, and reform at the Void Lift.",
-    stageLabels: ["OPEN", "TRANSFER", "HOLD", "EVACUATE"],
-    briefs: ["Open the western gate and establish the army route.", "Take responsibility for the opened gate as the lead advances.", "Secure the Signal Furnace and maintain the evacuation uplink.", "Hold the corridor connecting the army to the Void Lift.", "Recover the relay crew and reform the army for evacuation."],
-  },
-  spear: {
-    name: "FURNACE ASSAULT",
-    summary: "Screen, concentrate, secure, escort.",
-    intent: "Screen the approach, concentrate at the Signal Furnace, secure the relay, and escort the Warhost through the Void Lift corridor.",
-    stageLabels: ["SCREEN", "CONCENTRATE", "SECURE", "ESCORT"],
-    briefs: ["Protect the army while it concentrates through the western gate.", "Secure the smoke-obscured approach to the relay.", "Break the eastern gate defense and secure the Signal Furnace.", "Prevent the north-shaft reserve from reaching the relay.", "Escort the assault force through the protected Void Lift corridor."],
-  },
-  pressure: {
-    name: "TWIN GATE",
-    summary: "Divide, open, converge, evacuate.",
-    intent: "Divide the Warhost between both Ember Gates, prevent mutual support, then converge on the Signal Furnace and Void Lift.",
-    stageLabels: ["DIVIDE", "OPEN", "CONVERGE", "EVACUATE"],
-    briefs: ["Open and maintain the western Ember Gate.", "Open the eastern Ember Gate in parallel.", "Prevent either gate defense from reinforcing the other.", "Reunite both groups at the Signal Furnace relay.", "Collect the reunited army at the Void Lift."],
-  },
-};
-
-const ASHEN_REFIT_PROTOCOLS = {
-  magnet: {
-    name: "MAGNETIC RELAY KEY",
-    stopIndex: 2,
-    text: "The Breach Magnet locks onto the buried relay spine, opening the objective route and shielding the withdrawal.",
-    impact: { reactor: 30, extraction: 15, protects: 1 },
-  },
-  crucible: {
-    name: "VEIL CIPHER",
-    stopIndex: 1,
-    text: "The Ash Crucible reads the veil current, preserving the Void Lift approach through the smoke.",
-    impact: { extraction: 15, protects: 1 },
-  },
-  charge: {
-    name: "VEIL FRACTURE",
-    stopIndex: 0,
-    text: "The Fracture Charge breaks the first ash front, accelerating the eastern gate and protecting the column.",
-    impact: { beta: 30, extraction: 15, protects: 1 },
-  },
-  sled: {
-    name: "FURNACE FEED",
-    stopIndex: 1,
-    text: "The Supply Sled couples to a furnace conduit, feeding the gate assault, relay hold, and evacuation clock.",
-    impact: { beta: 30, reactor: 15, extraction: 15, protects: 1 },
-  },
-  shield: {
-    name: "VOID LIFT BUBBLE",
-    stopIndex: 0,
-    text: "The Evac Shield catches the full column at deployment, absorbing contact delay and protecting the lift run.",
-    impact: { extraction: 30, protects: 1, delayReduction: 45 },
-  },
-};
-
-const playbookForOperation = (playbook, operation) => {
-  if (operation?.id !== "ashen-passage") return playbook;
-  const copy = ASHEN_PASSAGE_PLAYBOOK_COPY[playbook.id];
-  if (!copy) return playbook;
-  return {
-    ...playbook,
-    name: copy.name ?? playbook.name,
-    summary: copy.summary ?? playbook.summary,
-    intent: copy.intent,
-    stages: playbook.stages.map((stage, index) => ({ ...stage, label: copy.stageLabels?.[index] ?? stage.label })),
-    roles: playbook.roles.map((role, index) => ({ ...role, brief: copy.briefs[index] ?? role.brief })),
-  };
-};
-
-const roleDemandsFor = roleDemandsForPressure;
-
-const DEAD_CIRCUIT_BREAKPOINTS = [
-  {
-    id: "beta",
-    title: "Beta lane is collapsing",
-    description: "Helioch fire has the planned transit lane ranged. Your authored response is ready for execution.",
-    trigger: "IF Beta lane is ranged",
-    options: [
-      { id: "tempo", label: "CROSS NOW", effect: "No delay. The eastern group crosses exposed, joins the army at assembly, then advances through the Reactor to extraction.", routeLabel: "DIRECT TO ASSEMBLY", path: ["BETA", "ASSEMBLY", "REACTOR", "EXTRACTION"] },
-      { id: "protect", label: "COVER THE BREACHER", effect: "+00:15 delay. The eastern group takes a covered arc, joins the army at assembly, then advances through the Reactor to extraction.", routeLabel: "COVERED TO ASSEMBLY", path: ["BETA", "COVERED ARC", "ASSEMBLY", "REACTOR", "EXTRACTION"] },
-    ],
-    defaultOption: "tempo",
-  },
-  {
-    id: "rescue",
-    title: "Salvage crew is cut off",
-    description: "The optional rescue now conflicts with the reactor timetable. Your playbook already contains a response.",
-    trigger: "IF salvage crew is located",
-    options: [
-      { id: "clock", label: "LEAVE THE CREW", effect: "No delay. The recovery element joins the Reactor assault and continues forward to extraction; the crew is abandoned.", routeLabel: "CONTINUE TO REACTOR", path: ["RECOVERY POSITION", "REACTOR", "EXTRACTION"] },
-      { id: "recover", label: "DIVERT TO RESCUE", effect: "+00:15 delay. The recovery element rescues the crew before joining the Reactor assault and continuing to extraction.", routeLabel: "RESCUE BEFORE REACTOR", path: ["RECOVERY POSITION", "SALVAGE CREW", "REACTOR", "EXTRACTION"] },
-    ],
-    defaultOption: "clock",
-  },
-];
-
-const ASHEN_PASSAGE_BREAKPOINTS = [
-  {
-    id: "beta",
-    title: "Ash veil closes Ember Gate East",
-    description: "The Black Litany has drowned the eastern route in furnace smoke. Your authored crossing order is ready.",
-    trigger: "IF Ember Gate East is obscured",
-    options: [
-      { id: "tempo", label: "CROSS ON INSTRUMENTS", effect: "Trust the route marks; preserve relay timing.", routeLabel: "BLIND CROSSING", path: ["EMBER GATE EAST", "SIGNAL FURNACE"] },
-      { id: "protect", label: "LIGHT BEACON ROUTE", effect: "Mark a longer protected approach through the ash.", routeLabel: "BEACON DIVERSION", path: ["EMBER GATE EAST", "BEACON ARC", "SIGNAL FURNACE"] },
-    ],
-    defaultOption: "tempo",
-  },
-  {
-    id: "rescue",
-    title: "Relay crew is broadcasting",
-    description: "The stranded furnace crew can be recovered, but the Void Lift window is already closing.",
-    trigger: "IF relay crew broadcasts",
-    options: [
-      { id: "clock", label: "HOLD LIFT WINDOW", effect: "Leave the crew below; secure the evacuation corridor.", routeLabel: "BYPASS CREW", path: ["SIGNAL FURNACE", "VOID LIFT"] },
-      { id: "recover", label: "RECOVER RELAY CREW", effect: "Divert the Hauler through the lower furnace deck.", routeLabel: "RELAY RECOVERY", path: ["SIGNAL FURNACE", "RELAY DECK", "VOID LIFT"] },
-    ],
-    defaultOption: "clock",
-  },
-];
-
-const BREAKPOINTS_BY_OPERATION = {
-  "dead-circuit": DEAD_CIRCUIT_BREAKPOINTS,
-  "ashen-passage": ASHEN_PASSAGE_BREAKPOINTS,
-};
-
-const breakpointsFor = (operation) => BREAKPOINTS_BY_OPERATION[operation?.id] ?? DEAD_CIRCUIT_BREAKPOINTS;
-
-const DEAD_CIRCUIT_BREAKPOINT_IMPACTS = {
-  beta: {
-    tempo: { text: "No delay · Breacher remains exposed" },
-    protect: { reactorDelay: 15, missionDelay: 15, protects: 1, text: "+00:15 · one formation protected" },
-  },
-  rescue: {
-    clock: { text: "No delay · salvage crew left behind" },
-    recover: { missionDelay: 15, protects: 1, rescue: true, text: "+00:15 · crew rescued · one formation protected" },
-  },
-};
-
-const ASHEN_PASSAGE_BREAKPOINT_IMPACTS = {
-  beta: {
-    tempo: { text: "No delay · relay guard crosses blind" },
-    protect: { reactorDelay: 15, missionDelay: 15, protects: 1, text: "+00:15 · one formation protected" },
-  },
-  rescue: {
-    clock: { text: "No delay · relay crew left below" },
-    recover: { missionDelay: 15, protects: 1, rescue: true, text: "+00:15 · crew recovered · one formation protected" },
-  },
-};
-
-const BREAKPOINT_IMPACTS_BY_OPERATION = {
-  "dead-circuit": DEAD_CIRCUIT_BREAKPOINT_IMPACTS,
-  "ashen-passage": ASHEN_PASSAGE_BREAKPOINT_IMPACTS,
-};
-
-const breakpointImpactsFor = (operation) => BREAKPOINT_IMPACTS_BY_OPERATION[operation?.id] ?? DEAD_CIRCUIT_BREAKPOINT_IMPACTS;
-
-const DEAD_CIRCUIT_ENEMY_PLAN = {
-  name: "IRON PROCESSION",
-  intent: "Screen Beta, counter the breach, then sever the gantry.",
-  formations: [
-    { id: "aegis", number: "E1", name: "AEGIS COHORT", start: { x: 94, y: 5 }, end: { x: 76, y: 18 }, actionAt: 90 },
-    { id: "cinder", number: "E2", name: "CINDER LANCE", start: { x: 96, y: 36 }, end: { x: 76, y: 48 }, actionAt: 225 },
-    { id: "pursuit", number: "E3", name: "OATH PURSUIT", start: { x: 94, y: 61 }, end: { x: 88, y: 23 }, actionAt: 330 },
-  ],
-  stages: [
-    {
-      id: "screen",
-      formationId: "aegis",
-      label: "BETA SCREEN",
-      creates: "FORTIFIED LANE",
-      intelligence: "KNOWN",
-      counterCapabilities: ["CONTROL", "DENIAL"],
-      pressure: { type: "SUPPRESSION", target: "cohesion", strength: 3 },
-      resistance: 7,
-      counteredBy: ["FURNACE DRAGNET", "ASHEN CORDON"],
-      impact: { reactorDelay: 15 },
-      consequence: "Reactor thrust delayed +00:15",
-    },
-    {
-      id: "counter",
-      formationId: "cinder",
-      label: "OATH COUNTER",
-      uses: "FORTIFIED LANE",
-      creates: "COUNTERFIRE",
-      intelligence: "UNCERTAIN",
-      counterCapabilities: ["BREACH", "SHOCK"],
-      pressure: { type: "FIREPOWER", target: "armor", strength: 4 },
-      resistance: 8,
-      counteredBy: ["EXECUTION BREACH", "THERMAL BREACH", "FORCED ENTRY", "FIELD REARM", "COVERED ADVANCE", "LOCKED BREACH"],
-      impact: { missionDelay: 15 },
-      consequence: "Extraction timetable delayed +00:15",
-    },
-    {
-      id: "sever",
-      formationId: "pursuit",
-      label: "GANTRY SEVER",
-      uses: "COUNTERFIRE",
-      creates: "CUT OFF",
-      intelligence: "UNKNOWN",
-      counterCapabilities: ["RECOVERY", "HOLD"],
-      pressure: { type: "PURSUIT", target: "mobility", strength: 5 },
-      resistance: 8,
-      counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "LOCKSTEP HOLD"],
-      impact: { recoveryLoss: 1 },
-      consequence: "One formation cut off from extraction",
-    },
-  ],
-};
-
-const ASHEN_PASSAGE_ENEMY_PLAN = {
-  name: "BLACK LITANY",
-  intent: "Blind the Ember Gates, silence the relay, then occupy the Void Lift.",
-  formations: [
-    { id: "veil", number: "E1", name: "VEIL ENGINES", start: { x: 95, y: 67 }, end: { x: 61, y: 23 }, actionAt: 90 },
-    { id: "ward", number: "E2", name: "OATH WARD", start: { x: 97, y: 45 }, end: { x: 72, y: 39 }, actionAt: 225 },
-    { id: "ascendant", number: "E3", name: "ASCENDANT GUARD", start: { x: 82, y: 3 }, end: { x: 89, y: 15 }, actionAt: 330 },
-  ],
-  stages: [
-    {
-      id: "veil",
-      formationId: "veil",
-      label: "ASH VEIL",
-      creates: "BLINDED CORRIDOR",
-      intelligence: "KNOWN",
-      counterCapabilities: ["CONTROL", "COVER"],
-      pressure: { type: "SIGNAL SHOCK", target: "cohesion", strength: 3 },
-      resistance: 7,
-      counteredBy: ["COVERED DRAG", "POWER WINCH", "FURNACE DRAGNET", "ASHEN CORDON", "MAGNETIC RELAY KEY", "VEIL FRACTURE", "FURNACE FEED"],
-      impact: { reactorDelay: 15 },
-      consequence: "Signal relay delayed +00:15",
-    },
-    {
-      id: "silence",
-      formationId: "ward",
-      label: "FURNACE SILENCE",
-      uses: "BLINDED CORRIDOR",
-      creates: "RELAY LOCK",
-      intelligence: "UNCERTAIN",
-      counterCapabilities: ["BREACH", "DENIAL"],
-      pressure: { type: "FIREPOWER", target: "armor", strength: 4 },
-      resistance: 8,
-      counteredBy: ["THERMAL BREACH", "COVERED ADVANCE", "LOCKED BREACH", "WEDGE & WALL", "LOCKSTEP HOLD", "FURNACE FEED"],
-      impact: { missionDelay: 15 },
-      consequence: "Void Lift opening delayed +00:15",
-    },
-    {
-      id: "occupy",
-      formationId: "ascendant",
-      label: "LIFT OCCUPATION",
-      uses: "RELAY LOCK",
-      creates: "LIFT SEALED",
-      intelligence: "UNKNOWN",
-      counterCapabilities: ["RECOVERY", "HOLD"],
-      pressure: { type: "OCCUPATION", target: "mobility", strength: 5 },
-      resistance: 8,
-      counteredBy: ["ARMORED EVAC", "HOT RECOVERY", "BREACH RECOVERY", "MOBILE RESUPPLY", "VOID LIFT BUBBLE"],
-      impact: { recoveryLoss: 1 },
-      consequence: "One formation sealed below the Void Lift",
-    },
-  ],
-};
-
-const ENEMY_PLANS = {
-  "dead-circuit": DEAD_CIRCUIT_ENEMY_PLAN,
-  "ashen-passage": ASHEN_PASSAGE_ENEMY_PLAN,
-};
-
-const enemyPlanFor = (operation) => ENEMY_PLANS[operation?.id] ?? DEAD_CIRCUIT_ENEMY_PLAN;
-
-const FIELD_PLANS = DEAD_CIRCUIT_FIELD_PLANS;
-
-const FIELD_LANDMARKS = DEAD_CIRCUIT_FIELD_LANDMARKS;
-
-const PLAYBOOK_BATTLEFIELD_READ = {
-  trapline: {
-    winsBy: "Sweeping from Alpha through the Reactor, then reforming at extraction.",
-    commits: "The army follows one connected objective-to-objective column.",
-    risks: "A stalled lead element delays every formation behind it.",
-  },
-  spear: {
-    winsBy: "Screening Alpha while the assault mass drives straight into the Reactor.",
-    commits: "Four formations collapse into one decisive corridor before extraction.",
-    risks: "The screening element and extraction corridor receive less protection.",
-  },
-  pressure: {
-    winsBy: "Taking Alpha and Beta in parallel, then converging at the Reactor.",
-    commits: "Two separated wings must reunite before the final extraction push.",
-    risks: "Either wing can be isolated before the convergence.",
-  },
-};
-
-const ASHEN_PASSAGE_FIELD_PLANS = {
-  trapline: {
-    positions: [
-      { x: 29, y: 42 },
-      { x: 43, y: 49 },
-      { x: 57, y: 40 },
-      { x: 68, y: 31 },
-      { x: 79, y: 24 },
-    ],
-    routes: [
-      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha", "alphaTransfer", "sabotageLane", "beta", "reactor", "extraction"] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, "alphaTransfer", "sabotageLane", "beta", "reactor", "extraction"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2], breakpoint: "beta" },
-      { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor", "extraction"] },
-      { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
-    ],
-    breakpointRoles: { beta: 2, rescue: 4 },
-    branchRoutes: {
-      beta: {
-        tempo: [2, "sabotageLane", "beta", "reactor", "extraction"],
-        protect: [2, { x: 59, y: 27 }, { x: 68, y: 22 }, "reactor", "extraction"],
-      },
-      rescue: {
-        clock: [4, "extraction"],
-        recover: [4, "rescue", "extraction"],
-      },
-    },
-  },
-  spear: {
-    positions: [
-      { x: 28, y: 46 },
-      { x: 42, y: 35 },
-      { x: 56, y: 43 },
-      { x: 65, y: 51 },
-      { x: 79, y: 25 },
-    ],
-    routes: [
-      { role: 0, start: { x: 15, y: 73 }, points: [0, "screenedConcentration", "assaultLaunch", "reactor", "extraction"] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, "screenedConcentration", "assaultLaunch", "reactor", "extraction"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2], breakpoint: "beta" },
-      { role: 3, start: { x: 44, y: 81 }, points: [3, "reactor", "extraction"] },
-      { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
-    ],
-    breakpointRoles: { beta: 2, rescue: 4 },
-    branchRoutes: {
-      beta: {
-        tempo: [2, "assaultLaunch", "reactor", "extraction"],
-        protect: [2, "beta", { x: 67, y: 23 }, "reactor", "extraction"],
-      },
-      rescue: {
-        clock: [4, "extraction"],
-        recover: [4, "rescue", "extraction"],
-      },
-    },
-  },
-  pressure: {
-    positions: [
-      { x: 28, y: 40 },
-      { x: 55, y: 27 },
-      { x: 43, y: 51 },
-      { x: 66, y: 41 },
-      { x: 79, y: 25 },
-    ],
-    routes: [
-      { role: 0, start: { x: 15, y: 73 }, points: [0, "alpha", "primaryConvergence", "reactor", "extraction"] },
-      { role: 1, start: { x: 24, y: 79 }, points: [1, "eastInterdiction", "beta", "primaryConvergence", "reactor", "extraction"] },
-      { role: 2, start: { x: 34, y: 75 }, points: [2, "eastInterdiction", "primaryConvergence", "reactor", "extraction"] },
-      { role: 3, start: { x: 44, y: 81 }, points: [3], breakpoint: "beta" },
-      { role: 4, start: { x: 54, y: 77 }, points: [4], breakpoint: "rescue" },
-    ],
-    breakpointRoles: { beta: 3, rescue: 4 },
-    branchRoutes: {
-      beta: {
-        tempo: [3, "primaryConvergence", "reactor", "extraction"],
-        protect: [3, "beta", { x: 68, y: 22 }, "reactor", "extraction"],
-      },
-      rescue: {
-        clock: [4, "extraction"],
-        recover: [4, "rescue", "extraction"],
-      },
-    },
-  },
-};
-
-const ASHEN_PASSAGE_LANDMARKS = {
-  alpha: { x: 29, y: 32 },
-  beta: { x: 61, y: 21 },
-  reactor: { x: 72, y: 40 },
-  extraction: { x: 91, y: 13 },
-  rescue: { x: 84, y: 68 },
-  alphaTransfer: { x: 39, y: 37 },
-  sabotageLane: { x: 51, y: 43 },
-  screenedConcentration: { x: 37, y: 39 },
-  assaultLaunch: { x: 50, y: 37 },
-  eastInterdiction: { x: 49, y: 35 },
-  primaryConvergence: { x: 61, y: 42 },
-};
-
-const OPERATION_FIELDS = {
-  "dead-circuit": { plans: FIELD_PLANS, landmarks: FIELD_LANDMARKS },
-  "ashen-passage": { plans: ASHEN_PASSAGE_FIELD_PLANS, landmarks: ASHEN_PASSAGE_LANDMARKS },
-};
-
-const operationFieldFor = (operation) => OPERATION_FIELDS[operation?.id] ?? OPERATION_FIELDS["dead-circuit"];
-
-const BASE_OPERATION = {
-  alphaAt: 60,
-  betaAt: 150,
-  reactorAt: 300,
-  extractionAt: 345,
-  completeAt: 360,
-};
-
-const PLAYBACK_BEAT_MS = 2600;
-const DEAD_CIRCUIT_REINFORCEMENT_WAVE = {
-  number: "E4",
-  name: "HELIOCH RELIEF COLUMN",
-  order: "GANTRY INTERCEPT",
-  approach: "EAST ENTRY → GANTRY INTERCEPT",
-  arrivalAt: BASE_OPERATION.completeAt,
-  approachDuration: 45,
-  start: { x: 97, y: 26 },
-  intercept: { x: 86, y: 29 },
-};
-
-const ASHEN_PASSAGE_REINFORCEMENT_WAVE = {
-  number: "E4",
-  name: "CENSER RESERVE",
-  order: "VOID LIFT OCCUPATION",
-  approach: "NORTH SHAFT → VOID LIFT",
-  arrivalAt: BASE_OPERATION.completeAt,
-  approachDuration: 45,
-  start: { x: 91, y: 1 },
-  intercept: { x: 88, y: 14 },
-};
-
-const REINFORCEMENT_WAVES = {
-  "dead-circuit": DEAD_CIRCUIT_REINFORCEMENT_WAVE,
-  "ashen-passage": ASHEN_PASSAGE_REINFORCEMENT_WAVE,
-};
-
-const reinforcementWaveFor = (operation, condition) => {
-  const wave = REINFORCEMENT_WAVES[operation?.id] ?? DEAD_CIRCUIT_REINFORCEMENT_WAVE;
-  const arrivalAt = waveArrivalForPressure(wave.arrivalAt, condition);
-  return arrivalAt === wave.arrivalAt ? wave : { ...wave, arrivalAt };
-};
+import {
+  FORMATIONS,
+  STAGING_NODES,
+  defaultRefits,
+  resolveFormations,
+  tacticalTerm,
+  tacticalText,
+} from "./formationData.js";
+import {
+  PLAYBOOKS,
+  PLAYBOOK_BATTLEFIELD_READ,
+  playbookForOperation,
+} from "./playbookData.js";
+import {
+  enemyPlanFor,
+} from "./enemyPlanData.js";
+import {
+  ASHEN_REFIT_PROTOCOLS,
+  TACTICAL_REACTIONS,
+} from "./tacticalReactionData.js";
+import {
+  BASE_OPERATION,
+  OPERATIONS,
+  PLAYBACK_BEAT_MS,
+  breakpointImpactsFor,
+  breakpointsFor,
+  operationFieldFor,
+  reinforcementWaveFor,
+  roleDemandsFor,
+} from "./operationData.js";
 
 const emptyAssignments = (playbook) => Object.fromEntries(
   playbook.roles.map((role) => [role.id, null]),
 );
 
-const TACTICAL_REACTIONS = {
-  "DISPLACED:furnace": { name: "FURNACE DRAGNET", result: "KILL ZONE", impact: { alpha: 15, phase: "alpha", text: "Alpha secured 15 seconds earlier" } },
-  "SCREENED:furnace": { name: "ASHEN CORDON", result: "SEALED LANE", impact: { beta: 15, phase: "beta", text: "Beta secured 15 seconds earlier" } },
-  "SUPPLIED:furnace": { name: "STOKED ADVANCE", result: "OVERHEATED", impact: { beta: 15, phase: "beta", text: "Beta pressure arrives 15 seconds earlier" } },
-  "FORWARD HOLD:furnace": { name: "BASTION PYRE", result: "KILL ZONE", impact: { alpha: 15, phase: "alpha", text: "The forward hold becomes a prepared kill zone" } },
-  "DISPLACED:breaker": { name: "FORCED ENTRY", result: "EXPOSED CORE", impact: { reactor: 15, phase: "reactor", text: "Reactor assault starts 15 seconds earlier" } },
-  "OVERHEATED:breaker": { name: "THERMAL BREACH", result: "FRACTURED ARMOR", impact: { reactor: 30, phase: "reactor", text: "Reactor opens 30 seconds earlier" } },
-  "SCREENED:breaker": { name: "COVERED ADVANCE", result: "SAFE BREACH", impact: { reactor: 15, phase: "reactor", text: "Reactor approach gains 15 seconds" } },
-  "SUPPLIED:breaker": { name: "FIELD REARM", result: "OVERCHARGED BREACH", impact: { reactor: 30, phase: "reactor", text: "Reactor strike gains 30 seconds" } },
-  "KILL ZONE:breaker": { name: "EXECUTION BREACH", result: "OPEN CORE", impact: { reactor: 30, phase: "reactor", text: "The trapped defense exposes the Reactor core" } },
-  "SEALED LANE:breaker": { name: "LOCKED BREACH", result: "OPEN CORE", impact: { reactor: 15, phase: "reactor", text: "The sealed lane becomes an uncontested Reactor breach" } },
-  "DISPLACED:railjack": { name: "TOWED BASTION", result: "FORWARD HOLD", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
-  "OVERHEATED:railjack": { name: "ASHEN CORDON", result: "SEALED LANE", impact: { beta: 15, phase: "beta", text: "Beta secured 15 seconds earlier" } },
-  "BREACHED:railjack": { name: "WEDGE & WALL", result: "SECURED BREACH", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
-  "SUPPLIED:railjack": { name: "MOBILE RESUPPLY", result: "FORTIFIED HOLD", impact: { protects: 1, phase: "extraction", text: "One additional formation survives extraction" } },
-  "OPEN CORE:railjack": { name: "LOCKSTEP HOLD", result: "SECURED CORRIDOR", impact: { protects: 1, phase: "extraction", text: "The open core becomes a protected extraction corridor" } },
-  "FRACTURED ARMOR:railjack": { name: "WEDGE & WALL", result: "SECURED CORRIDOR", impact: { protects: 1, phase: "extraction", text: "The breach is converted into a protected corridor" } },
-  "OVERHEATED:hauler": { name: "HOT RECOVERY", result: "CLEAR EXTRACTION", impact: { extraction: 15, phase: "extraction", text: "Extraction begins 15 seconds earlier" } },
-  "BREACHED:hauler": { name: "BREACH RECOVERY", result: "OPEN EXTRACTION", impact: { extraction: 30, phase: "extraction", text: "Extraction begins 30 seconds earlier" } },
-  "SCREENED:hauler": { name: "ARMORED EVAC", result: "PROTECTED RECOVERY", impact: { extraction: 15, protects: 1, phase: "extraction", text: "Extraction starts early and one more formation survives" } },
-  "OPEN CORE:hauler": { name: "BREACH RECOVERY", result: "OPEN EXTRACTION", impact: { extraction: 30, phase: "extraction", text: "The open core becomes a direct extraction lane" } },
-  "SECURED BREACH:hauler": { name: "ARMORED EVAC", result: "PROTECTED RECOVERY", impact: { extraction: 15, protects: 1, phase: "extraction", text: "The secured breach becomes a protected recovery lane" } },
-  "SECURED CORRIDOR:hauler": { name: "ARMORED EVAC", result: "PROTECTED RECOVERY", impact: { extraction: 15, protects: 1, phase: "extraction", text: "The corridor carries every formation toward extraction" } },
-  "SCREENED:harpoon": { name: "COVERED DRAG", result: "DISPLACED", impact: { alpha: 15, phase: "alpha", text: "The screened rig displaces the Alpha blocker early" } },
-  "SUPPLIED:harpoon": { name: "POWER WINCH", result: "DISPLACED", impact: { alpha: 15, phase: "alpha", text: "The resupplied rig displaces the Alpha blocker early" } },
-  "FORWARD HOLD:harpoon": { name: "ANCHOR DRAG", result: "DISPLACED", impact: { alpha: 15, phase: "alpha", text: "The forward hold anchors a forced displacement" } },
+const assignmentsWithFormationAtRole = ({ assignments, roles, formationId, roleId }) => {
+  const nextAssignments = { ...assignments };
+  roles.forEach((role) => {
+    if (nextAssignments[role.id] === formationId) nextAssignments[role.id] = null;
+  });
+  nextAssignments[roleId] = formationId;
+  return nextAssignments;
 };
 
 const evaluateTacticalSequence = (playbook, assignments, formations) => {
@@ -1549,7 +827,7 @@ function StrategyTestPanel({ activeTrial, available, blindActive, blindPredictio
   );
 }
 
-function FormationRoster({ formations, unavailableFormations = [], condition, inspected, onInspect, selected, onSelect, assignments, playbook, previewPlaybookId, onPreviewPlaybook, onPlaybook, operation, phase, strategyTrial, blindTestActive, blindPrediction, onBlindPrediction, onLoadStrategyTrial, onStartBlindTest, onFormationDragStart, readiness, refitsLocked, onRefit }) {
+function FormationRoster({ formations, unavailableFormations = [], condition, inspected, onInspect, selected, onSelect, assignments, playbook, previewPlaybookId, onPreviewPlaybook, onPlaybook, operation, phase, strategyTrial, blindTestActive, blindPrediction, onBlindPrediction, onLoadStrategyTrial, onStartBlindTest, onFormationDragStart, onFormationDragEnd, readiness, refitsLocked, onRefit }) {
   const roleByFormation = Object.fromEntries(
     playbook.roles.filter((role) => assignments[role.id]).map((role) => [assignments[role.id], role]),
   );
@@ -1612,8 +890,9 @@ function FormationRoster({ formations, unavailableFormations = [], condition, in
               onMouseLeave={() => onInspect(null)}
               onFocus={() => onInspect(formation.id)}
               onBlur={() => onInspect(null)}
-              draggable={phase === "plan"}
-              onDragStart={(event) => onFormationDragStart(event, formation.id)}
+                draggable={phase === "plan"}
+                onDragStart={(event) => onFormationDragStart(event, formation.id)}
+                onDragEnd={onFormationDragEnd}
               disabled={phase !== "plan" && phase !== "drill"}
               aria-pressed={active}
               aria-label={`${formation.name}. ${assignedRole ? `Assigned to action stop ${assignedIndex + 1}, ${assignedRole.label}` : "Available. Drag to an action stop"}.`}
@@ -1718,7 +997,7 @@ const fieldSegmentStyle = (start, end, size) => {
   };
 };
 
-function TacticalFieldPlan({ assignments, battleTime, branches, condition, consequences, formationFates, formations, handoffs, operation, phase, playbook, playbackBeat, profile }) {
+function TacticalFieldPlan({ assignments, battleTime, branches, condition, consequences, formationFates, formations, handoffs, operation, phase, playbook, playbackBeat, profile, routePreview }) {
   const layerRef = useRef(null);
   const [layerSize, setLayerSize] = useState({ width: 1, height: 1 });
   const operationField = operationFieldFor(operation);
@@ -1760,14 +1039,16 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
     const fateClass = formation && resolvedFates.has(formation.id) ? `fate-${resolvedFates.get(formation.id).fate}` : "";
     return { ...route, roleIndex, role, formation, start, playbackClass, consequenceClass, fateClass };
   });
+  const formationMovementProfiles = Object.fromEntries(
+    formations.map((formation) => [formation.id, formation.movementProfile]),
+  );
   const executionRoutes = buildAuthoredFormationRoutes({
     plan,
     landmarks: operationField.landmarks,
     roles: playbook.roles,
     assignments,
-    formationStarts: Object.fromEntries(routes.filter((route) => route.formation).map((route) => [route.formation.id, route.start])),
     branches,
-    formationMovementProfiles: Object.fromEntries(formations.map((formation) => [formation.id, formation.movementProfile])),
+    formationMovementProfiles,
   });
   // Setup and execution share the same selected, end-to-end geometry so the
   // player can read all five journeys before committing the playbook.
@@ -1782,6 +1063,47 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
       className: `base lane-${route.roleIndex + 1} ${index < routeParts.approach.length - 1 ? "action-stop-approach" : "route-continuation"} ${routePresentation?.formation ? `staffed movement-${route.movementRouteKind}` : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
     }));
   });
+  const previewRoleIndex = routePreview
+    ? playbook.roles.findIndex((role) => role.id === routePreview.roleId)
+    : -1;
+  const previewFormation = routePreview
+    ? formations.find((formation) => formation.id === routePreview.formationId)
+    : null;
+  const previewAssignments = phase === "plan" && previewFormation && previewRoleIndex >= 0
+    ? assignmentsWithFormationAtRole({
+        assignments,
+        roles: playbook.roles,
+        formationId: previewFormation.id,
+        roleId: routePreview.roleId,
+      })
+    : null;
+  const previewRoute = previewAssignments
+    ? buildAuthoredFormationRoutes({
+        plan,
+        landmarks: operationField.landmarks,
+        roles: playbook.roles,
+        assignments: previewAssignments,
+        branches,
+        formationMovementProfiles,
+      }).find((route) => route.roleIndex === previewRoleIndex && route.formationId === previewFormation.id)
+    : null;
+  const previewSegments = previewRoute
+    ? previewRoute.points.slice(0, -1).map((point, index) => ({
+        id: `preview-${previewFormation.id}-${previewRoleIndex}-${index}`,
+        start: point,
+        end: previewRoute.points[index + 1],
+      }))
+    : [];
+  const previewLabelPoint = previewRoute?.points[Math.max(1, previewRoute.points.length - 2)] ?? null;
+  // The preview is drawn as geometry, which conveys nothing to a screen reader.
+  // Focusing an action stop produces the same preview as hovering it, so the
+  // announcement below is the keyboard-equivalent of reading the drawn route.
+  const previewAnnouncement = previewRoute ? routePreviewAnnouncement({
+    formationName: previewFormation?.name,
+    movementRouteKind: previewRoute.movementRouteKind,
+    roleIndex: previewRoleIndex,
+    roleLabel: playbook.roles[previewRoleIndex]?.label,
+  }) : "";
   const objectiveIds = new Set(DEAD_CIRCUIT_MISSION.objectives.map((objective) => objective.id));
   const objectiveStops = (plan.objectivePhases ?? []).map((objectivePhase) => ({
     ...objectivePhase,
@@ -1831,7 +1153,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
   });
 
   return (
-    <div className={`field-plan-layer ${execution ? "executing" : "planning"}`} ref={layerRef} aria-label={`${playbook.name} authored battlefield plan`}>
+    <div className={`field-plan-layer ${execution ? "executing" : "planning"} ${previewRoute ? "previewing-route" : ""}`} ref={layerRef} aria-label={`${playbook.name} authored battlefield plan`}>
       <div className="field-plan-caption panel-surface" aria-live="polite">
         <div><span>{DEAD_CIRCUIT_MISSION.playerDisposition} MISSION</span><b>{playbook.name}</b></div>
         <div className="field-plan-branch-state">
@@ -1902,6 +1224,25 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
           <ArrowRight weight="bold" />
         </div>
       ))}
+      {previewSegments.map((segment) => (
+        <div
+          className={`field-plan-segment route-preview movement-${previewRoute.movementRouteKind}`}
+          style={fieldSegmentStyle(segment.start, segment.end, layerSize)}
+          key={segment.id}
+        />
+      ))}
+      {previewFormation && previewRoute && previewLabelPoint && (
+        <div
+          className={`field-route-preview-label movement-${previewRoute.movementRouteKind}`}
+          style={{ left: `${previewLabelPoint.x}%`, top: `${previewLabelPoint.y}%` }}
+          aria-hidden="true"
+        >
+          <b>PREVIEW ONLY</b>
+          <span>{previewFormation.name}</span>
+          <small>{previewRoute.movementRouteKind === "walker" ? "WALKER ROUTE - CUTS THROUGH RUINS" : "VEHICLE ROUTE - AVOIDS BLOCKED TERRAIN"}</small>
+        </div>
+      )}
+      <div className="sr-only field-route-preview-announcement" role="status" aria-live="polite">{previewAnnouncement}</div>
       {tacticalLinks.map((link) => (
         <div className={`field-plan-rendezvous ${link.staffed ? "staffed" : ""} ${execution ? `execution-${link.state}` : ""}`} style={{ left: `${link.at.x}%`, top: `${link.at.y}%` }} key={`rendezvous-${link.fromIndex}-${link.toIndex}`}>
           <Radio weight="fill" /><span>{link.status}</span><small>{link.label} · {actionStopPairLabel(link.fromIndex, link.toIndex)}</small>
@@ -2162,8 +1503,15 @@ function TacticalHandoffBoard({ feedback, formations, handoffs, profile, staffEx
   );
 }
 
-function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, feedback, formations, handoffs, inspected, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onInspectFormation, onSelectFormation, onStaffExercise, onViewRouteMap, outputs, phase, playbook, profile, readiness, refitProtocols, staffExerciseIndex }) {
+function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, draggingFormationId, feedback, formations, handoffs, inspected, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onFormationDragEnd, onInspectFormation, onRoutePreview, onSelectFormation, onStaffExercise, onViewRouteMap, outputs, phase, playbook, profile, readiness, refitProtocols, selected, staffExerciseIndex }) {
   const [dropTargetRoleId, setDropTargetRoleId] = useState(null);
+  const previewFormationId = draggingFormationId ?? selected;
+  const showRoutePreview = (roleId) => {
+    if (phase === "plan" && previewFormationId) {
+      onRoutePreview({ formationId: previewFormationId, roleId });
+    }
+  };
+  const clearRoutePreview = () => onRoutePreview(null);
   const discoveredHandoffs = handoffs.filter((handoff) => handoff.maneuver);
   const timing = comboWindowTimes(profile);
   const doctrine = profile.doctrine;
@@ -2326,22 +1674,49 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
             <Fragment key={role.id}>
               <div
                 className={`playbook-slot-shell ${interactionClass}`}
-                onMouseEnter={() => formation && onInspectFormation(formation.id)}
-                onMouseLeave={() => onInspectFormation(null)}
+                onMouseEnter={() => {
+                  if (formation) onInspectFormation(formation.id);
+                  showRoutePreview(role.id);
+                }}
+                onMouseLeave={() => {
+                  onInspectFormation(null);
+                  clearRoutePreview();
+                }}
               >
               <button
                 className={`playbook-slot planning-concealed ${formation ? "filled" : "empty"} ${dropTargetRoleId === role.id ? "drop-target" : ""} ${interactionClass}`}
                 onClick={() => onChooseRole(role.id)}
+                onFocus={() => showRoutePreview(role.id)}
+                onBlur={clearRoutePreview}
                 draggable={phase === "plan" && Boolean(formation)}
-                onDragStart={(event) => formation && onFormationDragStart(event, formation.id)}
-                onDragEnter={(event) => { event.preventDefault(); setDropTargetRoleId(role.id); }}
+                onDragStart={(event) => {
+                  if (!formation) return;
+                  onRoutePreview({ formationId: formation.id, roleId: role.id });
+                  onFormationDragStart(event, formation.id);
+                }}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setDropTargetRoleId(role.id);
+                  showRoutePreview(role.id);
+                }}
                 onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
-                onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropTargetRoleId(null); }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setDropTargetRoleId(null);
+                    clearRoutePreview();
+                  }
+                }}
                 onDrop={(event) => {
                   event.preventDefault();
                   const formationId = event.dataTransfer.getData("application/x-warhost-formation") || event.dataTransfer.getData("text/plain");
                   setDropTargetRoleId(null);
+                  clearRoutePreview();
                   onAssignFormation(role.id, formationId);
+                }}
+                onDragEnd={() => {
+                  setDropTargetRoleId(null);
+                  onFormationDragEnd();
+                  clearRoutePreview();
                 }}
                 disabled={phase !== "plan"}
                 aria-label={`Action stop ${index + 1}, ${role.label}. Currently ${formation?.name ?? "empty"}`}
@@ -2454,7 +1829,7 @@ function BattleStateLegend() {
   );
 }
 
-function Battlefield({ formations, formationFates, inspected, onInspect, selected, onSelect, deployments, phase, battleTime, condition, drillStep, placementFeedback, planReady, playbook, previewPlaybookId, drillSteps, assignments, branches, handoffs, operation, outputs, profile, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onStaffExercise, readiness, refitProtocols, staffExerciseIndex, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
+function Battlefield({ formations, formationFates, inspected, onInspect, selected, onSelect, deployments, phase, battleTime, condition, drillStep, draggingFormationId, placementFeedback, planReady, playbook, previewPlaybookId, drillSteps, assignments, branches, handoffs, operation, outputs, profile, routePreview, onChooseRole, onAssignFormation, onClearRole, onFormationDragStart, onFormationDragEnd, onRoutePreview, onStaffExercise, readiness, refitProtocols, staffExerciseIndex, playbackBeat, playbackBeats, playbackIndex, playbackPlaying, onPlaybackToggle, onPlaybackStep, onPlaybackReplay }) {
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   useEffect(() => {
     setRouteMapOpen(false);
@@ -2483,10 +1858,6 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
     landmarks: operationField.landmarks,
     roles: playbook.roles,
     assignments,
-    formationStarts: Object.fromEntries(formations.map((formation) => {
-      const staging = STAGING_NODES[formation.id];
-      return [formation.id, { x: staging.left, y: staging.top - 3 }];
-    })),
     branches,
     formationMovementProfiles: Object.fromEntries(formations.map((formation) => [formation.id, formation.movementProfile])),
   });
@@ -2520,7 +1891,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <div className="battlefield-map-stage">
       <TabletopBattlefieldOverlay landmarks={operationField.landmarks} operation={operation} plan={activeFieldPlan} />
       <EnemyFieldPlan battleTime={battleTime} operation={operation} phase={phase} clashes={profile.enemyClashes} profile={profile} planReady={planReady} playbook={playbook} playbackBeat={playbackBeat} collisionFocus={collisionFocus} />
-      <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} handoffs={handoffs} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} profile={profile} />
+      <TacticalFieldPlan assignments={previewingPlaybook ? emptyAssignments(mapPlaybook) : assignments} battleTime={battleTime} branches={branches} condition={condition} consequences={consequences.player} formationFates={formationFates} formations={formations} handoffs={handoffs} operation={operation} phase={phase} playbook={mapPlaybook} playbackBeat={playbackBeat} profile={profile} routePreview={previewingPlaybook ? null : routePreview} />
       {showingRouteMap && (
         <div className="playbook-map-preview" role="status">
           <span>{routeMapOpen ? "YOUR AUTHORED ROUTE" : `ROUTE PREVIEW · ${condition.name}`}</span>
@@ -2592,6 +1963,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             onBlur={() => onInspect(null)}
             draggable={phase === "plan"}
             onDragStart={(event) => onFormationDragStart(event, formation.id)}
+            onDragEnd={onFormationDragEnd}
             aria-label={`${formation.name}, ${assignedStop ? tacticalTerm(formation.role) : "unassigned"}, at ${node.label}${formationFate ? `, ${formationFate.battleLabel}` : consequence ? `, ${consequence.label} after ${consequence.cause}` : ""}`}
           >
             <FormationPortrait formation={formation} />
@@ -2628,7 +2000,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
 
       {playbackActive && <BattleStateLegend />}
       </div>
-      {!showingRouteMap && <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} feedback={placementFeedback} formations={formations} handoffs={handoffs} inspected={inspected} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onClearRole={onClearRole} onFormationDragStart={onFormationDragStart} onInspectFormation={onInspect} onSelectFormation={onSelect} onStaffExercise={onStaffExercise} onViewRouteMap={() => setRouteMapOpen(true)} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} />}
+      {!showingRouteMap && <PlaybookBoard active={planReady} assignments={assignments} battleTime={battleTime} condition={condition} drillStep={drillStep} draggingFormationId={draggingFormationId} feedback={placementFeedback} formations={formations} handoffs={handoffs} inspected={inspected} onChooseRole={onChooseRole} onAssignFormation={onAssignFormation} onClearRole={onClearRole} onFormationDragStart={onFormationDragStart} onFormationDragEnd={onFormationDragEnd} onInspectFormation={onInspect} onRoutePreview={onRoutePreview} onSelectFormation={onSelect} onStaffExercise={onStaffExercise} onViewRouteMap={() => setRouteMapOpen(true)} outputs={outputs} phase={phase} playbook={playbook} profile={profile} readiness={readiness} refitProtocols={refitProtocols} selected={selected} staffExerciseIndex={staffExerciseIndex} />}
       {phase === "drill" && (
         <div className="drill-status" role="status">
           <Play weight="fill" />
@@ -3316,6 +2688,8 @@ export function App() {
   const [phase, setPhase] = useState("plan");
   const [operationIndex, setOperationIndex] = useState(0);
   const [selected, setSelected] = useState("harpoon");
+  const [draggingFormationId, setDraggingFormationId] = useState(null);
+  const [routePreview, setRoutePreview] = useState(null);
   const [hoveredFormationId, setHoveredFormationId] = useState(null);
   const [playbookId, setPlaybookId] = useState("trapline");
   const [previewPlaybookId, setPreviewPlaybookId] = useState(null);
@@ -3773,6 +3147,21 @@ export function App() {
     event.dataTransfer.setData("application/x-warhost-formation", formationId);
     event.dataTransfer.setData("text/plain", formationId);
     setSelected(formationId);
+    setDraggingFormationId(formationId);
+    setRoutePreview(null);
+  };
+
+  const endFormationDrag = () => {
+    setDraggingFormationId(null);
+    setRoutePreview(null);
+  };
+
+  const previewFormationRoute = (preview) => {
+    if (phase !== "plan" || !preview?.formationId || !preview?.roleId) {
+      setRoutePreview(null);
+      return;
+    }
+    setRoutePreview(preview);
   };
 
   const chooseBranch = (breakpointId, optionId) => {
@@ -3965,8 +3354,8 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} condition={condition} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} previewPlaybookId={previewPlaybookId} onPreviewPlaybook={setPreviewPlaybookId} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
-        <Battlefield formations={formations} formationFates={operationFormationFates} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} previewPlaybookId={previewPlaybookId} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onClearRole={clearRoleAssignment} onFormationDragStart={beginFormationDrag} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
+        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} condition={condition} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} previewPlaybookId={previewPlaybookId} onPreviewPlaybook={setPreviewPlaybookId} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} onFormationDragEnd={endFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <Battlefield formations={formations} formationFates={operationFormationFates} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} draggingFormationId={draggingFormationId} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} previewPlaybookId={previewPlaybookId} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} routePreview={routePreview} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onClearRole={clearRoleAssignment} onFormationDragStart={beginFormationDrag} onFormationDragEnd={endFormationDrag} onRoutePreview={previewFormationRoute} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} blindTestActive={blindTestActive} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} blindTestActive={blindTestActive} blindPrediction={blindPrediction} branches={activeBranches} onBranch={chooseBranch} />
