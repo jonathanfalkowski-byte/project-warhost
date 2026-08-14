@@ -19,6 +19,12 @@ import { resolveTacticalEngagement } from "./tacticalResolution.js";
 // what actually happens in the operation. It is pure and free of React so the whole
 // outcome space can be swept in tests rather than only played by hand.
 
+// Seconds added to the operation for each demand a staffed formation cannot answer.
+// This is the main lever that makes placement matter: with two demands per stop across
+// five stops, a badly matched plan can concede far more time than any playbook doctrine
+// or mission pressure grants, so the placement puzzle outweighs the choice of play.
+const UNMET_DEMAND_SECONDS = 8;
+
 export const evaluateTacticalSequence = (playbook, assignments, formations) => {
   const outputs = {};
   const handoffs = [];
@@ -93,11 +99,15 @@ export const calculatePlacementReadiness = (playbook, assignments, handoffs, con
     const matchedCapabilities = demands.filter((demand) => formation.capabilities.includes(demand));
     const inboundReaction = index > 0 && Boolean(handoffs[index - 1]?.maneuver);
     const outboundLink = index < handoffs.length && Boolean(handoffs[index]?.maneuver);
-    // Every formation can carry every authored responsibility. Capabilities
-    // describe how it fights and which enemy orders it can answer; they are not
-    // a hidden placement gate or a binary correct-answer test.
-    const score = Math.min(100, 70 + (inboundReaction ? 15 : 0) + (outboundLink ? 15 : 0));
-    const label = score >= 100 ? "COORDINATED" : score >= 85 ? "SUPPORTED" : "ASSIGNED";
+    // Every formation can carry every authored responsibility, so this is never a gate:
+    // an unmatched formation still executes the stop, it just takes longer to do it.
+    // The cost is graded by how many of the stop's demands go unmet, not a binary
+    // FIT / MISMATCH grade and not a flat improvised-assignment penalty.
+    const unmetDemands = Math.max(0, demands.length - matchedCapabilities.length);
+    const taskDelay = unmetDemands * UNMET_DEMAND_SECONDS;
+    const matchRatio = demands.length > 0 ? matchedCapabilities.length / demands.length : 1;
+    const score = Math.min(100, Math.round(60 + 20 * matchRatio + (inboundReaction ? 10 : 0) + (outboundLink ? 10 : 0)));
+    const label = score >= 95 ? "COORDINATED" : score >= 80 ? "SUPPORTED" : "ASSIGNED";
 
     return [role.id, {
       formationId: formation.id,
@@ -107,8 +117,8 @@ export const calculatePlacementReadiness = (playbook, assignments, handoffs, con
       endurance: formation.endurance,
       score,
       label,
-      taskAligned: true,
-      taskDelay: 0,
+      taskAligned: unmetDemands === 0,
+      taskDelay,
       demands,
       matchedCapabilities,
       roleLabel: role.label,
@@ -124,10 +134,10 @@ export const summarizePlacementReadiness = (readiness) => {
   const totalScore = staffed.reduce((sum, item) => sum + item.score, 0);
   return {
     staffedCount: staffed.length,
-    alignedCount: staffed.length,
-    improvisedCount: 0,
+    alignedCount: staffed.filter((item) => item.taskAligned).length,
+    improvisedCount: staffed.filter((item) => !item.taskAligned).length,
     average: staffed.length > 0 ? Math.round(totalScore / staffed.length) : 0,
-    delay: 0,
+    delay: staffed.reduce((sum, item) => sum + (item.taskDelay ?? 0), 0),
     placements: staffed.map(({ formationName, roleLabel, stopNumber, taskAligned, demands, matchedCapabilities }) => ({
       formationName,
       roleLabel,

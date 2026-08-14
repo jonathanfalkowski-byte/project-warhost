@@ -22,7 +22,7 @@ export const DEAD_CIRCUIT_PRESSURES = Object.freeze([
       spear: [{ x: -2, y: 0 }, { x: -7, y: 8 }, { x: 2, y: 4 }, { x: 4, y: -2 }, { x: 0, y: 0 }],
       pressure: [{ x: -4, y: 1 }, { x: 5, y: 4 }, { x: 0, y: 2 }, { x: 2, y: -1 }, { x: 0, y: 0 }],
     },
-    playbookTiming: { trapline: 0, spear: 30, pressure: 15 },
+    playbookTiming: { trapline: 0, spear: 10, pressure: 5 },
   }),
   pressure({
     id: "reactor-window",
@@ -36,21 +36,21 @@ export const DEAD_CIRCUIT_PRESSURES = Object.freeze([
       spear: [{ x: -8, y: 1 }, { x: 8, y: -2 }, { x: 2, y: 3 }, { x: 1, y: -1 }, { x: 0, y: 0 }],
       pressure: [{ x: -8, y: 0 }, { x: 9, y: 0 }, { x: 1, y: 1 }, { x: 2, y: -2 }, { x: 0, y: 0 }],
     },
-    playbookTiming: { trapline: 30, spear: 15, pressure: -15 },
+    playbookTiming: { trapline: 10, spear: 5, pressure: -5 },
   }),
   pressure({
     id: "early-relief",
     operationId: "dead-circuit",
     name: "EARLY RELIEF COLUMN",
     brief: "Helioch reserves will reach the extraction gantry forty-five seconds early.",
-    effect: "STOP 04 demands DENIAL / COVER. The enemy wave arrives at 05:15.",
+    effect: "STOP 04 demands DENIAL / COVER. The enemy wave arrives at 06:15.",
     roleOverrides: { 3: ["DENIAL", "COVER"], 4: ["RECOVERY", "SUPPORT"] },
     positionOffsets: {
       trapline: [{ x: -1, y: 0 }, { x: 1, y: 2 }, { x: 3, y: 1 }, { x: 8, y: -4 }, { x: 3, y: -2 }],
       spear: [{ x: -1, y: 0 }, { x: 2, y: 2 }, { x: 4, y: 1 }, { x: 10, y: -5 }, { x: 3, y: -2 }],
       pressure: [{ x: -2, y: 0 }, { x: 1, y: 2 }, { x: 4, y: 1 }, { x: 9, y: -4 }, { x: 3, y: -2 }],
     },
-    playbookTiming: { trapline: 0, spear: -15, pressure: 0 },
+    playbookTiming: { trapline: 0, spear: -5, pressure: 0 },
     waveArrivalShift: -45,
   }),
 ]);

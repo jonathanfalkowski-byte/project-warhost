@@ -139,7 +139,7 @@ export const balanceReport = (rows, operation) => {
 };
 
 // Only print when run directly, so tests can import the sweep without side effects.
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const operation = OPERATIONS[0];
   console.log(balanceReport(sweepOperation(operation), operation));
 }

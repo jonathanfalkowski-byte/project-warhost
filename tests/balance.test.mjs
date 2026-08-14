@@ -38,12 +38,75 @@ test("placement changes the outcome", () => {
     "formation order barely changes the win rate, so placement is not a real decision");
 });
 
-test("no formation order is universally dominant or universally hopeless", () => {
-  // AGENTS.md: "never identify an optimal chain for the player". An order that always
-  // won would become the answer; one that never won would be a hidden trap.
+test("no formation order is universally dominant", () => {
+  // AGENTS.md: "never identify an optimal chain for the player". An order that won
+  // everywhere would become the answer and end the puzzle.
   const byOrder = Object.entries(groupBy(rows, (row) => row.order)).map(([order, group]) => ({ order, win: rate(group) }));
   assert.deepEqual(byOrder.filter((entry) => entry.win === 1).map((entry) => entry.order), []);
-  assert.deepEqual(byOrder.filter((entry) => entry.win === 0).map((entry) => entry.order), []);
+  // Losing placements are correct — placement is supposed to be able to lose the
+  // mission — but if most arrangements were hopeless the puzzle would be a needle hunt
+  // rather than a decision.
+  const hopeless = byOrder.filter((entry) => entry.win === 0).length;
+  assert.ok(hopeless < byOrder.length * 0.25,
+    `${hopeless} of ${byOrder.length} formation orders cannot win under any configuration`);
+});
+
+test("every fight is winnable with the right placement", () => {
+  // The design rule: a player may bring a weak play into a bad matchup and still have a
+  // route to victory through units and placement. No (pressure x play) pairing may be a
+  // dead end. This is the strongest expression of "every fight should have a chance".
+  const dead = [];
+  for (const [pressure, byPressure] of Object.entries(groupBy(rows, (row) => row.pressure))) {
+    for (const [play, group] of Object.entries(groupBy(byPressure, (row) => row.playbook))) {
+      if (!group.some((row) => row.won)) dead.push(`${pressure} x ${play}`);
+    }
+  }
+  assert.deepEqual(dead, [], `matchups no placement can win: ${dead.join(", ")}`);
+});
+
+test("placement decides more than the choice of play", () => {
+  // The core requirement: the outcome must depend on units and placement, not on
+  // looking up the right total-army play for the situation. Measured as how far the
+  // extraction count moves when only placement changes, against how far it moves when
+  // only the play changes.
+  const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const spread = (group) => Math.max(...group.map((r) => r.extracted)) - Math.min(...group.map((r) => r.extracted));
+  const pressures = [...new Set(rows.map((r) => r.pressure))];
+  const branches = [...new Set(rows.map((r) => r.branches))];
+  const plays = [...new Set(rows.map((r) => r.playbook))];
+  const orders = [...new Set(rows.map((r) => r.order))];
+  const placementSwing = [];
+  const playSwing = [];
+  for (const pressure of pressures) {
+    for (const branch of branches) {
+      const scoped = rows.filter((r) => r.pressure === pressure && r.branches === branch);
+      for (const play of plays) placementSwing.push(spread(scoped.filter((r) => r.playbook === play)));
+      for (const order of orders) playSwing.push(spread(scoped.filter((r) => r.order === order)));
+    }
+  }
+  assert.ok(mean(placementSwing) > mean(playSwing) * 1.5,
+    `placement swings ${mean(placementSwing).toFixed(2)} extractions against ${mean(playSwing).toFixed(2)} for the play; placement must be the deciding lever`);
+});
+
+test("the best placement is not the same answer everywhere", () => {
+  // If one order were optimal under every pressure and play, placement would be a
+  // solved lookup and the mission pressures would only be changing difficulty.
+  const best = new Set();
+  for (const [, byPressure] of Object.entries(groupBy(rows, (row) => row.pressure))) {
+    for (const [, group] of Object.entries(groupBy(byPressure, (row) => row.playbook))) {
+      // Many orders tie on win rate inside a single matchup, so break ties on average
+      // extractions to pick a meaningful representative rather than an arbitrary one.
+      const ranked = Object.entries(groupBy(group, (row) => row.order))
+        .map(([order, forOrder]) => ({
+          order,
+          win: rate(forOrder),
+          extracted: forOrder.reduce((sum, row) => sum + row.extracted, 0) / forOrder.length,
+        }))
+        .sort((a, b) => b.win - a.win || b.extracted - a.extracted);
+      best.add(ranked[0].order);
+    }
+  }
+  assert.ok(best.size >= 3, `only ${best.size} distinct best placements across 9 matchups; placement is a lookup`);
 });
 
 test("combo chains help without being mandatory", () => {

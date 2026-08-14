@@ -96,19 +96,70 @@ early-relief        spear    16.5%   trapline 1.0%  pressure 0.0%
 That is a partial answer to finding 3 below: pressures now reshape *which play to
 bring*, even though they still do not change the best formation order within a play.
 
+## The placement puzzle did not exist (15 Aug 2026)
+
+Fixing findings 1 and 2 left the mission as rock-paper-scissors: each pressure had one
+correct play, and the *same* formation order was optimal in all nine (pressure × play)
+matchups. Investigating why exposed the real problem.
+
+`calculatePlacementReadiness` computed `matchedCapabilities` — which formation
+capabilities answer each stop's demands — and then discarded it. `taskDelay` and the
+summary's `delay` were both hardcoded to `0`, while `calculateOperationProfile` added
+`readinessSummary.delay` to extraction time. The channel was wired and permanently zero.
+
+**Which unit went to which stop had no effect on the outcome, except through combo
+adjacency.** The `roleOverrides` each mission pressure defines were computed, shown to
+the player, and thrown away. That is why one placement was optimal everywhere: it was
+simply the arrangement that maximised combo chains, invariant to everything else.
+
+### The fix
+
+Three changes, in order of importance:
+
+1. **Placement now resolves.** Each demand a staffed formation cannot answer adds
+   `UNMET_DEMAND_SECONDS` (8s) to the operation. This is deliberately not a
+   FIT / MISMATCH gate — every formation still executes every responsibility, it just
+   takes longer when it is the wrong tool. With two demands across five stops the
+   graded cost ranges from about 32s to 80s, which outweighs any single doctrine or
+   pressure modifier.
+2. **The mission clock has headroom.** The wave now arrives 60s later (07:00 rather
+   than 06:00). Without this, adding placement cost simply made everything unwinnable
+   — the previous clock was so tight that only combo count could move it.
+3. **Play-versus-pressure timing softened to a tilt.** The per-pressure `playbookTiming`
+   overrides were ±15–30s — a full wave-loss step — which *was* the rock-paper-scissors
+   mechanism, encoded directly. They are now ±5–10s: enough to colour the choice, not
+   enough to decide it. This measurably helps two of the three pressures (best/worst
+   play ratio 5.3× → 3.6× and 2.6× → 1.6×).
+
+### Result against the design rules
+
+| Rule | Before | After |
+|---|---|---|
+| Every fight winnable with the right placement | 1 dead matchup of 9 | **0 dead of 9** |
+| Placement decides more than play choice | 1.61 vs 1.18 swing (1.4×) | **2.75 vs 1.02 (2.7×)** |
+| Best placement varies by situation | **1 answer everywhere** | **6 distinct answers across 9 matchups** |
+| Overall win rate | 21.5% | 26.6% |
+
+Placement is now the deciding lever, and the right answer moves with the mission
+pressure and the play — because pressures change what each stop demands, and that
+finally reaches the outcome.
+
+14 of 120 formation orders now cannot win under any configuration. That is intended:
+placement is supposed to be able to lose the mission. None win everywhere, and the
+win-rate distribution across orders is a smooth gradient rather than a cliff.
+
 ## Residual, and still open
 
-- **`early-relief` is effectively a spear mission** — 16.5% for `spear`, 1.0% for
-  `trapline`, 0.0% for `pressure`. Winnable, and arguably a legitimate identity for a
-  pressure that punishes slowness, but worth a deliberate decision rather than being
-  left as a side effect. It is also much harder than the other two (5.8% against 26.3%
-  and 32.4%).
-- **Finding 3 is unchanged** — see below. The best formation *order* is still identical
-  under all three pressures.
+- **`early-relief` × `pressure` is thin** — 2 of 120 placements win it (0.4%). Alive,
+  so it is no longer a dead end, but it is by far the weakest matchup and the one
+  remaining place where the play choice nearly decides the fight (best/worst play ratio
+  44× under that pressure, against 3.6× and 1.6× elsewhere). Worth a deliberate call:
+  either accept it as the identity of a pressure that punishes slowness, or widen it.
+- **Softening the play timings is helpful but not load-bearing.** Restoring the
+  original ±15–30s values does not break any invariant now that placement dominates —
+  the placement fix is what does the work. Verified by mutation.
 
-## Still open
-
-### Mission pressures change difficulty, not strategy (finding 3)
+## Resolved: mission pressures now reshape strategy (finding 3)
 
 The single best formation order is **identical under all three pressures**, and so are
 the second and third:
