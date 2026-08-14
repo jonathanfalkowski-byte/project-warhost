@@ -204,13 +204,48 @@ Nothing about placement quality appears before commitment; a regression guard as
 the readback is absent from the planning render, and all nine new colours clear WCAG AA
 (6.9:1 to 15.6:1).
 
+## The doctrine bug had a third instance (15 Aug 2026)
+
+`early-relief × pressure` was winnable by 2 of 120 placements — alive, but a dead end in
+practice. The cause turned out to be the same bug found in `spear`, for the third time.
+
+`pressure`'s doctrine grants `alpha: 15, beta: 15` — both control nodes fifteen seconds
+sooner — and charges `missionDelay: 15` for the convergence. But `betaAt` at 135 puts
+the `reactorAt` floor (`betaAt + 60`) at 195, well under the 300 baseline, so `reactorAt`
+never moves and `extractionAt` stays bound by its own 345 term. **The parallel capture
+never reached the win condition; the convergence cost always did.**
+
+**Fix:** taking both nodes at once now starts the withdrawal sooner —
+`{ alpha: 15, beta: 15, extraction: 30, missionDelay: 15 }`, the same shape as the
+`spear` fix. The mission clock was then tightened from +60s to +45s of headroom, because
+fixing the third play lifted the overall win rate to 36.8%.
+
+### Result
+
+| | Before | After |
+|---|---|---|
+| `early-relief × pressure` | **0.4% (2 of 120 placements)** | **5.0% (13 of 120)** |
+| Dead matchups | 0 of 9 | 0 of 9 |
+| Worst matchup | 0.4% | **2.1%** |
+| Placement vs play swing | 2.75 vs 1.02 (2.7×) | **2.83 vs 0.86 (3.3×)** |
+| Rock-paper-scissors ratio per pressure | 3.6× / 1.6× / **44×** | **1.1× / 2.3× / 3.9×** |
+| Overall win rate | 26.6% | 21.1% |
+
+The rock-paper-scissors reading is gone: the worst play-choice penalty within a pressure
+is now 3.9×, against 44× before. Each pressure still favours a different play, but the
+gap is a tilt rather than a verdict.
+
+**Refits improved without being touched.** Their swing rose from 0.44 to 0.61 extractions,
+putting them on par with the choice of play (0.82) rather than far behind it, while
+placement stayed dominant at 2.86. No loadout wins or loses everywhere (1.8× best to
+worst). The earlier "refits are too quiet" finding was largely a symptom of the same
+doctrine bug, so no refit content was changed.
+
 ## Residual, and still open
 
-- **`early-relief` × `pressure` is thin** — 2 of 120 placements win it (0.4%). Alive,
-  so it is no longer a dead end, but it is by far the weakest matchup and the one
-  remaining place where the play choice nearly decides the fight (best/worst play ratio
-  44× under that pressure, against 3.6× and 1.6× elsewhere). Worth a deliberate call:
-  either accept it as the identity of a pressure that punishes slowness, or widen it.
+- **`early-relief` remains the hard pressure** — 2.1% to 8.1% across the three plays,
+  against 19-45% elsewhere. Every play can win it, but it demands a well matched plan.
+  This now looks like an identity rather than a defect.
 - **Softening the play timings is helpful but not load-bearing.** Restoring the
   original ±15–30s values does not break any invariant now that placement dominates —
   the placement fix is what does the work. Verified by mutation.

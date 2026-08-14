@@ -547,6 +547,11 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
     .map((formationFate) => [formationFate.formationId, formationFate]));
   const focusedPlayerIds = playbackBeat?.playerFormationIds ?? [];
   const hasPlayerFocus = focusedPlayerIds.length > 0;
+  // Formations caught by an enemy order that actually landed. A broken order still
+  // focuses them, but only a landed one is drawn as taking the hit.
+  const struckIds = ["contact", "result", "intercept"].includes(playbackBeat?.kind)
+    ? focusedPlayerIds
+    : [];
 
   useEffect(() => {
     if (!layerRef.current) return undefined;
@@ -802,7 +807,7 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
         const consequenceClass = formation && consequences?.[formation.id] ? `state-${consequences[formation.id].state}` : "";
         const fateClass = formation && resolvedFates.has(formation.id) ? `fate-${resolvedFates.get(formation.id).fate}` : "";
         return (
-          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${consequenceClass} ${fateClass} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
+          <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${consequenceClass} ${fateClass} ${struckIds.includes(formation?.id) ? "struck" : ""} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
             <b>{String(index + 1).padStart(2, "0")}</b>
             <span>{role.label.split(" / ")[0]}</span>
             {routes[index]?.afterLabel && <small>{routes[index].afterLabel}</small>}
@@ -871,6 +876,8 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
     : Number.isInteger(playbackBeat?.enemyFormationIndex) ? [playbackBeat.enemyFormationIndex] : [];
   const doctrinePhase = playbackBeat?.doctrinePhase ?? "none";
   const reinforcementPlaybackClass = playbackBeat?.reinforcementFocus ? "playback-focused" : "";
+  // Beats where two plans actually meet, as opposed to beats that only describe intent.
+  const strikeBeat = ["contact", "result", "intercept"].includes(playbackBeat?.kind);
 
   return (
     <div className={`enemy-plan-layer phase-${phase} doctrine-${doctrinePhase}`} ref={layerRef} aria-label={`${enemyPlan.name} enemy battlefield plan`}>
@@ -912,6 +919,19 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
             {exactRoutesVisible && <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
               <b>{formation.number}</b><span>{clash.label}</span>
             </div>}
+            {/* The engagement has to happen somewhere on the map. Without this the
+                enemy order resolved only in a banner, so the player never saw contact
+                and had no read on the situation a Command Seal is answering. */}
+            {strikeBeat && playbackBeat?.enemyFormationIndex === index && (
+              <div
+                className={`field-strike ${clash.disrupted ? "broken" : "landed"} ${playbackBeat.kind === "intercept" ? "heavy" : ""}`}
+                style={{ left: `${displayPosition.x}%`, top: `${displayPosition.y}%` }}
+                key={`strike-${playbackBeat.id}`}
+                aria-hidden="true"
+              >
+                <i /><i /><span>{clash.disrupted ? "BROKEN" : "IMPACT"}</span>
+              </div>
+            )}
             <div className={`enemy-plan-formation ${contactForecastVisible ? "contact-forecast" : ""} ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass} ${counterRevealClass}`} style={{ left: `${displayPosition.x}%`, top: `${displayPosition.y}%` }}>
               <img src="/assets/helioch-sentinels.png" alt={`${formation.name} executing ${clash.label}`} />
               <span>{formation.number}</span>
@@ -2455,10 +2475,29 @@ export function App() {
     return () => window.clearInterval(interval);
   }, [phase, drillSteps.length]);
 
+  // Formations are drawn by interpolating their route against battleTime, so snapping
+  // battleTime to each beat's timestamp made them lurch: beats early in the operation
+  // are five game-seconds apart, later ones sixty, but every beat lasts the same real
+  // 2.6s. Easing battleTime across the beat instead makes movement continuous and makes
+  // the gap between "closing" and "contact" legible.
   useEffect(() => {
-    if (phase !== "battle" && phase !== "complete") return;
-    setBattleTime(playbackTimeForIndex(playbackBeats, playbackIndex));
-  }, [phase, playbackBeats, playbackIndex]);
+    if (phase !== "battle" && phase !== "complete") return undefined;
+    const target = playbackTimeForIndex(playbackBeats, playbackIndex);
+    const from = playbackIndex > 0 ? playbackTimeForIndex(playbackBeats, playbackIndex - 1) : 0;
+    if (phase === "complete" || !playbackPlaying || target <= from) {
+      setBattleTime(target);
+      return undefined;
+    }
+    const started = performance.now();
+    let frame = 0;
+    const tick = (now) => {
+      const progress = Math.min(1, (now - started) / PLAYBACK_BEAT_MS);
+      setBattleTime(Math.round(from + (target - from) * progress));
+      if (progress < 1) frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [phase, playbackBeats, playbackIndex, playbackPlaying]);
 
   useEffect(() => {
     if (phase !== "battle" || decision || !playbackPlaying || playbackIndex >= playbackBeats.length - 1) return undefined;

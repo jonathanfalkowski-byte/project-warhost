@@ -100,3 +100,31 @@ test("the focus trap seals the background and restores it on close", () => {
   assert.match(hook, /event\.key !== "Tab"/);
   assert.match(hook, /event\.key === "Escape"/);
 });
+
+test("contact is drawn on the map, not only announced in a banner", () => {
+  // Playtest finding, 15 Aug 2026: the battle read as a map animation because the two
+  // plans never visibly met — enemy orders resolved in a text banner while the map went
+  // on unchanged. That left the Command Seal decision with no visible cause. The strike
+  // marks the moment at the coordinate where the enemy order resolves.
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  assert.match(app, /className=\{`field-strike/, "contact strikes are not rendered");
+  assert.match(app, /struckIds\.includes\(formation\?\.id\)/, "player formations do not react to being hit");
+  // It must key off beats where plans actually meet, not beats that merely describe intent.
+  assert.match(app, /\["contact", "result", "intercept"\]/);
+  assert.match(css, /\.field-strike/);
+  assert.match(css, /@keyframes strikeRing/);
+  // Motion is decoration here; it must not be forced on people who have opted out.
+  const reduced = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+  assert.match(reduced, /field-strike/);
+  assert.match(reduced, /struck/);
+});
+
+test("battle time eases across a beat rather than snapping to it", () => {
+  // Formations are positioned by interpolating their route against battleTime. Snapping
+  // it to each beat's timestamp made them lurch, because early beats are 5 game-seconds
+  // apart and later ones 60, while every beat lasts the same real 2.6s.
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.match(app, /requestAnimationFrame\(tick\)/, "battleTime no longer eases across the beat");
+  assert.match(app, /cancelAnimationFrame\(frame\)/, "the animation frame must be cancelled on cleanup");
+});

@@ -20,7 +20,7 @@ export const PLAYBOOK_DOCTRINES = Object.freeze({
   }),
   pressure: Object.freeze({
     name: "TWO-AXIS ASSAULT",
-    strength: "Split pressure resolves Alpha and Beta 00:15 sooner each.",
+    strength: "Split pressure resolves Alpha and Beta 00:15 sooner each, starting the withdrawal 00:30 sooner.",
     exposure: "The separated wings require 00:15 to regroup before extraction.",
   }),
 });
@@ -56,8 +56,8 @@ export const resolvePlaybookDoctrine = (playbookId, handoffs = []) => {
     return {
       ...doctrine,
       triggered: true,
-      impact: { ...EMPTY_IMPACT, alpha: 15, beta: 15, missionDelay: 15 },
-      result: "PARALLEL CAPTURE · ALPHA / BETA -00:15 · CONVERGENCE +00:15",
+      impact: { ...EMPTY_IMPACT, alpha: 15, beta: 15, extraction: 30, missionDelay: 15 },
+      result: "PARALLEL CAPTURE · ALPHA / BETA -00:15 · WITHDRAWAL -00:30 · CONVERGENCE +00:15",
     };
   }
 

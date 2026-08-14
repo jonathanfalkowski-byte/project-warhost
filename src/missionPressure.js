@@ -43,7 +43,7 @@ export const DEAD_CIRCUIT_PRESSURES = Object.freeze([
     operationId: "dead-circuit",
     name: "EARLY RELIEF COLUMN",
     brief: "Helioch reserves will reach the extraction gantry forty-five seconds early.",
-    effect: "STOP 04 demands DENIAL / COVER. The enemy wave arrives at 06:15.",
+    effect: "STOP 04 demands DENIAL / COVER. The enemy wave arrives at 06:00.",
     roleOverrides: { 3: ["DENIAL", "COVER"], 4: ["RECOVERY", "SUPPORT"] },
     positionOffsets: {
       trapline: [{ x: -1, y: 0 }, { x: 1, y: 2 }, { x: 3, y: 1 }, { x: 8, y: -4 }, { x: 3, y: -2 }],
