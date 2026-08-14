@@ -15,7 +15,7 @@ export const PLAYBOOK_DOCTRINES = Object.freeze({
   }),
   spear: Object.freeze({
     name: "DECISIVE THRUST",
-    strength: "The concentrated column reaches the primary objective 00:30 sooner.",
+    strength: "The concentrated column reaches the primary objective 00:30 sooner and clears extraction 00:30 sooner.",
     exposure: "The exposed rear guard adds 00:15 to extraction.",
   }),
   pressure: Object.freeze({
@@ -47,8 +47,8 @@ export const resolvePlaybookDoctrine = (playbookId, handoffs = []) => {
     return {
       ...doctrine,
       triggered: true,
-      impact: { ...EMPTY_IMPACT, reactor: 30, missionDelay: 15 },
-      result: "REACTOR -00:30 · EXTRACTION +00:15",
+      impact: { ...EMPTY_IMPACT, reactor: 30, extraction: 30, missionDelay: 15 },
+      result: "REACTOR -00:30 · EXTRACTION -00:30 · REAR GUARD +00:15",
     };
   }
 

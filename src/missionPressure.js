@@ -50,7 +50,7 @@ export const DEAD_CIRCUIT_PRESSURES = Object.freeze([
       spear: [{ x: -1, y: 0 }, { x: 2, y: 2 }, { x: 4, y: 1 }, { x: 10, y: -5 }, { x: 3, y: -2 }],
       pressure: [{ x: -2, y: 0 }, { x: 1, y: 2 }, { x: 4, y: 1 }, { x: 9, y: -4 }, { x: 3, y: -2 }],
     },
-    playbookTiming: { trapline: 15, spear: -15, pressure: 15 },
+    playbookTiming: { trapline: 0, spear: -15, pressure: 0 },
     waveArrivalShift: -45,
   }),
 ]);
