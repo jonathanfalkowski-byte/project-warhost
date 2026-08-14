@@ -101,6 +101,32 @@ violations at every desktop viewport, idle and with a preview active.**
 - **Every control has an accessible name**, including all five action stops and all
   roster formations, each naming its exact assigned stop.
 
+### Resolved — modal dialogs were not modal
+
+A keyboard walkthrough on 14 Aug 2026 found that all four overlays — the formation
+picker, the Command Seal decision, the Salvage Workshop, and the after-action debrief
+— declared `role="dialog" aria-modal="true"` while implementing none of it. There was
+no focus management anywhere in the codebase.
+
+`aria-modal="true"` tells assistive technology that everything outside the dialog does
+not exist. Because focus was never moved in or trapped, `Tab` walked straight into the
+background — so the keyboard went somewhere the screen reader refused to read, with no
+way back. Sighted mouse users were unaffected (the backdrop blocks pointer events),
+which is why it survived earlier visual passes. axe-core does not flag it either: the
+markup is correct in isolation, and only the behaviour is wrong.
+
+Resolved with `src/useModalFocus.js`, applied to all four overlays: focus moves to the
+first control on open, is trapped and wraps in both directions, returns to the element
+that opened the dialog on close, and every sibling of the dialog is marked `inert`
+while it is open. Escape is wired only where dismissal is legitimate — the picker. The
+decision, workshop, and debrief all require a choice and deliberately ignore it.
+
+Verified in a browser: focus lands inside the dialog on open, six consecutive tabs stay
+inside and wrap, Escape returns focus to the originating action stop, and choosing a
+formation returns focus to that stop with its updated name — which is also how the
+assignment itself gets announced. While a dialog is open, 0 of 37 background controls
+are reachable; on close, all 36 are restored and no `inert` attribute is left behind.
+
 ### Still failing — scoped, not fixed
 
 **WCAG 1.4.10 Reflow (AA).** The layout reflows cleanly down to 1024 px, then requires
@@ -117,13 +143,21 @@ ever targets small screens.
 
 ### Regression guards
 
-Nine automated tests now protect this result, with no new dependencies:
+Eleven automated tests now protect this result, with no new dependencies:
 `tests/accessibility.test.mjs` re-computes real WCAG contrast ratios from
 `src/styles.css` for all seven surfaces and asserts `.sr-only` never uses
 `display:none` or `visibility:hidden`; `tests/app-render.test.mjs` asserts every button
 has an accessible name, that no positive `tabindex` exists, and that the live region is
 present and empty on first render; `tests/field-routes.test.mjs` covers the
-announcement builder, including that an incomplete preview announces nothing.
+announcement builder, including that an incomplete preview announces nothing. Two
+further guards assert that every `aria-modal` dialog is wired to the focus trap and
+carries an accessible name, and that the hook still seals and restores the background —
+focus behaviour itself needs a browser, so these guard the wiring rather than the
+behaviour.
+
+A manual test script for real assistive technology is in `docs/screen-reader-test.md`,
+with every expected announcement captured from the running prototype rather than
+written from assumption.
 
 Each guard was verified by deliberate mutation — reverting a contrast colour, setting
 `display:none`, dropping `aria-live`, weakening the announcement, and adding

@@ -71,6 +71,7 @@ import {
 } from "./fieldRoutes.js";
 import { resolvePlaybookDoctrine } from "./playbookDoctrine.js";
 import { resolveTacticalEngagement } from "./tacticalResolution.js";
+import { useModalFocus } from "./useModalFocus.js";
 import { strategyCausalityFor, strategyOutcomeStoryFor } from "./strategyCausality.js";
 import {
   fieldPlanForPressure,
@@ -2329,13 +2330,14 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
 }
 
 function DecisionOverlay({ decision, seals, branches, operation, onResolve }) {
+  const dialogRef = useModalFocus(Boolean(decision));
   if (!decision) return null;
   const breakpoint = breakpointsFor(operation).find((item) => item.id === decision);
   const breakpointImpacts = breakpointImpactsFor(operation);
   const authored = breakpoint.options.find((option) => option.id === branches[decision]);
   const alternative = breakpoint.options.find((option) => option.id !== branches[decision]);
   return (
-    <div className="decision-backdrop" role="dialog" aria-modal="true" aria-labelledby="decision-title">
+    <div className="decision-backdrop" role="dialog" aria-modal="true" aria-labelledby="decision-title" ref={dialogRef}>
       <div className="decision-panel">
         <div className="decision-icon"><Radio weight="duotone" /></div>
         <p className="eyebrow">PLAYBOOK BREAKPOINT</p>
@@ -2367,6 +2369,7 @@ function DecisionOverlay({ decision, seals, branches, operation, onResolve }) {
 }
 
 function FormationPicker({ role, playbook, condition, formations, assignments, onChoose, onClose }) {
+  const dialogRef = useModalFocus(Boolean(role), { onEscape: onClose });
   if (!role) return null;
   const assignedFormationId = assignments[role.id];
   const roleIndex = playbook.roles.findIndex((item) => item.id === role.id);
@@ -2391,7 +2394,7 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
     return formationStartOrder.get(left.id) - formationStartOrder.get(right.id);
   });
   return (
-    <div className="decision-backdrop formation-picker-backdrop" role="dialog" aria-modal="true" aria-labelledby="formation-picker-title">
+    <div className="decision-backdrop formation-picker-backdrop" role="dialog" aria-modal="true" aria-labelledby="formation-picker-title" ref={dialogRef}>
       <div className="decision-panel formation-picker-panel">
         <p className="eyebrow">STAFF ACTION STOP</p>
         <h2 id="formation-picker-title">Who executes {role.label}?</h2>
@@ -2431,6 +2434,7 @@ function FormationPicker({ role, playbook, condition, formations, assignments, o
 }
 
 function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperation, onChoose, onLaunch }) {
+  const dialogRef = useModalFocus(true);
   const incomingCondition = missionPressureFor(nextOperation.conditionId, nextOperation.id);
   const selectedAction = choice
     ? choice.type === "repair"
@@ -2443,7 +2447,7 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
     && choice?.formationId === action.formationId
     && (action.type !== "refit" || choice?.refitId === action.refitId);
   return (
-    <div className="decision-backdrop workshop-backdrop" role="dialog" aria-modal="true" aria-labelledby="workshop-title">
+    <div className="decision-backdrop workshop-backdrop" role="dialog" aria-modal="true" aria-labelledby="workshop-title" ref={dialogRef}>
       <div className="decision-panel workshop-panel">
         <div className="workshop-heading">
           <div>
@@ -2528,6 +2532,7 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
 }
 
 function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, strategyTrial, blindTestActive, blindPrediction, won, onAction }) {
+  const dialogRef = useModalFocus(true);
   const lostCount = formations.length - profile.extractedCount;
   const recoveryCarrierFate = formationFates.find(({ formation }) => formation.id === "hauler");
   const carrierCutOffAfterRescue = rescued && recoveryCarrierFate?.history?.some(({ state }) => state === "cut-off");
@@ -2582,7 +2587,7 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
       ? `${operation.primaryResult}, but only ${profile.extractedCount} formations cleared the timed extraction. Scattered survivors regrouped for a costly withdrawal.`
       : `${operation.primaryResult}, but only ${profile.extractedCount} formations escaped before the Warhost lost the ability to continue.`;
   return (
-    <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title">
+    <div className="decision-backdrop completion-backdrop" role="dialog" aria-modal="true" aria-labelledby="complete-title" ref={dialogRef}>
       <div className={`decision-panel completion-panel ${outcomeTone}`}>
         {won ? <CheckCircle className="completion-icon" weight="duotone" /> : <Warning className="completion-icon" weight="duotone" />}
         <p className="eyebrow">{outcomeLabel}</p>

@@ -69,3 +69,34 @@ test("small planning text meets WCAG AA contrast on its own panel", () => {
   }
   assert.deepEqual(failures, [], `contrast below the 4.5:1 AA threshold:\n${failures.join("\n")}`);
 });
+
+// Every overlay in App.jsx declares role="dialog" aria-modal="true". That attribute
+// tells assistive technology the rest of the page does not exist, so a dialog that
+// does not also trap focus strands the user on controls their screen reader refuses
+// to read. A browser walkthrough on 14 Aug 2026 confirmed all four dialogs now move
+// focus in, trap it, restore it on close, and mark their siblings inert. Focus
+// behaviour itself needs a real browser; this guards the wiring, so a fifth dialog
+// cannot be added without it.
+test("every modal dialog is wired to the focus trap", () => {
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const dialogs = app.match(/<div[^>]*aria-modal="true"[^>]*>/g) ?? [];
+  assert.ok(dialogs.length >= 4, `expected the known overlays, found ${dialogs.length}`);
+  const unmanaged = dialogs.filter((tag) => !/ref=\{dialogRef\}/.test(tag));
+  assert.deepEqual(unmanaged, [], `aria-modal dialogs without a focus trap:\n${unmanaged.join("\n")}`);
+  // Each dialog must also name itself, or a screen reader announces only "dialog".
+  const unlabelled = dialogs.filter((tag) => !/aria-labelledby="[^"]+"/.test(tag));
+  assert.deepEqual(unlabelled, [], `aria-modal dialogs without an accessible name:\n${unlabelled.join("\n")}`);
+});
+
+test("the focus trap seals the background and restores it on close", () => {
+  const hook = readFileSync(new URL("../src/useModalFocus.js", import.meta.url), "utf8");
+  // Sealing the background is what makes aria-modal honest.
+  assert.match(hook, /setAttribute\("inert", ""\)/);
+  // Failing to remove inert would leave the whole app permanently unusable.
+  assert.match(hook, /removeAttribute\("inert"\)/);
+  // Focus must return to whatever opened the dialog, or the user is dropped at the
+  // top of the document with no idea what happened.
+  assert.match(hook, /returnFocusRef/);
+  assert.match(hook, /event\.key !== "Tab"/);
+  assert.match(hook, /event\.key === "Escape"/);
+});
