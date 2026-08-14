@@ -6,3 +6,6 @@ vite.stderr.log
 
 *.tar.gz
 *.patch
+
+*.tar.gz
+*.patch
