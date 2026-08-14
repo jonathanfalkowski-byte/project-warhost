@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { OPERATIONS } from "../src/operationData.js";
-import { sweepOperation } from "../scripts/balance-sweep.mjs";
+import { sweepOperation, sweepRefitSpace } from "../scripts/balance-sweep.mjs";
 
 // The outcome pipeline is deterministic, so these resolve the entire decision space
 // rather than sampling it: 120 formation permutations x 3 total-army plays x 3
@@ -167,4 +167,53 @@ test("every total-army play can still reach a decisive result", () => {
     assert.ok(Math.max(...group.map((r) => r.extracted)) > operation.requiredExtraction,
       `total-army play "${play}" can never exceed the ${operation.requiredExtraction}-extraction requirement`);
   }
+});
+
+// Refits change a formation's capabilities, and capabilities now decide how well it
+// answers a stop's demands — so the loadout is a full dimension of the decision space,
+// not a cosmetic choice. 32 loadouts x 4,320 placements = 138,240 outcomes, ~3s.
+const deepRows = sweepRefitSpace(operation);
+
+test("the refit dimension is swept in full", () => {
+  assert.equal(deepRows.length, rows.length * 32);
+});
+
+test("no refit loadout is dominant or hopeless", () => {
+  // AGENTS.md: refits "must make legible tradeoffs... Do not reduce refits to generic
+  // stat bonuses, rank packages, recommend a build, or identify an optimal package".
+  // A loadout that wins everywhere would be the build; one that never wins would be a
+  // trap installed before the player ever places a formation.
+  const byRefit = Object.entries(groupBy(deepRows, (row) => row.refits))
+    .map(([loadout, group]) => ({ loadout, win: rate(group) }));
+  assert.equal(byRefit.length, 32);
+  assert.deepEqual(byRefit.filter((entry) => entry.win === 1).map((e) => e.loadout), []);
+  assert.deepEqual(byRefit.filter((entry) => entry.win === 0).map((e) => e.loadout), []);
+  const best = Math.max(...byRefit.map((e) => e.win));
+  const worst = Math.min(...byRefit.map((e) => e.win));
+  assert.ok(best / worst < 2.5, `loadout win rates span ${(best / worst).toFixed(1)}x; the pre-deployment choice is outweighing the mission`);
+});
+
+test("the loadout does not outweigh placement", () => {
+  // Refits are installed before deployment. If they mattered more than where the
+  // player puts each formation, the mission would be decided before it started.
+  const spread = (group) => Math.max(...group.map((r) => r.extracted)) - Math.min(...group.map((r) => r.extracted));
+  const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const branch = deepRows[0].branches;
+  const scoped = deepRows.filter((r) => r.branches === branch && r.pressure === "fractured-transit" && r.playbook === "trapline");
+  const loadouts = [...new Set(scoped.map((r) => r.refits))];
+  const orders = [...new Set(scoped.map((r) => r.order))];
+  const placementSwing = loadouts.map((lo) => spread(scoped.filter((r) => r.refits === lo)));
+  const refitSwing = orders.map((o) => spread(scoped.filter((r) => r.order === o)));
+  assert.ok(mean(placementSwing) > mean(refitSwing) * 1.5,
+    `placement swings ${mean(placementSwing).toFixed(2)} against ${mean(refitSwing).toFixed(2)} for the loadout`);
+});
+
+test("every fight stays winnable across every loadout", () => {
+  const dead = [];
+  for (const [pressure, byPressure] of Object.entries(groupBy(deepRows, (row) => row.pressure))) {
+    for (const [play, group] of Object.entries(groupBy(byPressure, (row) => row.playbook))) {
+      if (!group.some((row) => row.won)) dead.push(`${pressure} x ${play}`);
+    }
+  }
+  assert.deepEqual(dead, [], `matchups no loadout or placement can win: ${dead.join(", ")}`);
 });

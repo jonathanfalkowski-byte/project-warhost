@@ -30,8 +30,16 @@ const permutations = (items) => (items.length <= 1 ? [items] : items.flatMap(
     .map((rest) => [item, ...rest]),
 ));
 
-export const sweepOperation = (operation = OPERATIONS[0]) => {
-  const formations = resolveFormations(defaultRefits());
+// Every combination of installed refit packages. Refits change a formation's
+// capabilities, and capabilities decide how well it answers a stop's demands, so this
+// is a full dimension of the decision space rather than a cosmetic choice.
+export const refitCombinations = () => FORMATIONS.reduce(
+  (acc, formation) => acc.flatMap((partial) => formation.refits.map((refit) => ({ ...partial, [formation.id]: refit.id }))),
+  [{}],
+);
+
+export const sweepOperation = (operation = OPERATIONS[0], refits = defaultRefits()) => {
+  const formations = resolveFormations(refits);
   const formationIds = FORMATIONS.map((formation) => formation.id);
   const branchSets = breakpointsFor(operation).reduce((acc, breakpoint) => acc.flatMap(
     (partial) => breakpoint.options.map((option) => ({ ...partial, [breakpoint.id]: option.id })),
@@ -52,6 +60,7 @@ export const sweepOperation = (operation = OPERATIONS[0]) => {
             sequence.handoffs, branches, readiness, condition, operation, protocols, playbook,
           );
           rows.push({
+            refits: Object.values(refits).join("+"),
             pressure: pressure.id,
             playbook: basePlaybook.id,
             order: order.join(">"),
@@ -138,8 +147,15 @@ export const balanceReport = (rows, operation) => {
   return lines.join("\n");
 };
 
+// Sweeps every refit loadout as well as every placement. Far larger, so it is opt-in.
+export const sweepRefitSpace = (operation = OPERATIONS[0]) => refitCombinations()
+  .flatMap((refits) => sweepOperation(operation, refits));
+
 // Only print when run directly, so tests can import the sweep without side effects.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const operation = OPERATIONS[0];
-  console.log(balanceReport(sweepOperation(operation), operation));
+  const deep = process.argv.includes("--refits");
+  const rows = deep ? sweepRefitSpace(operation) : sweepOperation(operation);
+  console.log(balanceReport(rows, operation));
+  if (deep) console.log(`\n(swept ${refitCombinations().length} refit loadouts)`);
 }

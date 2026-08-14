@@ -148,6 +148,44 @@ finally reaches the outcome.
 placement is supposed to be able to lose the mission. None win everywhere, and the
 win-rate distribution across orders is a smooth gradient rather than a cliff.
 
+## The refit dimension (15 Aug 2026)
+
+The sweep above fixes every formation to its default refit, so it covers 4,320 of the
+**138,240** real configurations — one thirty-second of the space. That was a harmless
+simplification while capabilities decided nothing. Once placement began resolving
+through capabilities, and refits are exactly what change a formation's capabilities, it
+stopped being harmless: a loadout could have been quietly deciding the mission.
+
+`npm run analyse:balance -- --refits` now sweeps all 32 loadouts (~3 seconds).
+
+**The headline results survived.** Overall win rate 24.8% against 26.6% at default
+refits, and every conclusion holds:
+
+| | Default refits | All 32 loadouts |
+|---|---|---|
+| Dead matchups | 0 of 9 | **0 of 9** |
+| Placement swing | 2.75 | **2.72** |
+| Play swing | 1.02 | 1.21 |
+| Loadout swing | not measured | **0.44** |
+
+Refits are the **weakest** of the three levers — they tune, they do not decide. No
+loadout always wins and none never wins; best against worst is 1.8×
+(`magnet+crucible+ram+plates+shield` 32.5%, `winch+jets+charge+sled+crane` 18.2%).
+The pre-deployment choice therefore cannot settle the mission before it starts, which
+is what `AGENTS.md` asks of it.
+
+**But refits barely reshape the puzzle.** Across 288 (loadout × pressure × play)
+situations there are only 13 distinct optimal placements, and in three of the nine
+matchups the loadout never changes the best answer at all. Swapping the RECON TANK's
+Gravitic Winch (`CONTROL / MOBILITY`) for a Breach Magnet (`CONTROL / BREACH`) — half
+its capability profile — does not move it off stop 1.
+
+`AGENTS.md` wants refits to "make legible tradeoffs by changing capabilities or named
+condition vocabulary, allowing readiness and directional combo windows to change".
+They are currently a difficulty dial with a small reshaping effect, rather than a
+choice that changes where a formation belongs. That is the open design question, and
+it is a design decision rather than a bug: the mechanism works, it is just quiet.
+
 ## Residual, and still open
 
 - **`early-relief` × `pressure` is thin** — 2 of 120 placements win it (0.4%). Alive,
