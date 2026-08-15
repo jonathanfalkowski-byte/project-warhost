@@ -10,7 +10,7 @@ import {
   evaluateTacticalSequence,
   summarizePlacementReadiness,
 } from "../src/operationResolution.js";
-import { sweepOperation, sweepRefitSpace } from "../scripts/balance-sweep.mjs";
+import { sweepOperation, sweepRefitSpace, REFIT_SWEEP_ROSTER } from "../scripts/balance-sweep.mjs";
 
 // The outcome pipeline is deterministic, so these resolve the entire decision space
 // rather than sampling it: 120 formation permutations x 3 total-army plays x 3
@@ -22,18 +22,25 @@ import { sweepOperation, sweepRefitSpace } from "../scripts/balance-sweep.mjs";
 // docs/balance.md for the findings that produced these guards.
 
 const operation = OPERATIONS[0];
-const rows = sweepOperation(operation);
+// Two axes, asserted separately. `rows` pins the roster to five so it isolates the
+// ordering question; `listRows` opens the whole roster so it can answer the list
+// question — which five to field — which is the larger decision.
+const rows = sweepOperation(operation, { roster: REFIT_SWEEP_ROSTER });
+const listRows = sweepOperation(operation);
 const rate = (subset) => subset.filter((row) => row.won).length / subset.length;
 const groupBy = (subset, key) => subset.reduce((acc, row) => { (acc[key(row)] ||= []).push(row); return acc; }, {});
 
-test("the sweep resolves the whole decision space", () => {
-  assert.equal(rows.length, 4320);
+test("the sweep resolves both decision axes in full", () => {
+  assert.equal(rows.length, 4320, "ordering axis");
+  // 126 ways to pick five of nine, each in 120 orders, across plays, pressures, branches.
+  assert.equal(listRows.length, 544320, "list axis");
+  assert.equal(new Set(listRows.map((row) => row.list)).size, 126);
 });
 
 test("resolution is deterministic", () => {
   // Everything below depends on this. A stray Math.random or Date.now would make the
   // sweep meaningless and the game unfair to reason about.
-  assert.deepEqual(sweepOperation(operation), rows);
+  assert.deepEqual(sweepOperation(operation, { roster: REFIT_SWEEP_ROSTER }), rows);
 });
 
 test("placement changes the outcome", () => {
@@ -183,7 +190,7 @@ test("every total-army play can still reach a decisive result", () => {
 const deepRows = sweepRefitSpace(operation);
 
 test("the refit dimension is swept in full", () => {
-  assert.equal(deepRows.length, rows.length * 32);
+  assert.equal(deepRows.length, rows.length * 32, "32 loadouts across the five fielded formations");
 });
 
 test("no refit loadout is dominant or hopeless", () => {
@@ -249,4 +256,70 @@ test("the debrief can explain what placement cost", () => {
   assert.ok(summary.delay > 0, "a mismatched plan conceded no time, so the debrief has nothing to explain");
   assert.equal(summary.delay, summary.placements.reduce((sum, p) => sum + p.taskDelay, 0),
     "the total must be the sum of the per-stop costs, or the debrief will not add up");
+});
+
+// The roster is larger than the number of action stops, so the player's first decision
+// is which formations to field at all. These guard that decision being real.
+
+test("no list of five is dominant or dead", () => {
+  // A list that won everywhere would be the answer and end army building; one that never
+  // won would be a trap the player commits to before the mission starts.
+  const byList = Object.entries(groupBy(listRows, (row) => row.list))
+    .map(([list, group]) => ({ list, win: rate(group) }));
+  assert.equal(byList.length, 126);
+  assert.deepEqual(byList.filter((entry) => entry.win === 1).map((e) => e.list), []);
+  assert.deepEqual(byList.filter((entry) => entry.win === 0).map((e) => e.list), []);
+});
+
+test("choosing the list matters as much as ordering it", () => {
+  // If ordering dwarfed selection, the roster would be decoration and the game would be
+  // back to marching order. These should be comparable, with neither trivial.
+  const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const branch = listRows[0].branches;
+  const listSwing = [];
+  const orderSwing = [];
+  for (const [, byPressure] of Object.entries(groupBy(listRows.filter((r) => r.branches === branch), (r) => r.pressure))) {
+    for (const [, group] of Object.entries(groupBy(byPressure, (r) => r.playbook))) {
+      const byList = Object.values(groupBy(group, (r) => r.list));
+      const bestEach = byList.map((v) => Math.max(...v.map((x) => x.extracted)));
+      listSwing.push(Math.max(...bestEach) - Math.min(...bestEach));
+      for (const v of byList) orderSwing.push(Math.max(...v.map((x) => x.extracted)) - Math.min(...v.map((x) => x.extracted)));
+    }
+  }
+  assert.ok(mean(listSwing) > 1, `the list barely changes the outcome (${mean(listSwing).toFixed(2)} extractions)`);
+  assert.ok(mean(listSwing) > mean(orderSwing) * 0.6,
+    `list ${mean(listSwing).toFixed(2)} vs order ${mean(orderSwing).toFixed(2)}; selection must be a peer decision to ordering`);
+});
+
+test("every formation earns a place in some list", () => {
+  // AGENTS.md forbids identifying an optimal answer, and a formation nobody should ever
+  // field is the same failure in reverse: a unit that exists only to be left behind.
+  const roster = [...new Set(listRows.flatMap((row) => row.list.split("+")))];
+  assert.equal(roster.length, 9);
+  const weak = [];
+  for (const id of roster) {
+    const containing = listRows.filter((row) => row.list.includes(id));
+    const bestList = Math.max(...Object.values(groupBy(containing, (row) => row.list)).map(rate));
+    if (bestList < 0.1) weak.push(`${id} (best list ${(100 * bestList).toFixed(1)}%)`);
+  }
+  assert.deepEqual(weak, [], `formations that never justify a slot: ${weak.join(", ")}`);
+});
+
+test("the best list depends on the situation", () => {
+  // One list optimal everywhere would make army building a solved lookup, exactly the
+  // failure the placement puzzle already had before pressures reached the outcome.
+  const best = new Set();
+  for (const [, byPressure] of Object.entries(groupBy(listRows, (row) => row.pressure))) {
+    for (const [, group] of Object.entries(groupBy(byPressure, (row) => row.playbook))) {
+      const ranked = Object.entries(groupBy(group, (row) => row.list))
+        .map(([list, forList]) => ({
+          list,
+          win: rate(forList),
+          extracted: forList.reduce((sum, row) => sum + row.extracted, 0) / forList.length,
+        }))
+        .sort((a, b) => b.win - a.win || b.extracted - a.extracted);
+      best.add(ranked[0].list);
+    }
+  }
+  assert.ok(best.size >= 3, `only ${best.size} distinct best lists across 9 matchups; army building is a lookup`);
 });

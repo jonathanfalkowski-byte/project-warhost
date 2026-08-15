@@ -80,7 +80,7 @@ import {
 
 import {
   FORMATIONS,
-  STAGING_NODES,
+  stagingNodeFor,
   defaultRefits,
   resolveFormations,
   tacticalTerm,
@@ -233,7 +233,9 @@ function FormationDossier({ formation, interactions, assignedRole, assignedIndex
       <p>{formation.purpose}</p>
       <div className="dossier-endurance" aria-label="Formation endurance profile">
         {Object.entries(formation.endurance).map(([axis, value]) => (
-          <div key={axis}><span>{axis}</span><b>{value}</b><small>{"■".repeat(value)}{"□".repeat(5 - value)}</small></div>
+          // Clamped: an endurance value outside 0-5 used to crash the render with
+          // "Invalid count value" rather than just drawing an odd meter.
+          <div key={axis}><span>{axis}</span><b>{value}</b><small>{"■".repeat(Math.max(0, Math.min(5, value)))}{"□".repeat(Math.max(0, 5 - value))}</small></div>
         ))}
       </div>
       {formation.campaignCondition && (
@@ -1103,7 +1105,7 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
       <div className="playbook-board execution-view compact-execution panel-surface">
         <div className="compact-execution-heading">
           <div><span className="panel-label">{playbook.name} · FORMATION ROUTE PLAN</span><b>ORDERS IN MOTION</b></div>
-          <strong>{Object.values(assignments).filter(Boolean).length} / {formations.length} ROUTES STAFFED</strong>
+          <strong>{Object.values(assignments).filter(Boolean).length} / {playbook.roles.length} ROUTES STAFFED</strong>
         </div>
         <div className="compact-route-strip">
           {playbook.roles.map((role, index) => {
@@ -1190,8 +1192,8 @@ function PlaybookBoard({ active, assignments, battleTime, condition, drillStep, 
         </div>
         <div className="playbook-board-actions">
           <strong>
-            {assignedCount} / {formations.length} FORMATIONS PLACED
-            {formations.length < playbook.roles.length ? ` · ${playbook.roles.length - formations.length} STOP EMPTY` : ""}
+            {assignedCount} / {playbook.roles.length} FORMATIONS PLACED
+            {formations.length > playbook.roles.length ? ` · ${formations.length - playbook.roles.length} IN RESERVE` : ""}
           </strong>
           {phase !== "battle" && <button type="button" onClick={onViewRouteMap}><MapPin weight="fill" /> VIEW ROUTE MAP</button>}
         </div>
@@ -1480,7 +1482,7 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
         const assignedStop = assignedRole && staffedFieldPlan?.positions[assignedRoleIndex]
           ? { left: staffedFieldPlan.positions[assignedRoleIndex].x, top: staffedFieldPlan.positions[assignedRoleIndex].y, label: `${actionStopLabel(assignedRoleIndex)} · ${assignedRole.label}` }
           : null;
-        const node = assignedStop ?? STAGING_NODES[formation.id];
+        const node = assignedStop ?? stagingNodeFor(formation.id);
         const active = selected === formation.id;
         const consequence = consequences.player[formation.id] ?? null;
         const formationFate = resolvedFormationFates.get(formation.id) ?? null;
@@ -1869,7 +1871,7 @@ function FooterControls({ phase, seals, drillComplete, onDrill, onCommit, onRese
               <span><b>{blindTestActive ? "DRILL LOCKED" : phase === "drill" ? "RUNNING GHOST DRILL" : drillComplete ? "DRILL VERIFIED" : "RUN GHOST DRILL"}</b><small>{blindTestActive ? "Blind test keeps the outcome hidden." : "Preview routes, triggers, and timing."}</small></span>
             </button>
             <button className="commit-button" onClick={onCommit} disabled={!planReady || (blindTestActive && !blindPrediction)}>
-              <span><b>COMMIT PLAYBOOK</b><small>{!planReady ? "Staff every available formation first." : blindTestActive && !blindPrediction ? "Predict the result before commitment." : "Execute staffed roles and authored branches."}</small></span>
+              <span><b>COMMIT PLAYBOOK</b><small>{!planReady ? "Staff every action stop first." : blindTestActive && !blindPrediction ? "Predict the result before commitment." : "Execute staffed roles and authored branches."}</small></span>
               <ArrowRight weight="bold" />
             </button>
           </>
@@ -2362,12 +2364,14 @@ export function App() {
     [assignments],
   );
 
+  // The roster is deliberately larger than the number of action stops, so a plan is
+  // complete when every stop is staffed — not when every formation has been used.
+  // Which five deploy is the list decision; the rest stay in reserve.
   const planReady = useMemo(
-    () => formations.length >= operation.requiredExtraction
-      && assignedCount === formations.length
-      && new Set(Object.values(assignments).filter(Boolean)).size === formations.length
-      && formations.every((formation) => Object.values(assignments).includes(formation.id)),
-    [assignedCount, assignments, formations, operation.requiredExtraction],
+    () => formations.length >= playbook.roles.length
+      && assignedCount === playbook.roles.length
+      && new Set(Object.values(assignments).filter(Boolean)).size === playbook.roles.length,
+    [assignedCount, assignments, formations.length, playbook.roles.length],
   );
 
   const tacticalSequence = useMemo(

@@ -241,6 +241,65 @@ placement stayed dominant at 2.86. No loadout wins or loses everywhere (1.8× be
 worst). The earlier "refits are too quiet" finding was largely a symptom of the same
 doctrine bug, so no refit content was changed.
 
+## The roster became a list (15 Aug 2026)
+
+Playtest finding: the pre-battle phase felt thinner than 40k list building, and the
+reason was arithmetic. **There were five formations and five action stops, so every
+unit was always fielded.** The player chose a marching order, never a list. `planReady`
+enforced it literally — it required every formation in the roster to be assigned before
+the playbook could be committed.
+
+The roster is now **nine formations for five stops**. Four were authored to open
+capability pairs and combo chains the original five could not reach:
+
+| Formation | Capabilities | Refit alternative |
+|---|---|---|
+| SCOUT SKIMMER | `MOBILITY / SHOCK` | `MOBILITY / DENIAL` |
+| SIEGE GUN CARRIAGE | `AREA / HOLD` | `AREA / CONTROL` |
+| COMMAND VEHICLE | `CONTROL / SUPPORT` | `CONTROL / HOLD` |
+| SHIELD WALKER | `COVER / DENIAL` | `COVER / BREACH` |
+
+Each fills a demand pair no original formation could answer alone — `HOLD / CONTROL`,
+`MOBILITY / SHOCK` and `DENIAL / COVER` are all stop demands that previously no single
+unit could fully meet. Art is placeholder, reusing the nearest existing portrait.
+
+No new UI was needed: the roster already listed formations and the board already had
+five stops. Only the "every formation must deploy" rule had to go.
+
+### What the sweep says
+
+The decision space went from 4,320 to **544,320** — 126 ways to pick five of nine, each
+in 120 orders, across plays, pressures and branches. Still under eight seconds.
+
+| | Result |
+|---|---|
+| Possible lists | 126 |
+| Lists that always win | **0** |
+| Lists that never win | **0** |
+| Best list | 24.2% (`bastion+breaker+harpoon+hauler+railjack`) |
+| Worst list | 2.5% (`bastion+carriage+command+furnace+railjack`) |
+| Swing from choosing the list | **2.33 extractions** |
+| Swing from ordering it | 2.15 extractions |
+| Distinct best lists across 9 matchups | **7** |
+
+Choosing the list is now a peer decision to ordering it, no list is dominant or dead,
+and the right list changes with the situation. Every one of the nine formations appears
+in some list that reaches at least 22.4%, so none exists only to be left behind — and
+none is an auto-include, the strongest single unit being the ARMOURED RECOVERY VEHICLE
+at 17.6% average, which makes sense when the win condition is extraction.
+
+**Overall win rate fell from 21.1% to 12.7%**, and that is the correct direction: the
+average now includes 126 lists, most of them worse than the one previously forced on
+the player. A competent list sits at 24%, and the best list in its best matchup reaches
+51.7%. Bad army building is now able to lose the mission before it starts.
+
+### Two bugs this surfaced
+
+- The endurance meter rendered `"□".repeat(5 - value)` and crashed the whole planning
+  screen with `Invalid count value: -1` for any stat above 5. Now clamped.
+- `planReady` required every roster formation to be assigned, which is what made a
+  bench impossible. It now checks that every action stop is staffed.
+
 ## Residual, and still open
 
 - **`early-relief` remains the hard pressure** — 2.1% to 8.1% across the three plays,

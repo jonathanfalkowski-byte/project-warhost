@@ -30,17 +30,36 @@ const permutations = (items) => (items.length <= 1 ? [items] : items.flatMap(
     .map((rest) => [item, ...rest]),
 ));
 
+// The roster is larger than the number of action stops, so a plan is two decisions:
+// which formations to field, then in what order. `combinations` enumerates the list
+// decision; `permutations` enumerates the ordering of a chosen list.
+const combinations = (items, size) => (size === 0 ? [[]] : items.flatMap(
+  (item, index) => combinations(items.slice(index + 1), size - 1).map((rest) => [item, ...rest]),
+));
+
+// Every ordered way to fill `size` stops from the roster.
+const arrangements = (items, size) => combinations(items, size).flatMap(permutations);
+
 // Every combination of installed refit packages. Refits change a formation's
 // capabilities, and capabilities decide how well it answers a stop's demands, so this
 // is a full dimension of the decision space rather than a cosmetic choice.
-export const refitCombinations = () => FORMATIONS.reduce(
-  (acc, formation) => acc.flatMap((partial) => formation.refits.map((refit) => ({ ...partial, [formation.id]: refit.id }))),
-  [{}],
-);
+// Varies only the formations actually being fielded. Enumerating the whole roster
+// would be 2^9 loadouts for a five-slot plan, most of them differing only in units
+// that never deploy.
+export const refitCombinations = (roster = null) => FORMATIONS
+  .filter((formation) => !roster || roster.includes(formation.id))
+  .reduce(
+    (acc, formation) => acc.flatMap((partial) => formation.refits.map((refit) => ({ ...partial, [formation.id]: refit.id }))),
+    [{}],
+  );
 
-export const sweepOperation = (operation = OPERATIONS[0], refits = defaultRefits()) => {
+// `roster` narrows which formations may be fielded. Sweeping the whole roster answers
+// the list question (which five) and the ordering question together, which is 544,320
+// outcomes; pinning the roster to exactly five answers the ordering question alone in
+// 4,320. Tests use whichever axis they are actually asserting about.
+export const sweepOperation = (operation = OPERATIONS[0], { refits = defaultRefits(), roster = null } = {}) => {
   const formations = resolveFormations(refits);
-  const formationIds = FORMATIONS.map((formation) => formation.id);
+  const formationIds = (roster ?? FORMATIONS.map((formation) => formation.id));
   const branchSets = breakpointsFor(operation).reduce((acc, breakpoint) => acc.flatMap(
     (partial) => breakpoint.options.map((option) => ({ ...partial, [breakpoint.id]: option.id })),
   ), [{}]);
@@ -50,7 +69,7 @@ export const sweepOperation = (operation = OPERATIONS[0], refits = defaultRefits
     const condition = missionPressureFor(pressure.id, operation.id);
     for (const basePlaybook of PLAYBOOKS) {
       const playbook = playbookForOperation(basePlaybook, operation);
-      for (const order of permutations(formationIds)) {
+      for (const order of arrangements(formationIds, playbook.roles.length)) {
         const assignments = Object.fromEntries(playbook.roles.map((role, index) => [role.id, order[index]]));
         const sequence = evaluateTacticalSequence(playbook, assignments, formations);
         const readiness = calculatePlacementReadiness(playbook, assignments, sequence.handoffs, condition, formations);
@@ -61,6 +80,8 @@ export const sweepOperation = (operation = OPERATIONS[0], refits = defaultRefits
           );
           rows.push({
             refits: Object.values(refits).join("+"),
+            // The list decision, independent of the order it is slotted in.
+            list: [...order].sort().join("+"),
             pressure: pressure.id,
             playbook: basePlaybook.id,
             order: order.join(">"),
@@ -148,8 +169,11 @@ export const balanceReport = (rows, operation) => {
 };
 
 // Sweeps every refit loadout as well as every placement. Far larger, so it is opt-in.
-export const sweepRefitSpace = (operation = OPERATIONS[0]) => refitCombinations()
-  .flatMap((refits) => sweepOperation(operation, refits));
+// Refits multiply the space by 32, so this pins the roster to a fixed five: it asks
+// whether a loadout can decide the mission, not which five to bring.
+export const REFIT_SWEEP_ROSTER = ["harpoon", "furnace", "breaker", "railjack", "hauler"];
+export const sweepRefitSpace = (operation = OPERATIONS[0]) => refitCombinations(REFIT_SWEEP_ROSTER)
+  .flatMap((refits) => sweepOperation(operation, { refits, roster: REFIT_SWEEP_ROSTER }));
 
 // Only print when run directly, so tests can import the sweep without side effects.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

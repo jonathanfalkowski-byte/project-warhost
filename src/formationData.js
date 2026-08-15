@@ -1,7 +1,11 @@
 import {
   Anchor,
+  Crosshair,
   Fire,
+  Flag,
   Hammer,
+  Lightning,
+  Radio,
   Shield,
   Truck,
 } from "@phosphor-icons/react";
@@ -102,6 +106,86 @@ export const FORMATIONS = [
     icon: Truck,
     defaultNode: "recoveryLine",
   },
+  {
+    id: "skimmer",
+    number: "6",
+    name: "SCOUT SKIMMER",
+    role: "DISPLACE",
+    movementProfile: "light-hover",
+    endurance: { armor: 2, cohesion: 3, mobility: 5 },
+    capabilities: ["MOBILITY", "SHOCK"],
+    refits: [
+      { id: "lance", name: "SHOCK LANCE", summary: "Fast strike package for hitting a lane before it closes.", capabilities: ["MOBILITY", "SHOCK"], creates: "DISPLACED" },
+      { id: "netgun", name: "SNARE PROJECTOR", summary: "Trades strike power for holding a lane shut.", capabilities: ["MOBILITY", "DENIAL"], creates: "SEALED LANE" },
+    ],
+    purpose: "Outruns the enemy timetable and hits an exposed lane before it can be reinforced.",
+    creates: "DISPLACED",
+    uses: ["SCREENED", "SUPPLIED", "OPEN CORE"],
+    // Placeholder art: reuses the recon portrait until a skimmer asset exists.
+    asset: "/assets/harpoon-rig.png",
+    icon: Lightning,
+    defaultNode: "alphaApproach",
+  },
+  {
+    id: "carriage",
+    number: "7",
+    name: "SIEGE GUN CARRIAGE",
+    role: "DENY",
+    movementProfile: "heavy-tracked",
+    endurance: { armor: 4, cohesion: 4, mobility: 2 },
+    capabilities: ["AREA", "HOLD"],
+    refits: [
+      { id: "barrage", name: "SATURATION BARRAGE", summary: "Blankets an approach and holds the ground behind it.", capabilities: ["AREA", "HOLD"], creates: "KILL ZONE" },
+      { id: "spotter", name: "SPOTTER MAST", summary: "Trades weight of fire for directing the advance.", capabilities: ["AREA", "CONTROL"], creates: "DISPLACED" },
+    ],
+    purpose: "Saturates an approach lane and holds the ground it has just swept.",
+    creates: "KILL ZONE",
+    uses: ["DISPLACED", "SCREENED", "BREACHED", "FORWARD HOLD"],
+    // Placeholder art: reuses the flame support portrait until a carriage asset exists.
+    asset: "/assets/furnace-crew.png",
+    icon: Crosshair,
+    defaultNode: "fireLine",
+  },
+  {
+    id: "command",
+    number: "8",
+    name: "COMMAND VEHICLE",
+    role: "HOLD",
+    movementProfile: "tracked",
+    endurance: { armor: 3, cohesion: 5, mobility: 3 },
+    capabilities: ["CONTROL", "SUPPORT"],
+    refits: [
+      { id: "relay", name: "FIELD RELAY", summary: "Keeps the advance coordinated and resupplied.", capabilities: ["CONTROL", "SUPPORT"], creates: "SUPPLIED" },
+      { id: "bastion", name: "BASTION UPLINK", summary: "Trades resupply for holding a seized objective.", capabilities: ["CONTROL", "HOLD"], creates: "FORWARD HOLD" },
+    ],
+    purpose: "Coordinates the advance from the objective it has taken, keeping the column supplied.",
+    creates: "SUPPLIED",
+    uses: ["DISPLACED", "OVERHEATED", "BREACHED", "SECURED BREACH"],
+    // Placeholder art: reuses the battle tank portrait until a command asset exists.
+    asset: "/assets/railjack.png",
+    icon: Radio,
+    defaultNode: "highWalk",
+  },
+  {
+    id: "bastion",
+    number: "9",
+    name: "SHIELD WALKER",
+    role: "BREACH",
+    movementProfile: "walker",
+    endurance: { armor: 5, cohesion: 4, mobility: 3 },
+    capabilities: ["COVER", "DENIAL"],
+    refits: [
+      { id: "wall", name: "SHIELD WALL", summary: "Screens the lane it is standing in.", capabilities: ["COVER", "DENIAL"], creates: "SCREENED" },
+      { id: "breachram", name: "BREACH RAM", summary: "Trades the screen for opening a sealed approach.", capabilities: ["COVER", "BREACH"], creates: "BREACHED" },
+    ],
+    purpose: "Walks into the open lane and screens it while the rest of the army moves through.",
+    creates: "SCREENED",
+    uses: ["DISPLACED", "OVERHEATED", "KILL ZONE", "SUPPLIED"],
+    // Placeholder art: reuses the assault walker portrait until a shield walker asset exists.
+    asset: "/assets/breaker-exo.png",
+    icon: Flag,
+    defaultNode: "breachLine",
+  },
 ];
 
 export const TACTICAL_TERM_LABELS = Object.freeze({
@@ -139,10 +223,20 @@ export const NODES = {
   rescuePen: { left: 69, top: 72, label: "Salvage enclosure" },
 };
 
+// One staging position per formation in the roster. The roster is larger than the
+// number of action stops, so several of these hold formations left in reserve.
 export const STAGING_NODES = {
-  harpoon: { left: 32, top: 10.5, label: "Formation staging" },
-  furnace: { left: 43, top: 10.5, label: "Formation staging" },
-  breaker: { left: 54, top: 10.5, label: "Formation staging" },
-  railjack: { left: 65, top: 10.5, label: "Formation staging" },
-  hauler: { left: 76, top: 10.5, label: "Formation staging" },
+  harpoon: { left: 26, top: 10.5, label: "Formation staging" },
+  furnace: { left: 32, top: 10.5, label: "Formation staging" },
+  breaker: { left: 38, top: 10.5, label: "Formation staging" },
+  railjack: { left: 44, top: 10.5, label: "Formation staging" },
+  hauler: { left: 50, top: 10.5, label: "Formation staging" },
+  skimmer: { left: 56, top: 10.5, label: "Formation staging" },
+  carriage: { left: 62, top: 10.5, label: "Formation staging" },
+  command: { left: 68, top: 10.5, label: "Formation staging" },
+  bastion: { left: 74, top: 10.5, label: "Formation staging" },
 };
+
+// Any formation added without a staging position still renders rather than crashing.
+export const stagingNodeFor = (formationId) => STAGING_NODES[formationId]
+  ?? { left: 50, top: 10.5, label: "Formation staging" };
