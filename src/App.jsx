@@ -219,6 +219,57 @@ function AppHeader({ phase, battleTime, operation, operationIndex, profile }) {
   );
 }
 
+// Everything neutral about a formation, at a readable size, without a click. Shows the
+// facts and lets the player compare them: capabilities and the stop's demands sit side
+// by side, but nothing here grades the fit, ranks a candidate, or reveals a resolved
+// combo. Those stay sealed until commitment.
+function FormationHoverCard({ formation, playbook, assignments, condition }) {
+  if (!formation) return null;
+  const Icon = formation.icon;
+  const roleIndex = playbook.roles.findIndex((role) => assignments[role.id] === formation.id);
+  const role = roleIndex >= 0 ? playbook.roles[roleIndex] : null;
+  const demands = role ? roleDemandsFor(role, roleIndex, condition) : [];
+  const refit = formation.activeRefit ?? formation.refits[0];
+  return (
+    // Anchored rather than following the pointer: predictable, never occludes what the
+    // player is pointing at, and needs no mousemove tracking to appear on first hover.
+    <aside className="formation-hover-card" aria-hidden="true">
+      <header>
+        <FormationPortrait formation={formation} compact />
+        <div>
+          <span>FORMATION {formation.number}</span>
+          <b>{formation.name}</b>
+          <small><Icon weight="duotone" /> {tacticalTerm(formation.role)} · {formation.movementProfile.replace(/-/g, " ").toUpperCase()}</small>
+        </div>
+      </header>
+      <p>{formation.purpose}</p>
+      <div className="hover-endurance">
+        {Object.entries(formation.endurance).map(([axis, value]) => (
+          <div key={axis}>
+            <span>{axis}</span>
+            <b>{value}</b>
+            <i><em style={{ width: `${Math.max(0, Math.min(5, value)) * 20}%` }} /></i>
+          </div>
+        ))}
+      </div>
+      <dl>
+        <div><dt>CAPABILITIES</dt><dd>{formation.capabilities.join(" · ")}</dd></div>
+        <div><dt>REFIT INSTALLED</dt><dd>{refit.name}</dd></div>
+        <div><dt>CREATES</dt><dd className="creates">{tacticalTerm(refit.creates ?? formation.creates)}</dd></div>
+        <div><dt>CAN REACT TO</dt><dd>{(formation.uses ?? []).map(tacticalTerm).join(" · ") || "—"}</dd></div>
+      </dl>
+      {role ? (
+        <footer className="assigned">
+          <span>ASSIGNED · STOP {String(roleIndex + 1).padStart(2, "0")} · {role.label}</span>
+          <small>THIS STOP DEMANDS {demands.map(tacticalTerm).join(" / ")}</small>
+        </footer>
+      ) : (
+        <footer><span>IN RESERVE</span><small>NOT DEPLOYED ON THIS PLAN</small></footer>
+      )}
+    </aside>
+  );
+}
+
 function FormationDossier({ formation, interactions, assignedRole, assignedIndex, readiness, phase, refitsLocked, onRefit }) {
   if (!formation) return null;
   const Icon = formation.icon;
@@ -2986,6 +3037,14 @@ export function App() {
         <Battlefield formations={formations} formationFates={operationFormationFates} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} draggingFormationId={draggingFormationId} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} previewPlaybookId={previewPlaybookId} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} routePreview={routePreview} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onClearRole={clearRoleAssignment} onFormationDragStart={beginFormationDrag} onFormationDragEnd={endFormationDrag} onRoutePreview={previewFormationRoute} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
         <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} blindTestActive={blindTestActive} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
+      {phase === "plan" && (
+        <FormationHoverCard
+          formation={formations.find((item) => item.id === hoveredFormationId) ?? null}
+          playbook={playbook}
+          assignments={assignments}
+          condition={condition}
+        />
+      )}
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} blindTestActive={blindTestActive} blindPrediction={blindPrediction} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />

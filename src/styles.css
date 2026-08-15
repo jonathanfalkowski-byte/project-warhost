@@ -1588,3 +1588,46 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
   .field-strike i, .field-strike span,
   .field-plan-position.struck, .field-plan-position.struck::after { animation-duration: 1ms; }
 }
+
+/* Formation hover card. Playtest finding: the stats, capabilities and combo vocabulary
+   that drive every decision were only readable in the cramped left rail, and only after
+   selecting a unit. This shows the same neutral facts at a legible size on hover, with
+   no click. It never grades a fit or reveals a sealed result. */
+.formation-hover-card {
+  position: fixed; z-index: 60; left: 268px; top: 88px; width: 340px; display: grid; gap: 8px; padding: 12px;
+  border: 1px solid #4f6a74; background: rgba(9, 16, 19, .97);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .7); pointer-events: none;
+}
+.formation-hover-card header { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; align-items: center; }
+.formation-hover-card header > div { display: grid; gap: 2px; min-width: 0; }
+.formation-hover-card header span { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.formation-hover-card header b { color: #f2f7f5; font-size: 17px; font-weight: 700; line-height: 1.05; }
+.formation-hover-card header small { display: flex; align-items: center; gap: 5px; color: #9fd0e0; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 600; letter-spacing: .09em; }
+.formation-hover-card header small svg { width: 14px; height: 14px; }
+.formation-hover-card > p { margin: 0; color: #c3d2cd; font-size: 12px; line-height: 1.35; }
+
+.hover-endurance { display: grid; gap: 4px; padding: 8px; border: 1px solid #33474e; background: rgba(14, 24, 27, .9); }
+.hover-endurance > div { display: grid; grid-template-columns: 74px 22px minmax(0, 1fr); align-items: center; gap: 8px; }
+.hover-endurance span { color: #93a8a2; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.hover-endurance b { color: #f0f5f2; font-size: 14px; font-weight: 700; text-align: right; }
+.hover-endurance i { display: block; height: 7px; background: #1d2a2e; border: 1px solid #3c5058; }
+.hover-endurance em { display: block; height: 100%; background: linear-gradient(90deg, #4f9db7, #86d9f0); }
+
+.formation-hover-card dl { margin: 0; display: grid; gap: 5px; }
+.formation-hover-card dl > div { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.formation-hover-card dt { color: #8fa39a; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.formation-hover-card dd { margin: 0; color: #e3ece8; font-family: "Barlow Condensed"; font-size: 12px; font-weight: 600; letter-spacing: .05em; }
+.formation-hover-card dd.creates { color: #f0cf7e; }
+
+.formation-hover-card footer { display: grid; gap: 2px; padding: 7px 8px; border-left: 3px solid #4f6a74; background: rgba(16, 26, 30, .9); }
+.formation-hover-card footer.assigned { border-left-color: #7fd4ff; }
+.formation-hover-card footer span { color: #cfe3ea; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+.formation-hover-card footer small { color: #9fb3ad; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .07em; }
+
+/* The combo-window strip was unreadable at its old scale — it carries the vocabulary the
+   whole stat-combo game runs on, so it gets room to breathe. */
+.handoff-heading > span { font-size: 14px; }
+.handoff-heading > small { font-size: 11px; }
+.handoff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.handoff-card .combo-window-time { font-size: 11px; }
+.handoff-board { padding-bottom: 4px; }
