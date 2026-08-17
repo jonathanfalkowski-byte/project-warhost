@@ -7,11 +7,14 @@ import {
   blindOutcomeFor,
   blindPredictionResult,
   strategyTrialFor,
+  strategyTrialIsLoadable,
   strategyTrialResult,
   strategyTrialsForPlaybook,
 } from "../src/strategyExperiment.js";
+import { FORMATIONS } from "../src/formationData.js";
+import { PLAYBOOKS } from "../src/playbookData.js";
 
-const FORMATION_IDS = new Set(["harpoon", "furnace", "breaker", "railjack", "hauler"]);
+const FORMATION_IDS = new Set(FORMATIONS.map((formation) => formation.id));
 const ROLE_IDS = {
   trapline: new Set(["pull", "burn", "break", "anchor", "recover"]),
   spear: new Set(["screen", "point", "punch", "suppress", "recover"]),
@@ -27,16 +30,30 @@ test("every playbook has aggressive, balanced, and cautious templates", () => {
   });
 });
 
-test("every template uses valid roles and every formation exactly once", () => {
+test("every template staffs every role with a distinct available formation", () => {
   STRATEGY_TRIALS.forEach((trial) => {
     assert.deepEqual(new Set(Object.keys(trial.assignments)), ROLE_IDS[trial.playbookId]);
-    assert.deepEqual(new Set(Object.values(trial.assignments)), FORMATION_IDS);
+    const assignedIds = Object.values(trial.assignments);
+    assert.equal(assignedIds.length, ROLE_IDS[trial.playbookId].size);
+    assert.equal(new Set(assignedIds).size, assignedIds.length);
+    assignedIds.forEach((formationId) => assert.equal(FORMATION_IDS.has(formationId), true));
     assert.deepEqual(new Set(Object.keys(trial.branches)), new Set(["beta", "rescue"]));
     assert.ok(["tempo", "protect"].includes(trial.branches.beta));
     assert.ok(["clock", "recover"].includes(trial.branches.rescue));
     assert.ok(trial.priority.length > 10);
     assert.ok(trial.sacrifice.length > 10);
   });
+});
+
+test("a five-stop template remains loadable from the larger roster", () => {
+  const trial = strategyTrialFor("trapline-balanced");
+  const playbook = PLAYBOOKS.find((item) => item.id === trial.playbookId);
+  assert.equal(FORMATIONS.length, 9, "the regression requires a bench larger than the plan");
+  assert.equal(playbook.roles.length, 5);
+  assert.equal(strategyTrialIsLoadable(trial, playbook, FORMATIONS), true);
+  assert.equal(strategyTrialIsLoadable({ ...trial, assignments: { ...trial.assignments, pull: "missing" } }, playbook, FORMATIONS), false);
+  assert.equal(strategyTrialIsLoadable({ ...trial, assignments: { ...trial.assignments, pull: trial.assignments.burn } }, playbook, FORMATIONS), false);
+  assert.equal(strategyTrialIsLoadable({ ...trial, assignments: { ...trial.assignments, extra: "skimmer" } }, playbook, FORMATIONS), false);
 });
 
 test("template lookup and filtering fail closed", () => {

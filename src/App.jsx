@@ -56,6 +56,7 @@ import {
   BLIND_PREDICTIONS,
   blindPredictionResult,
   strategyTrialFor,
+  strategyTrialIsLoadable,
   strategyTrialResult,
   strategyTrialsForPlaybook,
 } from "./strategyExperiment.js";
@@ -2868,9 +2869,7 @@ export function App() {
     if (phase !== "plan" || operationIndex !== 0 || formations.length !== FORMATIONS.length) return;
     const trial = strategyTrialFor(trialId);
     const trialPlaybook = PLAYBOOKS.find((item) => item.id === trial?.playbookId);
-    const formationIds = new Set(formations.map((formation) => formation.id));
-    const assignmentIds = Object.values(trial?.assignments ?? {});
-    if (!trial || !trialPlaybook || assignmentIds.length !== formations.length || assignmentIds.some((formationId) => !formationIds.has(formationId))) return;
+    if (!strategyTrialIsLoadable(trial, trialPlaybook, formations)) return;
 
     setPlaybookId(trial.playbookId);
     setRefits(defaultRefits());
