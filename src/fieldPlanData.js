@@ -107,7 +107,12 @@ export const ROLLING_SABOTAGE_FIELD_PLAN = {
     { id: "beta-reactor", from: "beta", to: "reactor", label: "SABOTAGE", roles: [0, 1, 2, 3] },
     { id: "reactor-extraction", from: "reactor", to: "eastGantry", label: "WITHDRAW EAST", roles: [0, 1, 2, 3, 4] },
   ],
-  positions: [{ x: 18, y: 88 }, { x: 30, y: 88 }, { x: 42, y: 88 }, { x: 56, y: 88 }, { x: 70, y: 88 }],
+  // Action stops sit on the ground each role is ordered to take or hold, not on the
+  // deployment line. LEAD seizes Control Alpha; RELAY GUARD holds the southern arc the
+  // lead has just cleared; SABOTAGE ELEMENT works the opened lane into the Reactor;
+  // CORRIDOR SECURITY holds the central gate every route passes through; RECOVERY works
+  // the southern recovery gate.
+  positions: [{ x: 27, y: 58 }, { x: 35, y: 73 }, { x: 62, y: 55 }, { x: 58, y: 66 }, { x: 76, y: 82 }],
   objectivePhases: objectivePhases(
     { label: "SEIZE ALPHA", target: "alpha", roles: [0, 1], from: "deployment" },
     { label: "SWEEP TO BETA", target: "beta", roles: [0, 1, 2], from: "alpha" },
@@ -115,11 +120,11 @@ export const ROLLING_SABOTAGE_FIELD_PLAN = {
     { label: "WITHDRAW EAST", target: "eastGantry", objectiveId: "extraction", roles: [0, 1, 2, 3, 4], from: "reactor" },
   ),
   routes: [
-    route(0, { x: 18, y: 91 }, [0, "westGate", "alpha", "alphaExit", "southArcWest", "southArcEast", "centralGateSouth", "betaApproach", "beta", "betaExit", "reactorApproach", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"], "LEAD THE STREET SWEEP TO THE EAST GANTRY", { walker: [0, "westGate", "alpha", "southArcWest", "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", "beta", "reactorApproach", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"] }),
-    route(1, { x: 30, y: 91 }, [1, "westGate", "alpha", "southArcWest", "southArcEast", "centralGateSouth", "beta", "reactorApproach", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"], "RELIEVE EACH CAPTURED OBJECTIVE", { walker: [1, "alpha", "southArcWest", "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", "beta", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"] }),
-    { ...route(2, { x: 42, y: 91 }, [2, "southArcEast", "centralGateSouth"], "JOIN AT BETA, THEN BREACH THE REACTOR", { walker: [2, "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit"] }), breakpoint: "beta" },
-    route(3, { x: 56, y: 91 }, [3, "southArcEast", "centralGateSouth", "betaApproach", "beta", "reactorApproach", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"], "SECURE THE COLUMN'S EASTERN SIDE"),
-    { ...route(4, { x: 70, y: 91 }, [4], "RECOVER THE COLUMN AND WITHDRAW EAST"), breakpoint: "rescue" },
+    route(0, { x: 18, y: 91 }, ["westGate", 0, "alphaExit", "southArcWest", "southArcEast", "centralGateSouth", "betaApproach", "beta", "betaExit", "reactorApproach", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"], "SEIZE CONTROL ALPHA, THEN LEAD THE SWEEP EAST", { walker: ["westGate", 0, "southArcWest", "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", "beta", "reactorApproach", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"] }),
+    route(1, { x: 30, y: 91 }, ["westGate", "alpha", 1, "southArcEast", "centralGateSouth", "beta", "reactorApproach", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"], "HOLD THE SOUTHERN ARC BEHIND THE LEAD", { walker: ["alpha", 1, "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", "beta", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"] }),
+    { ...route(2, { x: 42, y: 91 }, ["southArcEast", "centralGateSouth", 2], "WORK THE OPENED LANE INTO THE REACTOR", { walker: ["walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", 2] }), breakpoint: "beta" },
+    route(3, { x: 56, y: 91 }, ["southArcEast", 3, "betaApproach", "beta", "reactorApproach", "reactor", "reactorSouthEast", "eastServiceSouth", "gantrySouthEast"], "HOLD THE CENTRAL GATE THE COLUMN PASSES THROUGH"),
+    { ...route(4, { x: 70, y: 91 }, [4], "WORK THE SOUTHERN RECOVERY GATE, THEN WITHDRAW EAST"), breakpoint: "rescue" },
   ],
   breakpointRoles: { beta: 2, rescue: 4 },
   branchRoutes: eastExitBranches,
@@ -146,7 +151,10 @@ export const DECISIVE_ASSAULT_FIELD_PLAN = {
     { id: "mass-reactor", from: "beta", to: "reactor", label: "MAIN THRUST", roles: [1, 2, 3] },
     { id: "reactor-north", from: "reactor", to: "northLift", label: "EXTRACT NORTH", roles: [0, 1, 2, 3, 4] },
   ],
-  positions: [{ x: 20, y: 88 }, { x: 38, y: 88 }, { x: 47, y: 88 }, { x: 56, y: 88 }, { x: 68, y: 88 }],
+  // SCREENING holds Control Alpha while the army masses; ADVANCE GUARD secures the narrow
+  // northern crossing; ASSAULT works the launch point onto the Reactor; FLANK SECURITY
+  // holds the Beta approach against reinforcement; REAR works the recovery gate.
+  positions: [{ x: 27, y: 58 }, { x: 64, y: 16 }, { x: 64, y: 56 }, { x: 64, y: 46 }, { x: 76, y: 82 }],
   objectivePhases: objectivePhases(
     { label: "SCREEN ALPHA", target: "alpha", roles: [0], from: "deployment" },
     { label: "MASS ON BETA", target: "beta", roles: [1, 2, 3], from: "deployment" },
@@ -154,11 +162,11 @@ export const DECISIVE_ASSAULT_FIELD_PLAN = {
     { label: "SECURE NORTH LIFT", target: "northLift", objectiveId: "extraction", roles: [0, 1, 2, 3, 4], from: "reactor" },
   ),
   routes: [
-    route(0, { x: 20, y: 91 }, [0, "westGate", "alpha", "westNorthGate", "northCrossing", "beta", "reactorApproach", "reactor", "reactorNorthWest", "northExitEast"], "SCREEN ALPHA, THEN JOIN THE NORTHERN THRUST", { walker: [0, "alpha", "southArcWest", "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", "beta", "reactorApproach", "reactor", "reactorNorthWest", "northExitEast"] }),
-    route(1, { x: 38, y: 91 }, [1, "southArcWest", "westGate", "westNorthGate", "northCrossing", "beta", "reactorApproach", "reactor", "reactorNorthWest", "northExitEast"], "MASS THROUGH THE NORTH PERIMETER"),
-    { ...route(2, { x: 47, y: 91 }, [2, "southArcEast", "centralGateSouth"], "BREACH FROM BETA INTO THE REACTOR", { walker: [2, "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit"] }), breakpoint: "beta" },
-    route(3, { x: 56, y: 91 }, [3, "southArcEast", "centralGateSouth", "betaApproach", "beta", "reactorApproach", "reactor", "reactorNorthWest", "northExitEast"], "ANCHOR THE CONCENTRATED BETA APPROACH"),
-    { ...route(4, { x: 68, y: 91 }, [4], "RECOVER THE ASSAULT MASS TO THE NORTH LIFT"), breakpoint: "rescue" },
+    route(0, { x: 20, y: 91 }, ["westGate", 0, "westNorthGate", "northCrossing", "beta", "reactorApproach", "reactor", "reactorNorthWest", "northExitEast"], "SCREEN CONTROL ALPHA WHILE THE ARMY MASSES", { walker: ["westGate", 0, "southArcWest", "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", "beta", "reactorApproach", "reactor", "reactorNorthWest", "northExitEast"] }),
+    route(1, { x: 38, y: 91 }, ["southArcWest", "westGate", "westNorthGate", 1, "beta", "reactorApproach", "reactor", "reactorNorthWest", "northExitEast"], "SECURE THE NARROW NORTHERN CROSSING"),
+    { ...route(2, { x: 47, y: 91 }, ["southArcEast", "centralGateSouth", 2], "LAUNCH THE ASSAULT ONTO THE REACTOR", { walker: ["walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", 2] }), breakpoint: "beta" },
+    route(3, { x: 56, y: 91 }, ["southArcEast", "centralGateSouth", 3, "beta", "reactorApproach", "reactor", "reactorNorthWest", "northExitEast"], "HOLD THE BETA APPROACH AGAINST REINFORCEMENT"),
+    { ...route(4, { x: 68, y: 91 }, [4], "WORK THE RECOVERY GATE, THEN LIFT NORTH"), breakpoint: "rescue" },
   ],
   breakpointRoles: { beta: 2, rescue: 4 },
   branchRoutes: northExitBranches,
@@ -185,7 +193,11 @@ export const TWIN_SEIZURE_FIELD_PLAN = {
     { id: "east-wing", from: "beta", to: "reactor", label: "EAST WING", roles: [1, 3] },
     { id: "reactor-south", from: "reactor", to: "southMotorPool", label: "CONVERGE SOUTH", roles: [0, 1, 2, 3, 4] },
   ],
-  positions: [{ x: 16, y: 88 }, { x: 48, y: 88 }, { x: 27, y: 88 }, { x: 58, y: 88 }, { x: 90, y: 76 }],
+  // Read against this plan's own role briefs: WEST and EAST OBJECTIVE GROUPS take Alpha
+  // and Beta, INTERDICTION holds the northern crossing that links the two fights,
+  // CONVERGENCE forms on the reactor approach where both wings meet, and EXTRACTION
+  // GUARD works the southern withdrawal road.
+  positions: [{ x: 27, y: 58 }, { x: 70, y: 43 }, { x: 60, y: 18 }, { x: 72, y: 50 }, { x: 81, y: 82 }],
   objectivePhases: objectivePhases(
     { label: "WEST WING: ALPHA", target: "alpha", roles: [0, 2], from: "deployment" },
     { label: "EAST WING: BETA", target: "beta", roles: [1, 3], from: "deployment" },
@@ -193,11 +205,11 @@ export const TWIN_SEIZURE_FIELD_PLAN = {
     { label: "WITHDRAW SOUTH", target: "southMotorPool", objectiveId: "extraction", roles: [0, 1, 2, 3, 4], from: "reactor" },
   ),
   routes: [
-    route(0, { x: 16, y: 91 }, [0, "westGate", "alpha", "westNorthGate", "northCrossing", "reactorNorth", "reactor", "reactorSouthEast", "reactorLowerGate", "southExit"], "HOLD ALPHA, THEN WITHDRAW TO SOUTH MOTOR POOL"),
-    { ...route(1, { x: 48, y: 91 }, [1, "southArcEast", "centralGateSouth", "betaApproach"], "TAKE BETA, THEN WITHDRAW TO SOUTH MOTOR POOL"), breakpoint: "beta" },
-    route(2, { x: 27, y: 91 }, [2, "alpha", "westNorthGate", "northCrossing", "reactorNorth", "reactor", "reactorSouthEast", "reactorLowerGate", "southExit"], "SUPPORT WEST WING TO SOUTH MOTOR POOL", { walker: [2, "alpha", "southArcWest", "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", "centralGateNorth", "northCrossing", "reactorNorth", "reactor", "reactorSouthEast", "reactorLowerGate", "southExit"] }),
-    route(3, { x: 58, y: 91 }, [3, "southArcEast", "centralGateSouth", "betaApproach", "beta", "reactorApproach", "reactor", "reactorSouthEast", "reactorLowerGate", "southExit"], "SUPPORT EAST WING TO SOUTH MOTOR POOL"),
-    { ...route(4, { x: 92, y: 72 }, [4], "GUARD THE SOUTHERN WITHDRAWAL TO SOUTH MOTOR POOL"), breakpoint: "rescue" },
+    route(0, { x: 16, y: 91 }, ["westGate", 0, "westNorthGate", "northCrossing", "reactorNorth", "reactor", "reactorSouthEast", "reactorLowerGate", "southExit"], "SEIZE AND HOLD CONTROL ALPHA"),
+    { ...route(1, { x: 48, y: 91 }, ["southArcEast", "centralGateSouth", "betaApproach", 1], "SEIZE AND HOLD CONTROL BETA"), breakpoint: "beta" },
+    route(2, { x: 27, y: 91 }, ["alpha", "westNorthGate", 2, "reactorNorth", "reactor", "reactorSouthEast", "reactorLowerGate", "southExit"], "HOLD THE NORTHERN CROSSING BETWEEN THE TWO FIGHTS", { walker: ["alpha", "southArcWest", "walkerRuinSouthEntry", "walkerRuinCore", "walkerRuinExit", "centralGateNorth", 2, "reactorNorth", "reactor", "reactorSouthEast", "reactorLowerGate", "southExit"] }),
+    route(3, { x: 58, y: 91 }, ["southArcEast", "centralGateSouth", "betaApproach", "beta", 3, "reactor", "reactorSouthEast", "reactorLowerGate", "southExit"], "UNITE BOTH WINGS ON THE REACTOR APPROACH"),
+    { ...route(4, { x: 92, y: 72 }, [4], "GUARD THE SOUTHERN WITHDRAWAL ROAD"), breakpoint: "rescue" },
   ],
   breakpointRoles: { beta: 1, rescue: 4 },
   branchRoutes: southExitBranches,

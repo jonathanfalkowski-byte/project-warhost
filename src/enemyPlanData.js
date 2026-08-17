@@ -104,6 +104,14 @@ export const ASHEN_PASSAGE_ENEMY_PLAN = {
   ],
 };
 
+// Which player action stops are in position to answer each enemy order. Stops 01/02
+// can respond to the enemy's opening, 03/04 to its middle order, 05 to its last.
+// The resolution pipeline scores engagements through these windows, and the planning
+// counter-board reads the same windows to tell the player which stop has to hold the
+// counter. Both must use this constant or the board would advise against a different
+// fight than the one that actually resolves.
+export const ENEMY_RESPONSE_WINDOWS = [[0, 1], [2, 3], [4]];
+
 export const ENEMY_PLANS = {
   "dead-circuit": DEAD_CIRCUIT_ENEMY_PLAN,
   "ashen-passage": ASHEN_PASSAGE_ENEMY_PLAN,

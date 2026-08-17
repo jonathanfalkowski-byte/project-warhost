@@ -90,9 +90,17 @@ export const victoryGradeFor = ({
   };
 };
 
+// `deployedIds` is the list of formations actually staffed onto action stops. It matters
+// because the roster is larger than the plan: a nine-formation roster fielding five left
+// four in reserve, and those four were previously handed fates as if they had fought.
+// Reserves carry no battlefield consequences, so they sorted last in `exposedFirst` and
+// absorbed the "extracted" slots, while every formation the player actually fielded and
+// watched reach the gantry was reported MISSING. Extraction is a fact about the units on
+// the field; formations that never deployed are neither extracted nor lost.
 export const formationFatesFor = ({
   formations = [],
   formationOrderIds = [],
+  deployedIds = null,
   extractedCount = 0,
   consequences = {},
   campaignDestroyed = false,
@@ -108,15 +116,24 @@ export const formationFatesFor = ({
     ...(Array.isArray(formationOrderIds) ? formationOrderIds : []),
     ...validFormations.map((formation) => formation.id),
   ])].filter((formationId) => byId.has(formationId));
+  // Omitting `deployedIds` keeps the old whole-roster behaviour, so a caller that has no
+  // plan to describe (a campaign summary, a test fixture) still gets fates for everyone.
+  const deployedSet = Array.isArray(deployedIds) && deployedIds.length > 0
+    ? new Set(deployedIds.filter((formationId) => byId.has(formationId)))
+    : null;
+  const wasDeployed = (formationId) => !deployedSet || deployedSet.has(formationId);
   const ordered = orderedIds.map((formationId, orderIndex) => ({
     formation: byId.get(formationId),
     orderIndex,
     consequence: consequences?.[formationId] ?? null,
+    deployed: wasDeployed(formationId),
   }));
-  const safeExtractedCount = Math.max(0, Math.min(ordered.length, Math.floor(Number(extractedCount) || 0)));
-  const unaccountedCount = ordered.length - safeExtractedCount;
+  // Every count below is over the fielded force only.
+  const fielded = ordered.filter((item) => item.deployed);
+  const safeExtractedCount = Math.max(0, Math.min(fielded.length, Math.floor(Number(extractedCount) || 0)));
+  const unaccountedCount = fielded.length - safeExtractedCount;
   const protectedIds = new Set(Array.isArray(protectedFormationIds) ? protectedFormationIds : []);
-  const exposedFirst = [...ordered].sort((left, right) => {
+  const exposedFirst = [...fielded].sort((left, right) => {
     if (safeExtractedCount > 0) {
       const protectionDifference = Number(protectedIds.has(left.formation.id)) - Number(protectedIds.has(right.formation.id));
       if (protectionDifference) return protectionDifference;
@@ -146,7 +163,24 @@ export const formationFatesFor = ({
     Math.round(safeExtractionAt + ((index + 1) / (unaccountedSequence.length + 1)) * (safeCompleteAt - safeExtractionAt)),
   ]));
 
-  return ordered.map(({ formation, orderIndex, consequence }) => {
+  return ordered.map(({ formation, orderIndex, consequence, deployed }) => {
+    // A formation left in reserve did not take part. It is not extracted (it never had to
+    // clear anything) and it is certainly not missing, so it gets its own fate rather
+    // than being scored against an operation it sat out.
+    if (!deployed) {
+      return {
+        formation,
+        formationId: formation.id,
+        orderIndex,
+        consequence: null,
+        fate: "reserve",
+        label: "IN RESERVE",
+        battleLabel: "IN RESERVE",
+        at: safeCompleteAt,
+        history: [],
+        detail: "Held in reserve; not committed to this operation.",
+      };
+    }
     const consequenceAt = Math.max(0, Math.min(safeCompleteAt, Math.floor(Number(consequence?.at) || safeExtractionAt)));
     const consequenceLabel = typeof consequence?.label === "string"
       ? consequence.label

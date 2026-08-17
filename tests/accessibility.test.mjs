@@ -115,7 +115,9 @@ test("contact is drawn on the map, not only announced in a banner", () => {
   assert.match(css, /\.field-strike/);
   assert.match(css, /@keyframes strikeRing/);
   // Motion is decoration here; it must not be forced on people who have opted out.
-  const reduced = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+  // Every reduced-motion block is searched, not just the last one: inspecting only the
+  // final block meant appending an unrelated one silently disarmed this guard.
+  const reduced = css.split("@media (prefers-reduced-motion: reduce)").slice(1).join("\n");
   assert.match(reduced, /field-strike/);
   assert.match(reduced, /struck/);
 });
@@ -127,4 +129,96 @@ test("battle time eases across a beat rather than snapping to it", () => {
   const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(app, /requestAnimationFrame\(tick\)/, "battleTime no longer eases across the beat");
   assert.match(app, /cancelAnimationFrame\(frame\)/, "the animation frame must be cancelled on cleanup");
+});
+
+test("the counter-board announces coverage changes and never leaks a result", () => {
+  // The board updates as the player places formations. A sighted player sees the colour
+  // change; a screen reader user needs it announced, or the surface is sighted-only.
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const board = app.slice(app.indexOf("function EnemyCounterBoard"), app.indexOf("function EnemyPlanIntel"));
+  assert.match(board, /role="status"/, "coverage changes are not announced");
+  assert.match(board, /aria-live="polite"/);
+  // Planning-phase copy must never carry an outcome; concealment before commitment is
+  // the whole reason the board reports capability coverage rather than resolution.
+  for (const leak of ["playerScore", "resolution", "disrupted", "extractedCount"]) {
+    assert.equal(board.includes(leak), false, `counter-board renders ${leak}`);
+  }
+});
+
+test("effectiveness is legible without relying on colour alone", () => {
+  // Grade is carried by a class that only changes hue, so the number and the grade word
+  // both have to be in the text or the readout is unusable to a colour-blind player.
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const section = app.slice(app.indexOf('className="formation-effectiveness"'), app.indexOf("strategy-outcome-story"));
+  assert.match(section, /\{row\.effectiveness\}%/, "the score is not stated numerically");
+  assert.match(section, /<em>\{row\.grade\}<\/em>/, "the grade word is not stated");
+  assert.match(section, /aria-label="How effective each formation was/);
+  // The bar duplicates the number, so it must not be announced twice.
+  assert.match(section, /className="effectiveness-bar" aria-hidden="true"/);
+  assert.match(css, /\.formation-effectiveness li\.grade-ineffective/);
+});
+
+test("the formation hover card is positioned, not parked", () => {
+  // Playtest findings, 15 Aug 2026, in both directions. First it was anchored at the
+  // map's top-left and hid the objective markers. Then it was parked in the left rail,
+  // where it stopped occluding anything but answered from nowhere near the row being
+  // hovered. It is now anchored to the hovered element itself.
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const card = css.slice(css.indexOf(".formation-hover-card {"), css.indexOf(".formation-hover-card header"));
+
+  // No hard-coded corner: position comes from the measured anchor.
+  assert.equal(/\n\s*(left|top):\s*-?\d/.test(card), false, "the card still hard-codes a corner position");
+  assert.match(card, /position: fixed/);
+  assert.match(app, /hoverCardPlacementFor\(/, "the card is not placed against its anchor");
+  // Both hover sources must report the element, or the card cannot find the row.
+  assert.equal(
+    (app.match(/onInspect\(formation\.id, event\.currentTarget\)/g) ?? []).length,
+    4,
+    "a hover source does not report the element it is anchored to",
+  );
+  // It must stay scrollable rather than running off a short viewport.
+  assert.match(card, /max-height/);
+  assert.match(card, /overflow:\s*auto/);
+  // The notch is what makes "beside this unit" legible rather than merely nearby.
+  assert.match(css, /\.formation-hover-card::before/);
+  assert.match(css, /var\(--notch-top/);
+});
+
+test("every lane colour is legible as the route-preview accent", () => {
+  // The preview label's accent is now the previewed stop's own lane colour rather than a
+  // single hard-coded gold, so all five have to clear AA on the label panel — not just
+  // whichever one happened to be checked when the change was made.
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const background = "#0a1213"; // .field-route-preview-label, rgba(10, 18, 19, .96) over the map
+  const lanes = [...css.matchAll(/\.lane-(\d) \{ --route-color: (#[0-9a-fA-F]{6})/g)];
+  assert.equal(lanes.length, 5, "the lane palette changed size");
+  const failures = lanes
+    .map(([, lane, colour]) => ({ lane, colour, ratio: contrastRatio(colour, background) }))
+    .filter(({ ratio }) => ratio < 4.5)
+    .map(({ lane, colour, ratio }) => `lane-${lane}: ${colour} = ${ratio.toFixed(2)}:1`);
+  assert.deepEqual(failures, [], `lane colours below 4.5:1 on the preview label:\n${failures.join("\n")}`);
+});
+
+test("the route preview reads as a preview without relying on its hue", () => {
+  // Colour identifies which action stop, everywhere on the map. The preview used to
+  // override it with one gold, so hovering any stop previewed identically. Preview is
+  // now carried by weight, opacity, rim and label — cues that survive the hue change.
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const rule = css.slice(
+    css.indexOf(".field-plan-layer.planning .field-plan-segment.route-preview {"),
+    css.indexOf(".field-plan-layer.planning .field-plan-segment.route-preview::before"),
+  );
+  assert.equal(/--route-color:\s*#/.test(rule), false, "the preview still overrides the lane colour");
+  assert.match(rule, /background: var\(--route-color/);
+  // The preview segment and its label must both carry the previewed stop's lane.
+  assert.match(app, /route-preview lane-\$\{previewRoleIndex \+ 1\}/);
+  assert.match(app, /field-route-preview-label lane-\$\{previewRoleIndex \+ 1\}/);
+  // Non-hue preview cues, so the state is still unmistakable.
+  assert.match(rule, /height: 7px/);
+  assert.match(rule, /opacity: 1/);
+  assert.match(rule, /box-shadow: 0 0 8px #071013/);
+  assert.match(app, /PREVIEW ONLY/);
 });

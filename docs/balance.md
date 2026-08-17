@@ -363,3 +363,80 @@ Run it after any change to formation capabilities, refits, playbook timing, miss
 pressure, breakpoint impacts, or enemy plans. It is the cheapest way to find out
 whether a tuning change did what you intended across the whole space instead of in the
 one configuration you happened to play.
+
+## 15 August 2026 — enemy legibility pass (no balance change)
+
+Three playtest findings, all about what the player can *read* rather than what the
+numbers do. Recorded here because the counter-board discloses authored balance data that
+was previously invisible, so a future balance change now has a second surface to keep
+honest.
+
+**Sweep after the change: identical.** 544,320 outcomes, overall win rate 12.7%, 0 orders
+that always win, 5,621 that never do, all three pressures winnable, best order differing
+per pressure, combos helpful (9.0% → 14.4% → 20.2%) and never mandatory. The counter-board
+is a read-only projection of data the pipeline already used, so this is the expected
+result and the evidence that it changed no outcome.
+
+### What was disclosed
+
+`src/enemyCounterIntel.js` surfaces, during planning only:
+
+| Tier | Identity | Clock | Cost | Counter capabilities |
+|---|---|---|---|---|
+| `KNOWN` | yes | yes | yes | yes |
+| `UNCERTAIN` | yes | — | — | yes |
+| `UNKNOWN` | — | — | — | — |
+
+Plus, per order, whether the formations currently placed in its response window hold the
+counter — `answered` / `partial` / `open` / `unstaffed` / `dark`.
+
+This is the first time the authored `counterCapabilities` table has been visible before
+commitment. It makes the placement puzzle legible without revealing a resolution: the
+player learns *what breaks this order*, not *whether their plan wins*.
+
+**Balance consequence to watch.** A capability that appears in many
+`counterCapabilities` entries is now much more visibly valuable than one that appears in
+none. Current spread across both operations' orders:
+
+- `CONTROL`, `DENIAL`, `BREACH`, `SHOCK`, `RECOVERY`, `HOLD`, `COVER` all appear.
+- No capability appears in more than two of the six authored orders.
+
+If a future roster or enemy plan pushes one capability into four or more orders, the
+counter-board will correctly tell every player to bring it, and the list decision
+narrows. Check this alongside the usual sweep.
+
+### Per-unit effectiveness
+
+`src/formationEffectiveness.js` scores each staffed stop 40/20/40 across stop fit, combo
+windows, and counter coverage. The weighting is deliberate: combos are capped at 20 so a
+maxed combo score (20) cannot outweigh a maxed fit or counter score (40 each). A
+well-comboed but badly placed list must not read as fine.
+
+Sample, `harpoon > furnace > breaker > railjack > hauler` under `fractured-transit`:
+
+| Stop | Formation | Score | Fit | Counter | Combo |
+|---|---|---|---|---|---|
+| 01 | RECON TANK | 60% PARTIAL | 50% | 50% vs E1 | 100% |
+| 02 | FLAME SUPPORT VEHICLE | 40% PARTIAL | 0% | 50% vs E1 | 100% |
+| 03 | ASSAULT WALKER | 70% EFFECTIVE | 50% | 100% vs E2 | 50% |
+| 04 | MAIN BATTLE TANK | 20% INEFFECTIVE | 50% | 0% vs E2 | 0% |
+| 05 | ARMOURED RECOVERY VEHICLE | 40% PARTIAL | 50% | 50% vs E3 | 0% |
+
+The list average (46%) moving with list quality is asserted in
+`tests/formation-effectiveness.test.mjs`; a readout that did not move in the same
+direction as the decision would be worse than none.
+
+### Route legibility
+
+The field drew all three enemy routes plus the reinforcement lane permanently. Now at
+most one enemy route is drawn at any moment, asserted second-by-second across every
+operation and pressure. This required authored order clocks to stay at least
+`ENEMY_ROUTE_LEAD_SECONDS` (60s) apart — currently 90 / 225 / 330 in both plans, so the
+tightest gap is 105s. A new order authored inside that gap fails
+`tests/enemy-route-visibility.test.mjs` rather than silently reintroducing the overlap.
+
+### Tooling fix
+
+`balanceReport` used `Math.max(...group)`, which overflowed the call stack once the
+default sweep became the full nine-formation roster (~180k rows per group). Replaced with
+a reduce.

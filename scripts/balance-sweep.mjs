@@ -99,6 +99,9 @@ export const sweepOperation = (operation = OPERATIONS[0], { refits = defaultRefi
 };
 
 const rate = (rows) => (rows.length ? rows.filter((row) => row.won).length / rows.length : 0);
+// Reduce rather than Math.max(...spread): the full-roster sweep puts ~180k rows in a
+// single group, and spreading that many arguments overflows the call stack.
+const maxExtracted = (rows) => rows.reduce((best, row) => (row.extracted > best ? row.extracted : best), 0);
 const percent = (value) => `${(100 * value).toFixed(1)}%`;
 const groupBy = (rows, key) => rows.reduce((acc, row) => { (acc[key(row)] ||= []).push(row); return acc; }, {});
 
@@ -130,13 +133,13 @@ export const balanceReport = (rows, operation) => {
 
   say("TOTAL-ARMY PLAYS  (each should be viable, not a trap)");
   for (const [play, group] of Object.entries(groupBy(rows, (row) => row.playbook))) {
-    say(`  ${play.padEnd(10)} win ${percent(rate(group)).padStart(6)}   best extraction ${Math.max(...group.map((r) => r.extracted))}`);
+    say(`  ${play.padEnd(10)} win ${percent(rate(group)).padStart(6)}   best extraction ${maxExtracted(group)}`);
   }
   say();
 
   say("MISSION PRESSURES (every disclosed pressure must be winnable)");
   for (const [pressure, group] of Object.entries(groupBy(rows, (row) => row.pressure))) {
-    const best = Math.max(...group.map((r) => r.extracted));
+    const best = maxExtracted(group);
     const flag = group.some((r) => r.won) ? "" : "   <-- UNWINNABLE";
     say(`  ${pressure.padEnd(20)} win ${percent(rate(group)).padStart(6)}   best extraction ${best}${flag}`);
   }

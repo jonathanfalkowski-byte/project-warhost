@@ -322,14 +322,21 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .field-plan-layer.planning .field-plan-segment.staffed.movement-walker { height: 2px; background: transparent; border-top: 3px dashed var(--route-color); box-shadow: 0 0 8px rgba(var(--route-rgb, 102, 206, 244), .48); }
 .field-plan-layer.planning .field-plan-segment.staffed.movement-walker::before { display: none; }
 .field-plan-layer.planning .field-plan-segment.staffed.movement-vehicle { height: 5px; border-top: 1px solid rgba(var(--route-rgb, 102, 206, 244), .72); border-bottom: 1px solid rgba(var(--route-rgb, 102, 206, 244), .72); }
-.field-plan-layer.planning .field-plan-segment.route-preview { --route-color: #ffd45e; --route-rgb: 255, 212, 94; z-index: 8; height: 7px; opacity: 1; pointer-events: none; background: #ffd45e; box-shadow: 0 0 8px #071013, 0 0 20px rgba(255, 212, 94, .9); }
+/* The preview keeps its own action stop's lane colour rather than forcing a single gold.
+   Colour identifies WHICH stop across the whole map, so overriding it during preview
+   destroyed that mapping precisely when the player was asking "where does stop 4 go?" —
+   every stop previewed the same. Preview is now signalled by the things that do not
+   collide with hue: four to seven times the weight of a planning-state route, full
+   opacity while everything else is suppressed, a hard dark rim so the line reads against
+   any terrain, and the PREVIEW ONLY label. */
+.field-plan-layer.planning .field-plan-segment.route-preview { z-index: 8; height: 7px; opacity: 1; pointer-events: none; background: var(--route-color, #66cef4); box-shadow: 0 0 8px #071013, 0 0 22px rgba(var(--route-rgb, 102, 206, 244), .95); }
 .field-plan-layer.planning .field-plan-segment.route-preview::before { display: none; }
-.field-plan-layer.planning .field-plan-segment.route-preview.movement-walker { height: 5px; background: transparent; border-top: 5px dashed #ffd45e; }
-.field-plan-layer.planning .field-plan-segment.route-preview.movement-vehicle { height: 7px; background: #ffd45e; border: 1px solid #fff0a0; }
-.field-route-preview-label { position: absolute; z-index: 10; transform: translate(-50%, -120%); display: grid; gap: 2px; min-width: 180px; padding: 7px 9px; border: 1px solid #ffd45e; background: rgba(10, 18, 19, .96); color: #fff3b8; box-shadow: 0 0 18px rgba(255, 212, 94, .35); pointer-events: none; }
-.field-route-preview-label b { color: #ffd45e; }
+.field-plan-layer.planning .field-plan-segment.route-preview.movement-walker { height: 5px; background: transparent; border-top: 5px dashed var(--route-color, #66cef4); }
+.field-plan-layer.planning .field-plan-segment.route-preview.movement-vehicle { height: 7px; background: var(--route-color, #66cef4); border: 1px solid rgba(255, 255, 255, .55); }
+.field-route-preview-label { position: absolute; z-index: 10; transform: translate(-50%, -120%); display: grid; gap: 2px; min-width: 180px; padding: 7px 9px; border: 1px solid var(--route-color, #66cef4); background: rgba(10, 18, 19, .96); color: #eef6f3; box-shadow: 0 0 18px rgba(var(--route-rgb, 102, 206, 244), .38); pointer-events: none; }
+.field-route-preview-label b { color: var(--route-color, #66cef4); }
 .field-route-preview-label span { font-weight: 800; }
-.field-route-preview-label small { color: #d5c98f; }
+.field-route-preview-label small { color: #b9c8c2; }
 .field-route-preview-label.movement-walker { border-style: dashed; }
 
 /* Visually hidden, but present in the accessibility tree. Used for the route-preview
@@ -1593,12 +1600,27 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
    that drive every decision were only readable in the cramped left rail, and only after
    selecting a unit. This shows the same neutral facts at a legible size on hover, with
    no click. It never grades a fit or reveals a sealed result. */
+/* Anchored beside the formation being hovered — `left`/`top` come from
+   hoverCardPlacement.js, which measures the hovered row and keeps the card inside the
+   band between header and footer. Two earlier versions were wrong in opposite ways: one
+   followed the pointer and missed its first hover, one sat in a fixed corner and
+   answered from nowhere near the unit being asked about. */
 .formation-hover-card {
-  position: fixed; z-index: 60; left: 268px; top: 88px; width: 340px; display: grid; gap: 8px; padding: 12px;
-  border: 1px solid #4f6a74; background: rgba(9, 16, 19, .97);
-  box-shadow: 0 14px 38px rgba(0, 0, 0, .7); pointer-events: none;
+  position: fixed; z-index: 60; width: 268px;
+  max-height: calc(100vh - 176px); overflow: auto; overscroll-behavior: contain;
+  display: grid; gap: 7px; padding: 10px;
+  border: 1px solid #4f6a74; background: rgba(9, 16, 19, .98);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .82); pointer-events: none;
+  scrollbar-width: thin; scrollbar-color: #3a4540 #111;
 }
-.formation-hover-card header { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; align-items: center; }
+/* Points back at the row, and keeps pointing at it after the card clamps to the band. */
+.formation-hover-card::before {
+  content: ""; position: absolute; left: -7px; top: var(--notch-top, 20px);
+  width: 12px; height: 12px; transform: translateY(-50%) rotate(45deg);
+  border-left: 1px solid #4f6a74; border-bottom: 1px solid #4f6a74;
+  background: rgba(9, 16, 19, .98);
+}
+.formation-hover-card header { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; align-items: center; }
 .formation-hover-card header > div { display: grid; gap: 2px; min-width: 0; }
 .formation-hover-card header span { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
 .formation-hover-card header b { color: #f2f7f5; font-size: 17px; font-weight: 700; line-height: 1.05; }
@@ -1607,14 +1629,14 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .formation-hover-card > p { margin: 0; color: #c3d2cd; font-size: 12px; line-height: 1.35; }
 
 .hover-endurance { display: grid; gap: 4px; padding: 8px; border: 1px solid #33474e; background: rgba(14, 24, 27, .9); }
-.hover-endurance > div { display: grid; grid-template-columns: 74px 22px minmax(0, 1fr); align-items: center; gap: 8px; }
+.hover-endurance > div { display: grid; grid-template-columns: 58px 18px minmax(0, 1fr); align-items: center; gap: 6px; }
 .hover-endurance span { color: #93a8a2; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
 .hover-endurance b { color: #f0f5f2; font-size: 14px; font-weight: 700; text-align: right; }
 .hover-endurance i { display: block; height: 7px; background: #1d2a2e; border: 1px solid #3c5058; }
 .hover-endurance em { display: block; height: 100%; background: linear-gradient(90deg, #4f9db7, #86d9f0); }
 
 .formation-hover-card dl { margin: 0; display: grid; gap: 5px; }
-.formation-hover-card dl > div { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.formation-hover-card dl > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; align-items: baseline; }
 .formation-hover-card dt { color: #8fa39a; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
 .formation-hover-card dd { margin: 0; color: #e3ece8; font-family: "Barlow Condensed"; font-size: 12px; font-weight: 600; letter-spacing: .05em; }
 .formation-hover-card dd.creates { color: #f0cf7e; }
@@ -1631,3 +1653,185 @@ button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 2px; }
 .handoff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .handoff-card .combo-window-time { font-size: 11px; }
 .handoff-board { padding-bottom: 4px; }
+
+/* ENEMY COUNTER-BOARD — the planning-phase read on the enemy plan.
+   Colour carries the coverage verdict so the player can scan three orders at a glance:
+   held (blue) / partial (amber) / open (red) / dark (violet, deliberately unreadable). */
+.enemy-counter-board .enemy-objective {
+  margin: 8px 0 0; padding: 7px 8px; display: grid; gap: 3px;
+  border-left: 3px solid #d0653f; background: rgba(40, 18, 12, .72);
+  color: #e9b79c; font-size: 11.5px; line-height: 1.4;
+}
+.enemy-counter-board .enemy-objective b {
+  color: #f28a5c; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em;
+}
+.counter-coverage {
+  margin: 8px 0 6px; padding: 5px 7px; border: 1px solid #3f5560; background: rgba(14, 24, 28, .85);
+  color: #9fd0e0; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .1em;
+}
+.counter-order-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.counter-order {
+  display: grid; gap: 5px; padding: 8px; border: 1px solid #33474e;
+  border-left-width: 3px; background: rgba(12, 20, 23, .9);
+}
+.counter-order.coverage-answered { border-left-color: #5fb7dd; }
+.counter-order.coverage-partial { border-left-color: #d8a44a; }
+.counter-order.coverage-open { border-left-color: #e0684a; }
+.counter-order.coverage-unstaffed { border-left-color: #6d7d78; }
+.counter-order.coverage-dark { border-left-color: #8b6fc4; }
+
+.counter-order header { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 6px; }
+.counter-order-number {
+  padding: 1px 5px; border: 1px solid #5b7078; background: #162327;
+  color: #cfe3ea; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .1em;
+}
+.counter-tier { font-family: "Barlow Condensed"; font-size: 9.5px; font-weight: 700; letter-spacing: .13em; }
+.counter-tier.tier-known { color: #6fc8ea; }
+.counter-tier.tier-uncertain { color: #ddb05c; }
+.counter-tier.tier-unknown { color: #a98ede; }
+.counter-clock {
+  justify-self: end; color: #93a8a2;
+  font-family: "Barlow Condensed"; font-size: 10px; font-weight: 600; letter-spacing: .09em;
+}
+.counter-order-label { color: #f2f7f5; font-size: 14px; font-weight: 700; line-height: 1.1; }
+.counter-order-label em { color: #8fa8b0; font-size: 11px; font-style: normal; font-weight: 600; }
+.counter-cost {
+  display: flex; align-items: center; gap: 4px; color: #eda07f;
+  font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .05em;
+}
+.counter-cost svg { width: 13px; height: 13px; flex: none; }
+.counter-cost.sealed { color: #7d8b86; }
+
+.counter-capabilities { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.counter-capabilities > span {
+  color: #8fa39a; font-family: "Barlow Condensed"; font-size: 9.5px; font-weight: 700; letter-spacing: .12em;
+}
+.counter-capabilities b {
+  padding: 1px 5px; border: 1px solid #45585f;
+  font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .07em;
+}
+.counter-capabilities b.held { border-color: #4f93b1; background: rgba(24, 56, 70, .85); color: #8fdcf6; }
+.counter-capabilities b.missing { border-color: #b1553c; background: rgba(56, 22, 15, .85); color: #f09372; }
+.counter-capabilities b.unknown { border-color: #6d5a99; background: rgba(38, 28, 58, .85); color: #b79ef0; }
+
+.counter-responders { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.counter-responders li {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 2px 6px;
+  padding: 4px 6px; border-left: 2px solid #3c4c52; background: rgba(17, 26, 29, .8);
+}
+.counter-responders li.answers { border-left-color: #5fb7dd; }
+.counter-responders li.empty { border-left-color: #7a4a3c; }
+.counter-responders span {
+  color: #8fa39a; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .1em;
+}
+.counter-responders b {
+  min-width: 0; color: #dfe9e5; font-family: "Barlow Condensed"; font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+}
+.counter-responders li.empty b { color: #e08d70; }
+.counter-responders small {
+  grid-column: 2; color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .06em;
+}
+.counter-responders li:not(.answers) small { color: #7d8b86; }
+.counter-guidance { margin: 0; color: #b8c6c1; font-size: 11.5px; line-height: 1.35; }
+.counter-order.coverage-open .counter-guidance { color: #eda07f; }
+.counter-order.coverage-dark .counter-guidance { color: #bda6ef; }
+
+/* A held enemy order is a clock on the staging edge, not a moving threat. Dimming it
+   keeps the eye on the one order whose route is actually drawn. */
+.enemy-plan-formation.route-pending { opacity: .58; filter: saturate(.6); }
+.enemy-plan-formation.route-pending small { color: #9aa8a3; letter-spacing: .09em; }
+.enemy-plan-stop.resolved { opacity: .72; }
+
+/* FORMATION EFFECTIVENESS — the per-unit debrief. Replaces the placement-cost table:
+   same stops, but scored across all three things a placement contributes, with the one
+   change worth making named on every row. */
+.formation-effectiveness {
+  grid-column: 1 / -1; display: grid; gap: 7px; padding: 10px 12px;
+  border: 1px solid #4a5a52; background: rgba(10, 18, 16, .92);
+}
+.formation-effectiveness header { display: grid; gap: 2px; }
+.formation-effectiveness header span { color: #e0c473; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .11em; }
+.formation-effectiveness header small { color: #9fb0a7; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .05em; }
+.formation-effectiveness ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.formation-effectiveness li {
+  display: grid; grid-template-columns: 58px minmax(0, 1fr) 78px;
+  align-items: center; gap: 3px 8px; padding: 6px 8px; text-align: left;
+  border-left: 3px solid #3d4b44; background: rgba(16, 24, 21, .82);
+}
+.formation-effectiveness header,
+.formation-effectiveness .placement-cost-total { text-align: left; }
+.formation-effectiveness li.grade-decisive { border-left-color: #5fb7dd; }
+.formation-effectiveness li.grade-effective { border-left-color: #6fbf7a; }
+.formation-effectiveness li.grade-partial { border-left-color: #d8a44a; }
+.formation-effectiveness li.grade-ineffective { border-left-color: #e0684a; }
+.formation-effectiveness li.grade-unstaffed { border-left-color: #6d7d78; }
+
+.effectiveness-stop { color: #93a8a2; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
+.effectiveness-name { min-width: 0; color: #f2f7f5; font-size: 14px; font-weight: 700; letter-spacing: .02em; }
+.effectiveness-score {
+  grid-row: 1 / 3; grid-column: 3; justify-self: end; text-align: right;
+  display: grid; gap: 1px; color: #f2f7f5; font-size: 22px; font-weight: 700; line-height: 1;
+}
+.effectiveness-score em { color: #9fb0a7; font-family: "Barlow Condensed"; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .12em; }
+.grade-decisive .effectiveness-score { color: #8fdcf6; }
+.grade-effective .effectiveness-score { color: #92dc9d; }
+.grade-partial .effectiveness-score { color: #edc478; }
+.grade-ineffective .effectiveness-score { color: #f09372; }
+
+.effectiveness-bar { grid-column: 1 / 3; display: block; height: 5px; background: #1b2724; border: 1px solid #37453f; }
+.effectiveness-bar em { display: block; height: 100%; background: linear-gradient(90deg, #4f9db7, #86d9f0); }
+.grade-partial .effectiveness-bar em { background: linear-gradient(90deg, #a3792c, #edc478); }
+.grade-ineffective .effectiveness-bar em { background: linear-gradient(90deg, #a3452c, #f09372); }
+.grade-effective .effectiveness-bar em { background: linear-gradient(90deg, #3f8a4c, #92dc9d); }
+
+.effectiveness-components { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 2px; }
+.effectiveness-components > span {
+  display: grid; gap: 1px; padding: 3px 6px; border: 1px solid #37453f; background: rgba(12, 19, 17, .85);
+  color: #cfe0d9; font-family: "Barlow Condensed"; font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+}
+.effectiveness-components > span.full { border-color: #4f93b1; color: #8fdcf6; }
+.effectiveness-components > span.part { border-color: #96742f; color: #edc478; }
+.effectiveness-components > span.none { border-color: #8a4432; color: #f09372; }
+.effectiveness-components em { color: #93a8a2; font-family: "Barlow Condensed"; font-size: 9.5px; font-style: normal; font-weight: 600; letter-spacing: .04em; }
+.effectiveness-worked { grid-column: 1 / -1; color: #b8c6c1; font-size: 11.5px; line-height: 1.35; }
+.effectiveness-change {
+  grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 5px;
+  color: #edc478; font-size: 11.5px; line-height: 1.35;
+}
+.effectiveness-change svg { width: 13px; height: 13px; flex: none; margin-top: 2px; }
+.grade-decisive .effectiveness-change { color: #8fdcf6; }
+
+/* EXTRACTION LEDGER — every term that removed a formation, with its cause named.
+   The wave term used to be attributed to placement delay (a different quantity) and the
+   route term, usually the larger, was never explained at all. */
+.extraction-ledger { margin: 2px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.extraction-ledger li {
+  display: grid; grid-template-columns: 74px 44px minmax(0, 1fr); align-items: baseline; gap: 3px 8px;
+  padding: 5px 7px; text-align: left; border-left: 3px solid #3d4b44; background: rgba(16, 24, 21, .82);
+}
+.extraction-ledger li.ledger-loss { border-left-color: #e0684a; }
+.extraction-ledger li.ledger-clear { border-left-color: #5fb7dd; }
+.extraction-ledger li.ledger-total.viable { border-left-color: #6fbf7a; background: rgba(18, 30, 22, .86); }
+.extraction-ledger li.ledger-total.broken { border-left-color: #e0684a; background: rgba(32, 18, 15, .86); }
+.extraction-ledger span { color: #93a8a2; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.extraction-ledger b { color: #f2f7f5; font-size: 18px; font-weight: 700; text-align: right; }
+.extraction-ledger li.ledger-loss b { color: #f09372; }
+.extraction-ledger li.ledger-total.viable b { color: #92dc9d; }
+.extraction-ledger li.ledger-total.broken b { color: #f09372; }
+.extraction-ledger small { grid-column: 3; color: #b8c6c1; font-size: 11.5px; line-height: 1.35; }
+
+/* A formation that never deployed is neither extracted nor lost. */
+.fate-reserve { opacity: .6; }
+
+/* Ground already covered fades behind the formation; the leg it is moving along now is
+   the bright one. Segments ahead of a formation are not drawn during execution at all. */
+.field-plan-layer .field-plan-segment.route-covered { opacity: .38; }
+.field-plan-layer .field-plan-segment.route-leading { opacity: 1; }
+
+/* The one-word answer to "what is this position for" on each action stop marker. */
+.field-plan-position .stop-objective {
+  justify-self: start; padding: 0 4px; font-style: normal;
+  border: 1px solid var(--route-color, #66cef4);
+  background: rgba(8, 15, 17, .88); color: var(--route-color, #66cef4);
+  font-family: "Barlow Condensed"; font-size: 8.5px; font-weight: 700; letter-spacing: .14em;
+}
