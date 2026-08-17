@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "@fontsource/barlow/400.css";
 import "@fontsource/barlow/500.css";
 import "@fontsource/barlow/600.css";
@@ -30,6 +30,22 @@ import {
 
 import { battlefieldConsequencesAt, formationStatusDisplay } from "./battleConsequences.js";
 import { enemyContactForecastVisibleFor, enemyExactRoutesVisibleFor } from "./enemyPlanVisibility.js";
+import {
+  battleStageTimesFor,
+  drawnDuringExecution,
+  haltedStageTimeFor,
+  stagedBattleTimeFor,
+} from "./battleStaging.js";
+import { counterBoardSummary, enemyCounterBoardFor } from "./enemyCounterIntel.js";
+import { effectivenessSummary, formationEffectivenessFor } from "./formationEffectiveness.js";
+import { hoverCardBoundsFor, hoverCardPlacementFor } from "./hoverCardPlacement.js";
+import {
+  enemyRouteLineVisible,
+  enemyRoutePhaseFor,
+  enemyRouteProgressFor,
+  enemyRouteStopVisible,
+  reinforcementRouteVisible,
+} from "./enemyRouteVisibility.js";
 import { battlefieldDoctrineFor } from "./battleDoctrineData.js";
 import { DEAD_CIRCUIT_MISSION } from "./fieldPlanData.js";
 
@@ -40,6 +56,7 @@ import {
   BLIND_PREDICTIONS,
   blindPredictionResult,
   strategyTrialFor,
+  strategyTrialIsLoadable,
   strategyTrialResult,
   strategyTrialsForPlaybook,
 } from "./strategyExperiment.js";
@@ -67,6 +84,8 @@ import {
   pointAlongRoute as pointAlongFieldRoute,
   positionAlongAuthoredRoute,
   routePreviewAnnouncement,
+  authoredRouteHeadFor,
+  routeSegmentStateFor,
   splitAuthoredRouteAtActionStop,
 } from "./fieldRoutes.js";
 
@@ -223,7 +242,44 @@ function AppHeader({ phase, battleTime, operation, operationIndex, profile }) {
 // facts and lets the player compare them: capabilities and the stop's demands sit side
 // by side, but nothing here grades the fit, ranks a candidate, or reveals a resolved
 // combo. Those stay sealed until commitment.
-function FormationHoverCard({ formation, playbook, assignments, condition }) {
+function FormationHoverCard({ formation, anchor, playbook, assignments, condition }) {
+  const cardRef = useRef(null);
+  const [placement, setPlacement] = useState(null);
+
+  // Measured after paint, so the card is positioned against its real height rather than
+  // an assumed one — the content varies with how many conditions a formation reacts to.
+  useLayoutEffect(() => {
+    const element = cardRef.current;
+    if (!element || !anchor) {
+      setPlacement(null);
+      return undefined;
+    }
+    const place = () => {
+      const header = document.querySelector(".app-header");
+      const footer = document.querySelector(".footer-controls, .mission-footer");
+      const box = element.getBoundingClientRect();
+      setPlacement(hoverCardPlacementFor({
+        anchor,
+        cardHeight: box.height,
+        cardWidth: box.width,
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        bounds: hoverCardBoundsFor({
+          headerBottom: header?.getBoundingClientRect().bottom,
+          footerTop: footer?.getBoundingClientRect().top,
+          viewportHeight: window.innerHeight,
+        }),
+      }));
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(element);
+    window.addEventListener("resize", place);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, [anchor, formation?.id]);
+
   if (!formation) return null;
   const Icon = formation.icon;
   const roleIndex = playbook.roles.findIndex((role) => assignments[role.id] === formation.id);
@@ -231,9 +287,17 @@ function FormationHoverCard({ formation, playbook, assignments, condition }) {
   const demands = role ? roleDemandsFor(role, roleIndex, condition) : [];
   const refit = formation.activeRefit ?? formation.refits[0];
   return (
-    // Anchored rather than following the pointer: predictable, never occludes what the
-    // player is pointing at, and needs no mousemove tracking to appear on first hover.
-    <aside className="formation-hover-card" aria-hidden="true">
+    // Anchored to the hovered element rather than to the pointer: it appears beside the
+    // formation the player is actually looking at, and needs no mousemove tracking to
+    // show up on the first hover. Hidden until measured so it never flashes at 0,0.
+    <aside
+      className="formation-hover-card"
+      ref={cardRef}
+      aria-hidden="true"
+      style={placement
+        ? { left: `${placement.left}px`, top: `${placement.top}px`, "--notch-top": `${placement.notchTop}px` }
+        : { visibility: "hidden" }}
+    >
       <header>
         <FormationPortrait formation={formation} compact />
         <div>
@@ -475,9 +539,9 @@ function FormationRoster({ formations, unavailableFormations = [], condition, in
               key={formation.id}
               className={`formation-row ${active ? "selected" : ""} ${inspectionSource ? "inspection-source" : ""} ${activeInteraction ? `interaction-${direction} interaction-active` : ""} ${assignedRole ? "assigned" : "available"}`}
               onClick={() => onSelect(formation.id)}
-              onMouseEnter={() => onInspect(formation.id)}
+              onMouseEnter={(event) => onInspect(formation.id, event.currentTarget)}
               onMouseLeave={() => onInspect(null)}
-              onFocus={() => onInspect(formation.id)}
+              onFocus={(event) => onInspect(formation.id, event.currentTarget)}
               onBlur={() => onInspect(null)}
                 draggable={phase === "plan"}
                 onDragStart={(event) => onFormationDragStart(event, formation.id)}
@@ -567,6 +631,19 @@ function TabletopBattlefieldOverlay({ landmarks, operation, plan }) {
   );
 }
 
+// The staged clock both map layers draw against. Derived from the profile so the routes
+// and the formations travelling along them can never disagree about where the army is.
+const actionTimesForProfile = (profile) => [
+  profile.alphaAt, profile.betaAt, profile.reactorExposeAt, profile.reactorAt, profile.extractionAt,
+];
+const stagedClockFor = (profile, battleTime) => {
+  const stageTimes = battleStageTimesFor({
+    actionTimes: actionTimesForProfile(profile),
+    extractionAt: profile.extractionAt,
+  });
+  return { stageTimes, stagedTime: stagedBattleTimeFor({ battleTime, stageTimes }) };
+};
+
 const resolveFieldPoint = (plan, landmarks, reference) => {
   if (typeof reference === "number") return plan.positions[reference];
   if (typeof reference === "string") return landmarks[reference];
@@ -595,6 +672,8 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
   const battlefieldDoctrine = battlefieldDoctrineFor(playbook.id);
   const breakpoints = breakpointsFor(operation);
   const execution = phase === "battle" || phase === "complete";
+  const { stagedTime } = stagedClockFor(profile, battleTime);
+  const roleActionTimes = actionTimesForProfile(profile);
   const resolvedFates = new Map((execution ? formationFates : [])
     .filter((formationFate) => formationFate.at <= battleTime)
     .map((formationFate) => [formationFate.formationId, formationFate]));
@@ -646,16 +725,35 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
   });
   // Setup and execution share the same selected, end-to-end geometry so the
   // player can read all five journeys before committing the playbook.
+  // Planning draws all five journeys end to end — reading them against each other is the
+  // whole decision. Execution does not: drawing every complete route from the first frame
+  // put five full-length lines across the board for the entire battle, which is the
+  // "still lines everywhere" the player reported after the enemy lanes were fixed. During
+  // execution a route is drawn only as far as its formation has actually travelled, with
+  // the leading segment bright and covered ground faded behind it.
   const baseSegments = executionRoutes.flatMap((route) => {
     const points = route.points;
     const routePresentation = routes.find((item) => item.roleIndex === route.roleIndex);
-    const routeParts = splitAuthoredRouteAtActionStop(points);
-    return points.slice(0, -1).map((point, index) => ({
-      id: `route-${route.roleIndex}-${index}`,
-      start: point,
-      end: points[index + 1],
-      className: `base lane-${route.roleIndex + 1} ${index < routeParts.approach.length - 1 ? "action-stop-approach" : "route-continuation"} ${routePresentation?.formation ? `staffed movement-${route.movementRouteKind}` : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
-    }));
+    const routeParts = splitAuthoredRouteAtActionStop(points, route.actionStopIndex);
+    const head = execution
+      ? authoredRouteHeadFor({
+          points,
+          battleTime: stagedTime,
+          actionAt: roleActionTimes[route.roleIndex] ?? profile.extractionAt,
+          completeAt: profile.completeAt,
+          actionStopIndex: route.actionStopIndex,
+        })
+      : null;
+    return points.slice(0, -1).map((point, index) => {
+      const state = execution ? routeSegmentStateFor({ segmentIndex: index, head }) : "covered";
+      return {
+        id: `route-${route.roleIndex}-${index}`,
+        start: point,
+        end: points[index + 1],
+        hidden: state === "ahead",
+        className: `base lane-${route.roleIndex + 1} route-${state} ${index < routeParts.approach.length - 1 ? "action-stop-approach" : "route-continuation"} ${routePresentation?.formation ? `staffed movement-${route.movementRouteKind}` : ""} ${routePresentation?.playbackClass ?? ""} ${routePresentation?.consequenceClass ?? ""} ${routePresentation?.fateClass ?? ""}`,
+      };
+    }).filter((segment) => !segment.hidden);
   });
   const previewRoleIndex = routePreview
     ? playbook.roles.findIndex((role) => role.id === routePreview.roleId)
@@ -818,16 +916,21 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
           <ArrowRight weight="bold" />
         </div>
       ))}
+      {/* The preview carries its own action stop's lane colour. It used to force a single
+          gold, so every stop previewed identically and colour stopped meaning "which
+          stop" at the exact moment the player was asking that question. Preview is
+          signalled by weight, glow and the label instead — none of which collide with
+          hue. */}
       {previewSegments.map((segment) => (
         <div
-          className={`field-plan-segment route-preview movement-${previewRoute.movementRouteKind}`}
+          className={`field-plan-segment route-preview lane-${previewRoleIndex + 1} movement-${previewRoute.movementRouteKind}`}
           style={fieldSegmentStyle(segment.start, segment.end, layerSize)}
           key={segment.id}
         />
       ))}
       {previewFormation && previewRoute && previewLabelPoint && (
         <div
-          className={`field-route-preview-label movement-${previewRoute.movementRouteKind}`}
+          className={`field-route-preview-label lane-${previewRoleIndex + 1} movement-${previewRoute.movementRouteKind}`}
           style={{ left: `${previewLabelPoint.x}%`, top: `${previewLabelPoint.y}%` }}
           aria-hidden="true"
         >
@@ -863,6 +966,10 @@ function TacticalFieldPlan({ assignments, battleTime, branches, condition, conse
           <div className={`field-plan-position lane-${index + 1} ${formation ? "staffed" : ""} ${consequenceClass} ${fateClass} ${struckIds.includes(formation?.id) ? "struck" : ""} ${execution && hasPlayerFocus ? focusedPlayerIds.includes(formation?.id) ? "playback-focused" : "playback-muted" : ""}`} style={{ left: `${position.x}%`, top: `${position.y}%` }} key={role.id}>
             <b>{String(index + 1).padStart(2, "0")}</b>
             <span>{role.label.split(" / ")[0]}</span>
+            {/* What this position is FOR. The stops used to sit in a row on the deployment
+                line with no stated purpose, so the player could not tell whether a stop
+                was something to recover or something to hold for strategic value. */}
+            {role.objective && <i className="stop-objective">{role.objective}</i>}
             {routes[index]?.afterLabel && <small>{routes[index].afterLabel}</small>}
             {formation && <em>{formation.name}</em>}
           </div>
@@ -944,7 +1051,8 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
             : ""
           : "";
         const counterRevealClass = playbackFocused && (doctrinePhase === "enemy-counter" || doctrinePhase === "outcome") ? "doctrine-counter-reveal" : "";
-        const progress = inBattle ? Math.min(1, battleTime / formation.actionAt) : 0;
+        const routePhase = enemyRoutePhaseFor({ battleTime, actionAt: formation.actionAt, routesVisible: exactRoutesVisible });
+        const progress = enemyRouteProgressFor({ battleTime, actionAt: formation.actionAt, routePhase });
         const route = routeForClash(formation, clash, index);
         const position = pointAlongFieldRoute(route, progress);
         const convergenceSpread = Math.pow(progress, 2);
@@ -964,12 +1072,14 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
         const resolved = inBattle && battleTime >= formation.actionAt;
         return (
           <Fragment key={formation.id}>
-            {exactRoutesVisible && route.slice(0, -1).map((start, segmentIndex) => (
+            {/* One order's route at a time. See enemyRouteVisibility.js — drawing all
+                three at once was the "enemy lines everywhere" problem. */}
+            {enemyRouteLineVisible(routePhase) && route.slice(0, -1).map((start, segmentIndex) => (
               <div className={`enemy-plan-segment enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={fieldSegmentStyle(start, route[segmentIndex + 1], layerSize)} key={`${formation.id}-segment-${segmentIndex}`}>
                 <ArrowRight weight="bold" />
               </div>
             ))}
-            {exactRoutesVisible && <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${playbackClass} ${counterRevealClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
+            {enemyRouteStopVisible(routePhase) && <div className={`enemy-plan-stop enemy-lane-${index + 1} ${clash.routeState} ${routePhase} ${playbackClass} ${counterRevealClass}`} style={{ left: `${endpoint.x}%`, top: `${endpoint.y}%` }}>
               <b>{formation.number}</b><span>{clash.label}</span>
             </div>}
             {/* The engagement has to happen somewhere on the map. Without this the
@@ -985,10 +1095,16 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
                 <i /><i /><span>{clash.disrupted ? "BROKEN" : "IMPACT"}</span>
               </div>
             )}
-            <div className={`enemy-plan-formation ${contactForecastVisible ? "contact-forecast" : ""} ${clash.routeState} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass} ${counterRevealClass}`} style={{ left: `${displayPosition.x}%`, top: `${displayPosition.y}%` }}>
+            {/* A waiting order holds on its staging edge and reads as a clock, not as a
+                nameless icon drifting across the board from the first frame. */}
+            <div className={`enemy-plan-formation ${contactForecastVisible ? "contact-forecast" : ""} ${clash.routeState} route-${routePhase} ${resolved ? clash.disrupted ? "disrupted" : "landed" : "advancing"} ${playbackClass} ${counterRevealClass}`} style={{ left: `${displayPosition.x}%`, top: `${displayPosition.y}%` }}>
               <img src="/assets/helioch-sentinels.png" alt={`${formation.name} executing ${clash.label}`} />
               <span>{formation.number}</span>
-              <small>{contactForecastVisible ? forecastLabel : resolved ? clash.routeState === "starved" ? "CHAIN STARVED" : clash.routeState === "diverted" || clash.routeState === "redirected" ? "REROUTED" : clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
+              <small>{contactForecastVisible
+                ? forecastLabel
+                : routePhase === "pending"
+                  ? `HOLDING · T+${fmtDuration(formation.actionAt)}`
+                  : resolved ? clash.routeState === "starved" ? "CHAIN STARVED" : clash.routeState === "diverted" || clash.routeState === "redirected" ? "REROUTED" : clash.disrupted ? "DISRUPTED" : clash.label : formation.name}</small>
             </div>
           </Fragment>
         );
@@ -999,7 +1115,9 @@ function EnemyFieldPlan({ battleTime, operation, phase, clashes, profile, planRe
           <span>{profile.enemyCollision?.revealed ? profile.enemyCollision.title : "STOP 01/02 CONTACT WINDOW"}</span>
         </div>
       )}
-      {exactRoutesVisible && <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"} ${reinforcementPlaybackClass}`} style={fieldSegmentStyle(reinforcementWave.start, reinforcementWave.intercept, layerSize)}>
+      {/* The wave lane is one more line, and was drawn from the first frame for the same
+          reason the others were. It earns its line once it is actually inbound. */}
+      {reinforcementRouteVisible({ battleTime, approachAt: waveApproachAt, routesVisible: exactRoutesVisible }) && <div className={`reinforcement-route ${clearsBeforeWave ? "avoided" : "threat"} ${reinforcementPlaybackClass}`} style={fieldSegmentStyle(reinforcementWave.start, reinforcementWave.intercept, layerSize)}>
         <ArrowRight weight="bold" />
       </div>}
       <div className={`reinforcement-intercept ${clearsBeforeWave ? "avoided" : "threat"} ${reinforcementPlaybackClass}`} style={{ left: `${reinforcementWave.intercept.x}%`, top: `${reinforcementWave.intercept.y}%` }}>
@@ -1470,7 +1588,10 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
     branches,
     formationMovementProfiles: Object.fromEntries(formations.map((formation) => [formation.id, formation.movementProfile])),
   });
-  const roleActionTimes = [profile.alphaAt, profile.betaAt, profile.reactorExposeAt, profile.reactorAt, profile.extractionAt];
+  const roleActionTimes = actionTimesForProfile(profile);
+  // Turn staging. The army covers ground in bursts between mission milestones and holds
+  // between them, rather than inching along a continuous timeline. Drawing only.
+  const { stageTimes, stagedTime } = stagedClockFor(profile, battleTime);
   const inspectedFormation = formations.find((formation) => formation.id === inspected) ?? null;
   const inspectedInteractions = formationInteractionsFor({ formations, formationId: inspected });
   const interactionByFormationId = new Map(inspectedInteractions.map((interaction) => [interaction.partnerId, interaction]));
@@ -1527,7 +1648,10 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
       <div className={`combo-path combo-burn ${planReady ? "active warm" : ""}`} aria-hidden="true" />
       <div className={`combo-path combo-break ${planReady ? "active" : ""}`} aria-hidden="true" />
       <div className={`kill-zone ${planReady ? "active" : ""}`}><span>DECISION AREA</span></div>
-      {formations.map((formation) => {
+      {formations.filter((formation) => drawnDuringExecution({
+        phase,
+        assignedToStop: playbook.roles.some((role) => assignments[role.id] === formation.id),
+      })).map((formation) => {
         const assignedRoleIndex = playbook.roles.findIndex((role) => assignments[role.id] === formation.id);
         const assignedRole = assignedRoleIndex >= 0 ? playbook.roles[assignedRoleIndex] : null;
         const assignedStop = assignedRole && staffedFieldPlan?.positions[assignedRoleIndex]
@@ -1550,14 +1674,21 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             : activeInteraction
               ? `interaction-active interaction-${interactionDirection}`
               : "interaction-muted";
+        // A formation cut off from extraction halts at the last action stop it reached.
+        // It used to be drawn arriving at the gantry and then relabelled CUT OFF, because
+        // every authored route terminates at extraction and fate times land at 96-99% of
+        // the way along it — so a lost force looked like a force that had made it.
+        const lost = formationFate && (formationFate.fate === "missing" || formationFate.fate === "destroyed");
+        const drawnTime = lost
+          ? Math.min(stagedTime, haltedStageTimeFor({ stageTimes, fateAt: formationFate.at, extractionAt: profile.extractionAt }))
+          : stagedTime;
         const routePosition = playbackActive && authoredRoute
           ? positionAlongAuthoredRoute({
               points: authoredRoute.points,
-              battleTime: formationFate && (formationFate.fate === "missing" || formationFate.fate === "destroyed")
-                ? Math.min(battleTime, formationFate.at)
-                : battleTime,
+              battleTime: drawnTime,
               actionAt: roleActionTimes[authoredRoute.roleIndex] ?? profile.extractionAt,
               completeAt: profile.completeAt,
+              actionStopIndex: authoredRoute.actionStopIndex,
             })
           : { x: node.left, y: node.top };
         return (
@@ -1566,9 +1697,9 @@ function Battlefield({ formations, formationFates, inspected, onInspect, selecte
             className={`map-formation ${active ? "selected" : ""} ${interactionClass} ${routeReadiness ? "route-assigned" : ""} ${phase === "battle" && !["missing", "destroyed"].includes(formationFate?.fate) ? "in-motion" : ""} ${consequence ? `state-${consequence.state}` : ""} ${formationFate ? `fate-${formationFate.fate}` : ""} ${!assignedStop && (phase === "plan" || phase === "drill") ? "staged" : ""} ${collisionFocus ? focusedPlayerIds.includes(formation.id) ? "playback-focused" : "playback-muted" : ""}`}
             style={{ left: `${routePosition.x}%`, top: `${routePosition.y}%` }}
             onClick={() => onSelect(formation.id)}
-            onMouseEnter={() => onInspect(formation.id)}
+            onMouseEnter={(event) => onInspect(formation.id, event.currentTarget)}
             onMouseLeave={() => onInspect(null)}
-            onFocus={() => onInspect(formation.id)}
+            onFocus={(event) => onInspect(formation.id, event.currentTarget)}
             onBlur={() => onInspect(null)}
             draggable={phase === "plan"}
             onDragStart={(event) => onFormationDragStart(event, formation.id)}
@@ -1695,6 +1826,67 @@ function BattlePlaybackDirector({ beat, beats, index, playing, onToggle, onStep,
   );
 }
 
+// The planning-phase view of the enemy plan. Every order carries the capabilities that
+// break it; before this board that data only surfaced in the debrief, as an explanation
+// of a result the player could no longer change. Here it is a decision surface: what is
+// coming, what it costs, what breaks it, and whether the current placement holds that.
+// Outcomes stay sealed — this reports capability coverage, never a resolution.
+function EnemyCounterBoard({ operation, playbook, assignments, formations, condition }) {
+  const board = useMemo(
+    () => enemyCounterBoardFor({ operation, playbook, assignments, formations, condition }),
+    [assignments, condition, formations, operation, playbook],
+  );
+  const summary = counterBoardSummary(board);
+  return (
+    <div className="intel-block enemy-counter-board">
+      <span className="panel-label">ENEMY PLAYBOOK · COUNTER-BOARD</span>
+      <div className="enemy-doctrine-title"><Target weight="duotone" /><span><b>{board.name}</b><small>{board.intent}</small></span></div>
+      {board.objective && <p className="enemy-objective"><b>ENEMY OBJECTIVE</b>{board.objective}</p>}
+      <div className="counter-coverage" role="status" aria-live="polite">{summary}</div>
+      <ol className="counter-order-list">
+        {board.orders.map((order) => (
+          <li key={order.id} className={`counter-order coverage-${order.coverage}`}>
+            <header>
+              <span className="counter-order-number">{order.number}</span>
+              <span className={`counter-tier tier-${order.disclosure.tier.toLowerCase()}`}>{order.disclosure.label}</span>
+              <span className="counter-clock">{order.clock === null ? "TIMING UNCONFIRMED" : `T+${fmtDuration(order.clock)}`}</span>
+            </header>
+            <b className="counter-order-label">{order.label}{order.enemyName ? <em> · {order.enemyName}</em> : null}</b>
+            {order.cost
+              ? <small className="counter-cost"><Warning weight="duotone" /> {order.cost}</small>
+              : <small className="counter-cost sealed">COST UNCONFIRMED</small>}
+            {order.counters
+              ? (
+                <div className="counter-capabilities">
+                  <span>BREAKS IT</span>
+                  {order.counters.map((capability) => (
+                    <b key={capability} className={order.answeredCapabilities.includes(capability) ? "held" : "missing"}>
+                      {tacticalTerm(capability)}
+                    </b>
+                  ))}
+                </div>
+              )
+              : <div className="counter-capabilities dark"><span>BREAKS IT</span><b className="unknown">NOT SCOUTED</b></div>}
+            <ul className="counter-responders">
+              {order.responders.map((responder) => (
+                <li key={responder.stopIndex} className={responder.formationId ? responder.answers.length > 0 ? "answers" : "present" : "empty"}>
+                  <span>{responder.stopLabel}</span>
+                  <b>{responder.formationName ?? "UNSTAFFED"}</b>
+                  <small>{responder.answers.length > 0 ? responder.answers.map(tacticalTerm).join(" · ") : "NO COUNTER HELD"}</small>
+                </li>
+              ))}
+            </ul>
+            <p className="counter-guidance">{order.guidance}</p>
+          </li>
+        ))}
+      </ol>
+      <small className="prototype-note">
+        SCOUTED BEFORE COMMITMENT · RESOLUTION STAYS SEALED UNTIL EXECUTION. A DARK ORDER IS WHAT A COMMAND SEAL IS FOR.
+      </small>
+    </div>
+  );
+}
+
 function EnemyPlanIntel({ battleTime, operation, phase, planReady, blindTestActive, clashes, profile }) {
   const enemyPlan = enemyPlanFor(operation);
   const reinforcementWave = reinforcementWaveFor(operation, profile.condition);
@@ -1786,14 +1978,21 @@ function MissionConditionSelector({ condition, locked, operation, phase, onCondi
   );
 }
 
-function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, blindTestActive, rescueComplete, playbook, assignedCount, formationCount, integrity, profile }) {
+function IntelRail({ phase, battleTime, condition, onCondition, operation, planReady, blindTestActive, rescueComplete, playbook, assignments, formations, assignedCount, formationCount, integrity, profile }) {
   const planningSealed = phase === "plan" || phase === "drill";
+  // Against the fielded force, not the whole roster. `extractedCount` is capped at the
+  // number deployed, so dividing by the nine-formation roster made a full extraction read
+  // as 5 / 9 and the readout's own ceiling unreachable.
+  const deployedCount = profile.readiness.staffedCount;
   const forecast = profile.overrun > 0
-    ? `${profile.extractedCount} / ${formationCount} EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
-    : `${profile.extractedCount} / ${formationCount} EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
+    ? `${profile.extractedCount} / ${deployedCount} EXTRACT · WAVE ${fmtDuration(profile.overrun)} EARLY`
+    : `${profile.extractedCount} / ${deployedCount} EXTRACT · ${fmtDuration(profile.timeSaved)} CLEAR`;
   return (
     <section className="right-rail" aria-label="Mission outlook and enemy intelligence">
       <MissionConditionSelector condition={condition} locked={operation.conditionLocked} operation={operation} phase={phase} onCondition={onCondition} />
+      {/* During planning the counter-board is the surface the player acts on, so it sits
+          directly under the pressure and above the outlook rather than below the fold. */}
+      {planningSealed && <EnemyCounterBoard operation={operation} playbook={playbook} assignments={assignments} formations={formations} condition={condition} />}
       <div className="intel-block">
         <span className="panel-label">MISSION OUTLOOK</span>
         <strong className={planningSealed ? "sealed" : planReady ? profile.overrun > 0 ? "at-risk" : "viable" : "at-risk"}>{planningSealed && planReady ? "OUTCOME SEALED · COMMIT TO REVEAL" : planReady ? forecast : `${assignedCount} / ${formationCount} AVAILABLE ASSIGNED`}</strong>
@@ -1833,7 +2032,10 @@ function IntelRail({ phase, battleTime, condition, onCondition, operation, planR
         )}
         {!planReady && phase === "plan" && <p className="assignment-pointer"><ArrowRight weight="bold" /> Place formations on the authored tactical route.</p>}
       </div>
-      <EnemyPlanIntel battleTime={battleTime} operation={operation} phase={phase} planReady={planReady} blindTestActive={blindTestActive} clashes={profile.enemyClashes} profile={profile} />
+      {/* Planning gets the counter-board above (what is coming and what breaks it);
+          execution gets the clash chain (what actually happened). The old chain showed
+          "OUTCOME UNREAD" three times during planning: accurate and useless. */}
+      {!planningSealed && <EnemyPlanIntel battleTime={battleTime} operation={operation} phase={phase} planReady={planReady} blindTestActive={blindTestActive} clashes={profile.enemyClashes} profile={profile} />}
       <div className="intel-block victory-block">
         <span className="panel-label">VICTORY CONDITION</span>
         <Factory weight="duotone" />
@@ -2139,9 +2341,15 @@ function SalvageWorkshop({ baseline, choice, formations, integrity, nextOperatio
   );
 }
 
-function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, strategyTrial, blindTestActive, blindPrediction, won, onAction }) {
+function CompletionOverlay({ formations, formationFates, canContinue, campaignDestroyed, integrityBefore, integrityLoss, integrityAfter, operation, rescued, usedSeals, playbook, profile, readiness, handoffs, strategyTrial, blindTestActive, blindPrediction, won, onAction }) {
   const dialogRef = useModalFocus(true);
-  const lostCount = formations.length - profile.extractedCount;
+  // Losses are counted against what was fielded. Subtracting from the whole roster
+  // reported four reserve formations as casualties of an operation they sat out.
+  const lostCount = Math.max(0, profile.readiness.staffedCount - profile.extractedCount);
+  const effectiveness = useMemo(() => {
+    const rows = formationEffectivenessFor({ readiness, clashes: profile.enemyClashes, handoffs, playbook });
+    return { rows, summary: effectivenessSummary(rows) };
+  }, [handoffs, playbook, profile.enemyClashes, readiness]);
   // Placement is the deciding lever, so the debrief has to say plainly what it cost.
   // Concealment belongs before commitment; after the fact an unexplained loss is just
   // an unexplained loss.
@@ -2153,7 +2361,10 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
     // total failure even for a well matched plan.
     unanswered: profile.readiness.placements.reduce((sum, placement) => sum + placement.unansweredDemands.length, 0),
     demanded: profile.readiness.placements.reduce((sum, placement) => sum + placement.demands.length, 0),
-    extractionsLost: Math.floor(placementCostTotal / 30),
+    // The wave removes a slot per complete 30s of OVERRUN, not per 30s of placement
+    // delay. The two coincide only when the plan had no time buffer, so dividing the
+    // delay claimed losses at the wave that the wave never took.
+    extractionsLost: profile.reinforcementLoss,
   };
   const recoveryCarrierFate = formationFates.find(({ formation }) => formation.id === "hauler");
   const carrierCutOffAfterRescue = rescued && recoveryCarrierFate?.history?.some(({ state }) => state === "cut-off");
@@ -2226,37 +2437,89 @@ function CompletionOverlay({ formations, formationFates, canContinue, campaignDe
           <div><span>FORMATION ROUTE PLAN</span><b>{profile.readiness.staffedCount} / {playbook.roles.length} orders staffed</b><small>{profile.effects.length} secondary combo bonuses · {disruptedEnemyOrders} / {profile.enemyClashes.length} enemy orders broken</small><Seal weight="duotone" /></div>
           <div className={`integrity-after-action ${integrityAfter <= 0 ? "collapsed" : "holding"}`}><span>WARHOST INTEGRITY · −{integrityLoss}</span><b>{integrityBefore} → {integrityAfter} REMAINING</b><Shield weight={integrityAfter > 0 ? "fill" : "thin"} /></div>
         </div>
-        <section className="placement-cost" aria-label="What your formation placement cost the operation">
+        {/* Per-formation effectiveness. The debrief used to explain the mission without
+            ever attributing it to a unit, which is the wrong feedback for a game whose
+            whole decision is which formations to field and where. Each row scores the
+            three things a placement can contribute — its own stop, its combo windows,
+            and the enemy orders aimed at it — and names the single change worth making. */}
+        <section className="formation-effectiveness" aria-label="How effective each formation was in its position and role">
           <header>
-            <span>PLACEMENT COST · WHAT EACH ORDER DEMANDED</span>
+            <span>FORMATION EFFECTIVENESS · POSITION &amp; ROLE</span>
             <small>
-              {placementCost.total > 0
-                ? `${fmtDuration(placementCost.total)} conceded · ${placementCost.unanswered} of ${placementCost.demanded} stop demands went unanswered`
-                : "Every demand was answered. No time conceded to placement."}
+              LIST AVERAGE {effectiveness.summary.average}%
+              {effectiveness.summary.best ? ` · BEST ${effectiveness.summary.best.formationName} ${effectiveness.summary.best.effectiveness}%` : ""}
+              {effectiveness.summary.worst && effectiveness.summary.worst !== effectiveness.summary.best
+                ? ` · WEAKEST ${effectiveness.summary.worst.formationName} ${effectiveness.summary.worst.effectiveness}%`
+                : ""}
             </small>
           </header>
           <ol>
-            {profile.readiness.placements.map((placement) => (
-              <li className={placement.taskAligned ? "answered" : "unanswered"} key={placement.stopNumber}>
-                <span>STOP {String(placement.stopNumber).padStart(2, "0")}</span>
-                <b>{placement.formationName}</b>
-                <small>
-                  {placement.roleLabel} demanded {placement.demands.map(tacticalTerm).join(" / ")}.{" "}
-                  {placement.taskAligned
-                    ? "Answered in full."
-                    : `Could not answer ${placement.unansweredDemands.map(tacticalTerm).join(" and ")}.`}
-                </small>
-                <strong>{placement.taskDelay > 0 ? `+${placement.taskDelay}s` : "—"}</strong>
+            {effectiveness.rows.map((row) => (
+              <li className={`grade-${row.grade.toLowerCase()}`} key={row.stopNumber}>
+                <span className="effectiveness-stop">STOP {String(row.stopNumber).padStart(2, "0")}</span>
+                <b className="effectiveness-name">{row.formationName ?? "UNSTAFFED"}</b>
+                <strong className="effectiveness-score">{row.effectiveness}%<em>{row.grade}</em></strong>
+                <i className="effectiveness-bar" aria-hidden="true"><em style={{ width: `${row.effectiveness}%` }} /></i>
+                {row.staffed && (
+                  <div className="effectiveness-components">
+                    <span className={row.fit.percent >= 100 ? "full" : row.fit.percent > 0 ? "part" : "none"}>
+                      STOP FIT {row.fit.percent}%<em>{row.fit.matched}/{row.fit.demanded} demands{row.secondsConceded > 0 ? ` · +${row.secondsConceded}s` : ""}</em>
+                    </span>
+                    <span className={row.counter.percent >= 100 ? "full" : row.counter.percent > 0 ? "part" : "none"}>
+                      COUNTER {row.counter.percent}%<em>{row.counter.carried}/{row.counter.required} vs {row.counter.orders.map((order) => order.number).join(" · ") || "—"}</em>
+                    </span>
+                    <span className={row.combo.percent >= 100 ? "full" : row.combo.percent > 0 ? "part" : "none"}>
+                      COMBO {row.combo.percent}%<em>{row.combo.names.join(" · ") || `0/${row.combo.windows} windows`}</em>
+                    </span>
+                  </div>
+                )}
+                <small className="effectiveness-worked">{row.worked}</small>
+                <small className="effectiveness-change"><ArrowRight weight="bold" /> {row.change}</small>
               </li>
             ))}
           </ol>
-          {placementCost.extractionsLost > 0 && (
+          {placementCost.total > 0 && (
             <p className="placement-cost-total">
-              That delay reached the extraction gantry <b>{fmtDuration(placementCost.total)}</b> late,
-              costing <b>{placementCost.extractionsLost}</b> {placementCost.extractionsLost === 1 ? "formation" : "formations"} at the wave.
-              Better matched placement was worth {placementCost.extractionsLost} {placementCost.extractionsLost === 1 ? "extraction" : "extractions"}.
+              Unanswered stop demands conceded <b>{fmtDuration(placementCost.total)}</b> in total
+              — {placementCost.unanswered} of {placementCost.demanded} demands went unanswered.
             </p>
           )}
+          {/* The full extraction ledger. Every term that removed a formation is named
+              with its cause: previously the wave term was reported as a consequence of
+              placement delay (a different quantity) and the route term — usually the
+              larger of the two — was never explained at all, so a player could lose
+              three formations and see one of them accounted for. */}
+          <ul className="extraction-ledger" aria-label="Why formations did not extract">
+            <li className="ledger-start">
+              <span>FIELDED</span><b>{profile.readiness.staffedCount}</b>
+              <small>Formations committed to action stops. Reserves are not scored.</small>
+            </li>
+            <li className={profile.reinforcementLoss > 0 ? "ledger-loss" : "ledger-clear"}>
+              <span>WAVE</span><b>{profile.reinforcementLoss > 0 ? `−${profile.reinforcementLoss}` : "−0"}</b>
+              <small>
+                {profile.overrun <= 0
+                  ? `Extraction cleared ${fmtDuration(profile.timeSaved)} before ${reinforcementWave.name} arrived. No formation lost to the wave.`
+                  : profile.reinforcementLoss > 0
+                    ? `${reinforcementWave.name} reached the gantry ${fmtDuration(profile.overrun)} before extraction cleared — one formation per complete 30 seconds of contact.`
+                    // Contact without a loss still needs saying, or a player reads an
+                    // arriving wave and a −0 as a contradiction.
+                    : `${reinforcementWave.name} arrived ${fmtDuration(profile.overrun)} early, under the 30 seconds of contact that costs a formation.`}
+              </small>
+            </li>
+            <li className={profile.enemyRecoveryLoss > 0 ? "ledger-loss" : "ledger-clear"}>
+              <span>ROUTE</span><b>{profile.enemyRecoveryLoss > 0 ? `−${profile.enemyRecoveryLoss}` : "−0"}</b>
+              <small>
+                {profile.enemyRecoveryLoss > 0
+                  ? `${profile.enemyClashes.filter((clash) => clash.appliesImpact && clash.impact.recoveryLoss).map((clash) => `${clash.label} (${clash.resolution?.label ?? "LANDED"})`).join(", ") || "Enemy orders"} severed the extraction route.`
+                  : "No enemy order reached the extraction route."}
+                {profile.recoveryLossPrevented > 0 ? ` ${profile.recoveryRoleProtection.formationName} absorbed one of these at the recovery element.` : ""}
+              </small>
+            </li>
+            <li className={profile.extractedCount >= operation.requiredExtraction ? "ledger-total viable" : "ledger-total broken"}>
+              <span>EXTRACTED</span><b>{profile.extractedCount}</b>
+              <small>{operation.requiredExtraction} required to win this operation.</small>
+            </li>
+          </ul>
         </section>
         <section className="strategy-outcome-story" aria-label="How your choices produced the mission result">
           <header><span>WHY YOUR PLAN {won ? "WORKED" : "FAILED"}</span><small>ROUTE ASSIGNMENTS → ENEMY RESPONSE → MISSION COST</small></header>
@@ -2348,7 +2611,22 @@ export function App() {
   const [selected, setSelected] = useState("harpoon");
   const [draggingFormationId, setDraggingFormationId] = useState(null);
   const [routePreview, setRoutePreview] = useState(null);
-  const [hoveredFormationId, setHoveredFormationId] = useState(null);
+  // The hovered formation carries the element it was hovered from, measured in the same
+  // event that set it. Reading the pointer separately is what made the first version of
+  // the card miss its first hover.
+  const [hovered, setHovered] = useState({ id: null, anchor: null });
+  const hoveredFormationId = hovered.id;
+  const inspectFormation = useCallback((formationId, element) => {
+    if (!formationId) {
+      setHovered({ id: null, anchor: null });
+      return;
+    }
+    const rect = element?.getBoundingClientRect?.();
+    setHovered({
+      id: formationId,
+      anchor: rect ? { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right } : null,
+    });
+  }, []);
   const [playbookId, setPlaybookId] = useState("trapline");
   const [previewPlaybookId, setPreviewPlaybookId] = useState(null);
   const [conditionId, setConditionId] = useState("fractured-transit");
@@ -2470,6 +2748,9 @@ export function App() {
     () => formationFatesFor({
       formations,
       formationOrderIds,
+      // Only the formations actually staffed onto action stops took part in the
+      // operation; the rest of the roster stayed in reserve and must not be scored.
+      deployedIds: playbook.roles.map((role) => assignments[role.id]).filter(Boolean),
       extractedCount: operationProfile.extractedCount,
       consequences: finalConsequences.player,
       campaignDestroyed,
@@ -2477,7 +2758,7 @@ export function App() {
       completeAt: operationProfile.completeAt,
       protectedFormationIds: recoveryProtectedFormationIds,
     }),
-    [campaignDestroyed, finalConsequences.player, formationOrderIds, formations, operationProfile.completeAt, operationProfile.extractedCount, operationProfile.extractionAt, recoveryProtectedFormationIds],
+    [assignments, campaignDestroyed, finalConsequences.player, formationOrderIds, formations, operationProfile.completeAt, operationProfile.extractedCount, operationProfile.extractionAt, playbook.roles, recoveryProtectedFormationIds],
   );
   const operationEvents = useMemo(
     () => buildOperationEvents(operationProfile, operation),
@@ -2588,9 +2869,7 @@ export function App() {
     if (phase !== "plan" || operationIndex !== 0 || formations.length !== FORMATIONS.length) return;
     const trial = strategyTrialFor(trialId);
     const trialPlaybook = PLAYBOOKS.find((item) => item.id === trial?.playbookId);
-    const formationIds = new Set(formations.map((formation) => formation.id));
-    const assignmentIds = Object.values(trial?.assignments ?? {});
-    if (!trial || !trialPlaybook || assignmentIds.length !== formations.length || assignmentIds.some((formationId) => !formationIds.has(formationId))) return;
+    if (!strategyTrialIsLoadable(trial, trialPlaybook, formations)) return;
 
     setPlaybookId(trial.playbookId);
     setRefits(defaultRefits());
@@ -2809,7 +3088,7 @@ export function App() {
     if (!formationId) return;
     setAssignments((current) => ({ ...current, [roleId]: null }));
     setSelected(formationId);
-    setHoveredFormationId(null);
+    inspectFormation(null);
     setPickerRoleId(null);
     setPlacementFeedback(null);
     setDrillComplete(false);
@@ -3033,13 +3312,14 @@ export function App() {
     <main className={`warhost-app ${phase}`}>
       <AppHeader phase={phase} battleTime={battleTime} operation={operation} operationIndex={operationIndex} profile={operationProfile} />
       <div className="mission-shell">
-        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} condition={condition} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} previewPlaybookId={previewPlaybookId} onPreviewPlaybook={setPreviewPlaybookId} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} onFormationDragEnd={endFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
-        <Battlefield formations={formations} formationFates={operationFormationFates} inspected={inspectedFormationId} onInspect={setHoveredFormationId} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} draggingFormationId={draggingFormationId} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} previewPlaybookId={previewPlaybookId} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} routePreview={routePreview} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onClearRole={clearRoleAssignment} onFormationDragStart={beginFormationDrag} onFormationDragEnd={endFormationDrag} onRoutePreview={previewFormationRoute} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
-        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} blindTestActive={blindTestActive} rescueComplete={rescueComplete} playbook={playbook} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
+        <FormationRoster formations={formations} unavailableFormations={allFormations.filter((formation) => !formation.available)} condition={condition} inspected={inspectedFormationId} onInspect={inspectFormation} selected={selected} onSelect={setSelected} assignments={assignments} playbook={playbook} previewPlaybookId={previewPlaybookId} onPreviewPlaybook={setPreviewPlaybookId} onPlaybook={changePlaybook} operation={operation} phase={phase} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} onBlindPrediction={chooseBlindPrediction} onLoadStrategyTrial={loadStrategyTrial} onStartBlindTest={startBlindTest} onFormationDragStart={beginFormationDrag} onFormationDragEnd={endFormationDrag} readiness={placementReadiness} refitsLocked={operationIndex > 0} onRefit={changeRefit} />
+        <Battlefield formations={formations} formationFates={operationFormationFates} inspected={inspectedFormationId} onInspect={inspectFormation} selected={selected} onSelect={setSelected} deployments={deployments} phase={phase} battleTime={battleTime} condition={condition} drillStep={drillStep} draggingFormationId={draggingFormationId} placementFeedback={placementFeedback} planReady={planReady} playbook={playbook} previewPlaybookId={previewPlaybookId} drillSteps={drillSteps} assignments={assignments} branches={activeBranches} handoffs={tacticalHandoffs} operation={operation} outputs={roleOutputs} profile={operationProfile} routePreview={routePreview} onChooseRole={setPickerRoleId} onAssignFormation={assignFormationToRole} onClearRole={clearRoleAssignment} onFormationDragStart={beginFormationDrag} onFormationDragEnd={endFormationDrag} onRoutePreview={previewFormationRoute} onStaffExercise={runStaffExercise} readiness={placementReadiness} refitProtocols={refitProtocols} staffExerciseIndex={staffExerciseIndex} playbackBeat={currentPlaybackBeat} playbackBeats={playbackBeats} playbackIndex={playbackIndex} playbackPlaying={playbackPlaying} onPlaybackToggle={togglePlayback} onPlaybackStep={stepPlayback} onPlaybackReplay={replayPlayback} />
+        <IntelRail phase={phase} battleTime={battleTime} condition={condition} onCondition={changeCondition} operation={operation} planReady={planReady} blindTestActive={blindTestActive} rescueComplete={rescueComplete} playbook={playbook} assignments={assignments} formations={formations} assignedCount={assignedCount} formationCount={formations.length} integrity={warhostIntegrity} profile={operationProfile} />
       </div>
       {phase === "plan" && (
         <FormationHoverCard
           formation={formations.find((item) => item.id === hoveredFormationId) ?? null}
+          anchor={hovered.anchor}
           playbook={playbook}
           assignments={assignments}
           condition={condition}
@@ -3048,7 +3328,7 @@ export function App() {
       <FooterControls phase={phase} seals={seals} drillComplete={drillComplete} onDrill={() => setPhase("drill")} onCommit={commitMission} onReset={resetMission} operation={operation} planReady={planReady} blindTestActive={blindTestActive} blindPrediction={blindPrediction} branches={activeBranches} onBranch={chooseBranch} />
       <DecisionOverlay decision={decision} seals={seals} branches={branches} operation={operation} onResolve={resolveDecision} />
       <FormationPicker role={playbook.roles.find((role) => role.id === pickerRoleId)} playbook={playbook} condition={condition} formations={formations} assignments={assignments} onChoose={chooseFormationForRole} onClose={() => setPickerRoleId(null)} />
-      {showCompletion && <CompletionOverlay formations={formations} formationFates={operationFormationFates} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} won={operationWon} onAction={blindTestActive ? repeatBlindTest : strategyTrial ? resetMission : handleCompletionAction} />}
+      {showCompletion && <CompletionOverlay formations={formations} formationFates={operationFormationFates} canContinue={canContinueCampaign} campaignDestroyed={campaignDestroyed} integrityBefore={warhostIntegrity} integrityLoss={integrityLoss} integrityAfter={integrityAfterMission} operation={operation} rescued={rescueComplete} usedSeals={2 - seals} playbook={playbook} profile={operationProfile} readiness={placementReadiness} handoffs={tacticalHandoffs} strategyTrial={strategyTrial} blindTestActive={blindTestActive} blindPrediction={blindPrediction} won={operationWon} onAction={blindTestActive ? repeatBlindTest : strategyTrial ? resetMission : handleCompletionAction} />}
       {showWorkshop && workshopBaseline && <SalvageWorkshop baseline={workshopBaseline} choice={salvageChoice} formations={workshopFormations} integrity={warhostIntegrity} nextOperation={OPERATIONS[operationIndex + 1]} onChoose={chooseWorkshopAction} onLaunch={launchNextOperation} />}
     </main>
   );

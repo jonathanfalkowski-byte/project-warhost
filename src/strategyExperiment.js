@@ -108,6 +108,24 @@ export const strategyTrialsForPlaybook = (playbookId) => typeof playbookId === "
 
 export const strategyTrialFor = (trialId) => STRATEGY_TRIALS.find((trial) => trial.id === trialId) ?? null;
 
+// Templates staff the playbook, not the whole roster. The roster deliberately contains
+// more formations than action stops, so requiring every available formation here makes
+// every template unloadable as soon as the bench grows.
+export const strategyTrialIsLoadable = (trial, playbook, formations = []) => {
+  if (!trial?.assignments || !Array.isArray(playbook?.roles) || !Array.isArray(formations)) return false;
+  const roleIds = playbook.roles.map((role) => role?.id).filter(Boolean);
+  const assignmentRoleIds = Object.keys(trial.assignments);
+  const assignmentIds = Object.values(trial.assignments);
+  const rosterIds = new Set(formations.map((formation) => formation?.id).filter(Boolean));
+
+  return roleIds.length > 0
+    && assignmentRoleIds.length === roleIds.length
+    && assignmentRoleIds.every((roleId) => roleIds.includes(roleId))
+    && assignmentIds.length === roleIds.length
+    && new Set(assignmentIds).size === assignmentIds.length
+    && assignmentIds.every((formationId) => rosterIds.has(formationId));
+};
+
 export const strategyTrialResult = (trial, extractedCount) => {
   if (!trial) return null;
   const numeric = Number(extractedCount);

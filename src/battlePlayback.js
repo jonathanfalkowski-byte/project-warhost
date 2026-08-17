@@ -207,7 +207,7 @@ export const buildBattlePlayback = ({
   });
 
   if (profile.overrun > 0 && reinforcementWave?.name && Number.isFinite(reinforcementWave.arrivalAt)) {
-    const exposedFates = formationFates.filter((formationFate) => formationFate?.fate && formationFate.fate !== "extracted");
+    const exposedFates = formationFates.filter((formationFate) => formationFate?.fate && !["extracted", "reserve"].includes(formationFate.fate));
     const exposedIds = exposedFates.map((formationFate) => formationFate.formationId).filter(Boolean);
     const exposedNames = exposedFates.map((formationFate) => formationFate.formation?.name).filter(Boolean);
     const pursuitIndex = profile.enemyClashes.findIndex((clash) => !clash.disrupted && (clash.creates === "CUT OFF" || clash.pressure?.type === "PURSUIT"));
@@ -243,7 +243,7 @@ export const buildBattlePlayback = ({
   }
 
   formationFates
-    .filter((formationFate) => formationFate?.fate && formationFate.fate !== "extracted")
+    .filter((formationFate) => formationFate?.fate && !["extracted", "reserve"].includes(formationFate.fate))
     .forEach((formationFate) => {
       const name = formationFate.formation?.name ?? "Formation";
       const extractionHistory = (formationFate.history ?? []).find((historyItem) => historyItem.source === "extraction");

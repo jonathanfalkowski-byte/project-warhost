@@ -1,5 +1,5 @@
 import { resolveAshenCollision } from "./enemyCollision.js";
-import { enemyPlanFor } from "./enemyPlanData.js";
+import { ENEMY_RESPONSE_WINDOWS, enemyPlanFor } from "./enemyPlanData.js";
 import { resolveExtractionOutcome } from "./extractionResolution.js";
 import { playbookTimingForPressure } from "./missionPressure.js";
 import {
@@ -173,7 +173,7 @@ export const calculateRefitProtocols = (playbook, assignments, formations, opera
 export const calculateEnemyClashes = (operation, handoffs, activeProtocols = [], readiness = {}) => {
   const enemyPlan = enemyPlanFor(operation);
   const staffedRoles = Object.values(readiness);
-  const actorWindows = [[0, 1], [2, 3], [4]];
+  const actorWindows = ENEMY_RESPONSE_WINDOWS;
   const handoffWindows = [[0], [1, 2], [3]];
   const resolutionForStage = (stage, stageIndex) => {
     const actorIndices = actorWindows[stageIndex] ?? [];

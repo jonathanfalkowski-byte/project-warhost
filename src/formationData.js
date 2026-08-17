@@ -225,18 +225,23 @@ export const NODES = {
 
 // One staging position per formation in the roster. The roster is larger than the
 // number of action stops, so several of these hold formations left in reserve.
+//
+// The row used to sit at 10.5%, directly on top of the battle-sequence band, so hovering
+// a reserve formation put its marker over the mission chrome the player was reading. It
+// now sits in the gap between that band and the first objective markers.
+const STAGING_TOP = 20.5;
 export const STAGING_NODES = {
-  harpoon: { left: 26, top: 10.5, label: "Formation staging" },
-  furnace: { left: 32, top: 10.5, label: "Formation staging" },
-  breaker: { left: 38, top: 10.5, label: "Formation staging" },
-  railjack: { left: 44, top: 10.5, label: "Formation staging" },
-  hauler: { left: 50, top: 10.5, label: "Formation staging" },
-  skimmer: { left: 56, top: 10.5, label: "Formation staging" },
-  carriage: { left: 62, top: 10.5, label: "Formation staging" },
-  command: { left: 68, top: 10.5, label: "Formation staging" },
-  bastion: { left: 74, top: 10.5, label: "Formation staging" },
+  harpoon: { left: 23, top: STAGING_TOP, label: "Formation staging" },
+  furnace: { left: 27.5, top: STAGING_TOP, label: "Formation staging" },
+  breaker: { left: 32, top: STAGING_TOP, label: "Formation staging" },
+  railjack: { left: 36.5, top: STAGING_TOP, label: "Formation staging" },
+  hauler: { left: 41, top: STAGING_TOP, label: "Formation staging" },
+  skimmer: { left: 45.5, top: STAGING_TOP, label: "Formation staging" },
+  carriage: { left: 50, top: STAGING_TOP, label: "Formation staging" },
+  command: { left: 54.5, top: STAGING_TOP, label: "Formation staging" },
+  bastion: { left: 59, top: STAGING_TOP, label: "Formation staging" },
 };
 
 // Any formation added without a staging position still renders rather than crashing.
 export const stagingNodeFor = (formationId) => STAGING_NODES[formationId]
-  ?? { left: 50, top: 10.5, label: "Formation staging" };
+  ?? { left: 41, top: STAGING_TOP, label: "Formation staging" };

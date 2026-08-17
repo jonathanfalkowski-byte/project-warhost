@@ -248,3 +248,85 @@ test("a staffed recovery element protects its assigned formation when any extrac
   assert.equal(fates.find(({ formation }) => formation.id === "recovery").fate, "damaged");
   assert.equal(fates.filter(({ fate }) => fate === "missing").length, 2);
 });
+
+test("only the formations actually fielded are scored for extraction", () => {
+  // Reported 15 Aug 2026: a nine-formation roster fielding five reported "2 / 9 EXTRACT",
+  // and every formation the player watched reach the gantry was marked MISSING while the
+  // two counted as extracted were reserves that never left staging. Cause: fates were
+  // allocated across the whole roster, so unaccounted = 9 - 2 = 7, and reserves carry no
+  // battlefield consequences so they sorted safest and absorbed the extracted slots.
+  const roster = ["a", "b", "c", "d", "e", "f", "g", "h", "i"].map((id) => ({ id, name: id.toUpperCase() }));
+  const deployedIds = ["a", "b", "c", "d", "e"];
+  const fates = formationFatesFor({
+    formations: roster,
+    formationOrderIds: roster.map((formation) => formation.id),
+    deployedIds,
+    extractedCount: 2,
+    consequences: {},
+    extractionAt: 400,
+    completeAt: 420,
+  });
+
+  const byId = new Map(fates.map((fate) => [fate.formationId, fate]));
+  for (const id of ["f", "g", "h", "i"]) {
+    assert.equal(byId.get(id).fate, "reserve", `reserve ${id} was scored as ${byId.get(id).fate}`);
+  }
+  const cleared = deployedIds.filter((id) => ["extracted", "damaged"].includes(byId.get(id).fate));
+  const lost = deployedIds.filter((id) => ["missing", "destroyed"].includes(byId.get(id).fate));
+  assert.equal(cleared.length, 2, "the extracted count must be drawn from the fielded force");
+  assert.equal(lost.length, 3);
+  // A reserve is neither a casualty nor a success.
+  assert.equal(fates.filter((fate) => fate.fate === "reserve").length, 4);
+});
+
+test("the unaccounted count is taken from the fielded force, not the roster", () => {
+  // Ordering must not be what rescues this. With the deployed formations sorted most
+  // exposed, a roster-sized unaccounted count consumes every one of them and reports a
+  // total loss for a plan that extracted two.
+  const roster = ["a", "b", "c", "d", "e", "f", "g", "h", "i"].map((id) => ({ id, name: id.toUpperCase() }));
+  const deployedIds = ["e", "f", "g", "h", "i"];
+  const fates = formationFatesFor({
+    formations: roster,
+    formationOrderIds: roster.map((formation) => formation.id),
+    deployedIds,
+    extractedCount: 2,
+    consequences: {},
+    extractionAt: 400,
+    completeAt: 420,
+  });
+  const byId = new Map(fates.map((fate) => [fate.formationId, fate]));
+  const cleared = deployedIds.filter((id) => ["extracted", "damaged"].includes(byId.get(id).fate));
+  assert.equal(cleared.length, 2, `expected 2 of the fielded force to clear, got ${cleared.length}`);
+  assert.equal(deployedIds.filter((id) => ["missing", "destroyed"].includes(byId.get(id).fate)).length, 3);
+});
+
+test("a reserve formation is not counted as a campaign loss", () => {
+  const roster = ["a", "b", "c"].map((id) => ({ id, name: id.toUpperCase() }));
+  const fates = formationFatesFor({
+    formations: roster,
+    formationOrderIds: roster.map((formation) => formation.id),
+    deployedIds: ["a"],
+    extractedCount: 1,
+    extractionAt: 100,
+    completeAt: 120,
+  });
+  const grade = victoryGradeFor({
+    won: true, extractedCount: 1, requiredExtraction: 1, totalFormations: 1, formationFates: fates,
+  });
+  assert.ok(grade, "a win with every fielded formation recovered still grades");
+  assert.equal(fates.filter((fate) => fate.fate === "missing").length, 0);
+});
+
+test("omitting the deployed list keeps the whole-roster behaviour", () => {
+  // Callers that describe no plan (campaign summaries, fixtures) must be unaffected.
+  const roster = ["a", "b", "c"].map((id) => ({ id, name: id.toUpperCase() }));
+  const fates = formationFatesFor({
+    formations: roster,
+    formationOrderIds: roster.map((formation) => formation.id),
+    extractedCount: 1,
+    extractionAt: 100,
+    completeAt: 120,
+  });
+  assert.equal(fates.filter((fate) => fate.fate === "reserve").length, 0);
+  assert.equal(fates.filter((fate) => ["missing", "destroyed"].includes(fate.fate)).length, 2);
+});

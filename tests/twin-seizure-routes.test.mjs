@@ -21,10 +21,20 @@ test("Twin Seizure shows complete objective-to-extraction routes", () => {
   assert.equal(branchRoutes.rescue.clock.at(-1), "southExit");
   assert.equal(branchRoutes.rescue.recover.at(-1), "southExit");
 
-  assert.ok(routes[0].points.indexOf("alpha") < routes[0].points.indexOf("reactor"));
+  // Role 0's Alpha is now its own action stop (referenced by index) rather than a
+  // landmark string, so assert the ordering on the resolved geometry instead of on the
+  // authored reference list, where `indexOf("alpha")` would be a vacuous -1.
+  const west = buildAuthoredFormationRoutes({
+    plan: TWIN_SEIZURE_FIELD_PLAN, landmarks, roles, assignments, branches: { beta: "tempo", rescue: "recover" },
+  });
+  const indexOfPoint = (route, point) => route.points.findIndex((item) => item.x === point.x && item.y === point.y);
+  assert.ok(indexOfPoint(west[0], landmarks.alpha) < indexOfPoint(west[0], landmarks.reactor));
   assert.equal(TWIN_SEIZURE_FIELD_PLAN.breakpointRoles.beta, 1);
-  assert.ok(routes[2].points.indexOf("alpha") < routes[2].points.indexOf("reactor"));
-  routes.forEach((route) => assert.match(route.afterLabel, /MOTOR POOL$/));
+  assert.ok(indexOfPoint(west[2], landmarks.alpha) < indexOfPoint(west[2], landmarks.reactor));
+  // Route labels now state what the stop is FOR rather than repeating the destination —
+  // the player could not tell whether a stop was being recovered or held. The journey
+  // still ending at extraction is asserted above, on the geometry, where it belongs.
+  routes.forEach((route) => assert.ok(route.afterLabel.length > 0, "a route lost its order text"));
 });
 
 test("every selected Twin Seizure order is a complete journey ending at extraction", () => {
