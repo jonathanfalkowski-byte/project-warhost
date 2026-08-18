@@ -7,14 +7,13 @@
     "dev": "vite",
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
-    "test:game": "node --test tests/accessibility.test.mjs tests/balance.test.mjs tests/app-render.test.mjs tests/battle-doctrine.test.mjs tests/enemy-collision.test.mjs tests/battle-playback.test.mjs tests/battle-consequences.test.mjs tests/campaign-persistence.test.mjs tests/extraction-resolution.test.mjs tests/field-plan-geometry.test.mjs tests/field-routes.test.mjs tests/formation-interactions.test.mjs tests/mission-disposition.test.mjs tests/mission-pressure.test.mjs tests/planning-intel.test.mjs tests/playbook-doctrine.test.mjs tests/strategy-causality.test.mjs tests/strategy-experiment.test.mjs tests/tactical-resolution.test.mjs tests/twin-seizure-routes.test.mjs tests/enemy-counter-intel.test.mjs tests/enemy-route-visibility.test.mjs tests/formation-effectiveness.test.mjs tests/hover-card-placement.test.mjs tests/battle-staging.test.mjs",
+    "test:game": "node --test tests/accessibility.test.mjs tests/app-render.test.mjs tests/battle-rules.test.mjs tests/battle-stratagems.test.mjs tests/battle-doctrine-layers.test.mjs tests/battle-plans.test.mjs tests/battle-missions.test.mjs tests/battle-after-action.test.mjs tests/battle-campaign.test.mjs tests/battle-refits.test.mjs tests/battle-support.test.mjs tests/battle-synergies.test.mjs tests/battle-terrain.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs",
-    "analyse:balance": "node scripts/balance-sweep.mjs"
+    "analyse": "node scripts/battle-sweep.mjs"
   },
   "dependencies": {
     "@fontsource/barlow": "^5.2.6",
     "@fontsource/barlow-condensed": "^5.2.6",
-    "@phosphor-icons/react": "^2.1.10",
     "@vitejs/plugin-react": "5.0.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
