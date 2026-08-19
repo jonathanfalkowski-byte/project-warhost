@@ -1,0 +1,232 @@
+// What each formation actually did.
+//
+// "if im doing combos and strategy and units i kind of need to know what worked... maybe a
+// percentage how effective the unit was in their position and role". The operation model
+// answered that and the battle model did not, so this is the answer carried across rather
+// than lost when the old screen was retired.
+//
+// The measure adapts to what you declared, because measuring a formation against a job it
+// was never given is worse than not measuring it. Under a disposition paid on damage, a
+// formation's share is its share of the damage. Under one paid on ground, it is its share
+// of the objective-rounds the army held. Contribution is always a share of what the army
+// was actually scoring for.
+
+import { OBJECTIVE_CONTROL_RANGE } from "./battleProfiles.js";
+import { COMMAND_RANGE, SHIELD_RANGE } from "./battleRules.js";
+import { dispositionFor, liveSitesFor } from "./doctrine.js";
+
+const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const percent = (part, whole) => (whole > 0 ? Math.round((100 * part) / whole) : 0);
+
+// A formation holds an objective in a round if it is alive, on it, and its side ended the
+// round holding it. Standing on ground you did not take is not holding it.
+const heldThisRound = ({ unit, round, sites }) => sites.filter((site) => (
+  unit.wounds > 0
+  && distance(unit, site) <= OBJECTIVE_CONTROL_RANGE
+  && round.objectives.find((entry) => entry.objectiveId === site.id)?.holder === "player"
+)).length;
+
+// Ground held that this disposition does not pay for — which is not nothing. Every marker
+// you are standing on is a marker THEY are not scoring, and denying a point is worth what
+// taking one is.
+//
+// Under SAFEGUARD exactly one marker on the board is live, and every safeguard plan sends
+// two or three of its five slots to the flank markers. Measured against scoring ground
+// alone, most of a safeguard army came back reading "Held no scoring ground at any point" —
+// the debrief telling the player that half of what they fielded did nothing, in the run
+// where it was doing the most. HOME-LINE is that disposition's best line BECAUSE of this
+// work.
+const deniedThisRound = ({ unit, round, objectives, sites }) => {
+  const scoring = new Set(sites.map((site) => site.id));
+  return objectives.filter((objective) => (
+    !scoring.has(objective.id)
+    && unit.wounds > 0
+    && distance(unit, objective) <= OBJECTIVE_CONTROL_RANGE
+    && round.objectives.find((entry) => entry.objectiveId === objective.id)?.holder === "player"
+  )).length;
+};
+
+// Which formations are working together, right now, on the board.
+//
+// The combos have been in the rules since the wargame profiles were written — a SHIELD
+// soaks fire aimed at anything near it, a COMMAND makes everything near it shoot better,
+// a REPAIR patches one friend a round — and the screen has never once shown them. A combo
+// nobody can see is a combo nobody has, which is most of the answer to why buying a second
+// SHIELD never felt like it did anything.
+//
+// Derived from position rather than tracked through the resolution, because that is all it
+// is: standing near the right formation.
+export const SUPPORT_RANGES = { SHIELD: SHIELD_RANGE, COMMAND: COMMAND_RANGE };
+
+export const supportLinksFor = ({ players = [] } = {}) => {
+  const standing = players.filter((unit) => unit.wounds > 0);
+  const links = [];
+  for (const source of standing) {
+    for (const keyword of ["SHIELD", "COMMAND"]) {
+      if (!source.keywords?.includes(keyword)) continue;
+      for (const friend of standing) {
+        if (friend.id === source.id) continue;
+        if (Math.hypot(source.x - friend.x, source.y - friend.y) > SUPPORT_RANGES[keyword]) continue;
+        links.push({ kind: keyword.toLowerCase(), from: source.name, to: friend.name });
+      }
+    }
+  }
+  return links;
+};
+
+// The pairings firing in a round, as lines between exactly the two hulls that formed each
+// one. Derived from what the round RECORDED rather than recomputed from positions, so what
+// is drawn and what was resolved cannot drift apart.
+export const pairingLinksFor = ({ round } = {}) => (round?.synergies?.player ?? [])
+  .map((found) => ({ kind: "pairing", from: found.holder, to: found.partner, name: found.name }));
+
+// The one thing worth saying about a round while you are watching it. Five rounds of
+// silent markers sliding around is confirmation, not suspense — there is no moment where
+// something HAPPENS. This picks it out: a wreck first, then a stratagem, then the heaviest
+// blow, and stays quiet if the round genuinely had nothing in it.
+export const headlineFor = ({ round, previous, known = [] } = {}) => {
+  if (!round) return null;
+  // A pairing forming for the FIRST TIME outranks everything, including a casualty. It is
+  // the only moment in the game where the player learns a rule that was written nowhere,
+  // and it happens once per run per pairing — a wreck can wait one banner.
+  // `known` is everything the run already knew plus everything earlier rounds of this
+  // battle showed. The caller owns that, because only the caller knows where the round
+  // being displayed sits in the run.
+  const seen = new Set(known);
+  const fresh = (round.synergies?.player ?? []).find((found) => !seen.has(found.id));
+  if (fresh) {
+    return {
+      tone: "found",
+      text: `PAIRING FOUND — ${fresh.name}: ${fresh.holder} standing with ${fresh.partner}. ${fresh.reveal}`,
+    };
+  }
+  const wasAlive = new Map((previous?.players ?? []).map((unit) => [unit.id, unit.wounds > 0]));
+  const wasAliveEnemy = new Map((previous?.enemies ?? []).map((unit) => [unit.id, unit.wounds > 0]));
+
+  const lostThisRound = round.players.filter((unit) => unit.wounds <= 0 && (wasAlive.get(unit.id) ?? true));
+  // Say WHOSE. A red banner reading "ASSAULT WALKER destroyed" is ambiguous when red is
+  // also the enemy's colour everywhere else on the screen, and both armies field
+  // formations drawn from the same roster.
+  if (lostThisRound.length > 0) {
+    return { tone: "loss", text: `You lost ${lostThisRound.map((unit) => unit.name).join(" and ")}.` };
+  }
+  const brokeThisRound = round.enemies.filter((unit) => unit.wounds <= 0 && (wasAliveEnemy.get(unit.id) ?? true));
+  if (brokeThisRound.length > 0) {
+    return { tone: "kill", text: `You wrecked ${brokeThisRound.map((unit) => unit.name).join(" and ")}.` };
+  }
+  const enemySpend = (round.spends ?? []).find((spend) => spend.side === "enemy");
+  if (enemySpend) return { tone: "enemy", text: `Helioch spends ${enemySpend.name}.` };
+  const ourSpend = (round.spends ?? []).find((spend) => spend.side === "player");
+  if (ourSpend) return { tone: "player", text: `${ourSpend.name} fires.` };
+
+  const heaviest = (round.log ?? [])
+    .filter((entry) => entry.phase !== "stratagem" && typeof entry.amount === "number")
+    .sort((left, right) => right.amount - left.amount)[0];
+  if (heaviest) {
+    // "Puts 1 into" is wrong for a formation patching a friend, and the repair phase is in
+    // the same log as the shooting.
+    const verb = heaviest.phase === "repair" ? "patches" : "puts";
+    return {
+      tone: heaviest.side === "player" ? "player" : "enemy",
+      text: heaviest.phase === "repair"
+        ? `${heaviest.actor} ${verb} ${heaviest.target} for ${heaviest.amount}.`
+        : `${heaviest.actor} ${verb} ${heaviest.amount} into ${heaviest.target}.`,
+    };
+  }
+  return { tone: "quiet", text: "Nothing in range. Both armies are still closing." };
+};
+
+export const afterActionFor = ({ result, objectives = [], disposition = "dominion" } = {}) => {
+  const rounds = result?.rounds ?? [];
+  if (rounds.length === 0) return { formations: [], measure: "ground", basis: 0 };
+
+  const rule = dispositionFor(disposition);
+  const sites = liveSitesFor({ disposition, side: "player", objectives });
+  // With no live markers there is no ground to be measured against, so the only honest
+  // measure left is what the formation broke.
+  const measure = sites.length === 0 ? "damage" : "ground";
+
+  const roster = new Map();
+  for (const unit of rounds[0].players) {
+    roster.set(unit.name, {
+      id: unit.id,
+      name: unit.name,
+      dealt: 0,
+      taken: 0,
+      objectiveRounds: 0,
+      deniedRounds: 0,
+      lostInRound: null,
+      survived: true,
+      maxWounds: unit.maxWounds,
+      wounds: unit.wounds,
+    });
+  }
+
+  rounds.forEach((round, index) => {
+    for (const entry of round.log) {
+      if (entry.phase === "stratagem") continue;
+      if (entry.side === "player" && roster.has(entry.actor)) roster.get(entry.actor).dealt += entry.amount;
+      if (entry.side === "enemy" && roster.has(entry.target)) roster.get(entry.target).taken += entry.amount;
+    }
+    for (const unit of round.players) {
+      const record = roster.get(unit.name);
+      if (!record) continue;
+      record.wounds = unit.wounds;
+      record.objectiveRounds += heldThisRound({ unit, round, sites });
+      record.deniedRounds += deniedThisRound({ unit, round, objectives, sites });
+      if (unit.wounds <= 0 && record.lostInRound === null) {
+        record.lostInRound = index + 1;
+        record.survived = false;
+      }
+    }
+  });
+
+  const formations = [...roster.values()];
+  const basis = measure === "damage"
+    ? formations.reduce((sum, entry) => sum + entry.dealt, 0)
+    : formations.reduce((sum, entry) => sum + entry.objectiveRounds, 0);
+
+  return {
+    measure,
+    basis: Number(basis.toFixed(2)),
+    scoring: rule.scoring,
+    formations: formations
+      .map((entry) => {
+        // Round before the sentence is written, or the note reads "took 3.4000000000000004".
+        const rounded = { ...entry, dealt: Number(entry.dealt.toFixed(2)), taken: Number(entry.taken.toFixed(2)) };
+        return {
+          ...rounded,
+          contribution: percent(measure === "damage" ? rounded.dealt : rounded.objectiveRounds, basis),
+          note: noteFor({ entry: rounded, measure }),
+        };
+      })
+      .sort((left, right) => right.contribution - left.contribution || left.name.localeCompare(right.name)),
+  };
+};
+
+// One line saying what the formation did, in the terms the disposition is scored in. A
+// number with no sentence beside it is the thing that made the old debrief unreadable.
+const noteFor = ({ entry, measure }) => {
+  if (measure === "damage") {
+    if (entry.dealt <= 0 && !entry.survived) return `Destroyed in round ${entry.lostInRound} without firing a shot.`;
+    if (entry.dealt <= 0) return "Never got into range of anything.";
+    if (!entry.survived) return `Dealt ${entry.dealt} before it was destroyed in round ${entry.lostInRound}.`;
+    return `Dealt ${entry.dealt} and took ${entry.taken}.`;
+  }
+  const rounds = (count) => `${count} round${count === 1 ? "" : "s"}`;
+  const denial = entry.deniedRounds > 0
+    ? ` Denied them ground for ${rounds(entry.deniedRounds)}, which this disposition does not pay you for.`
+    : "";
+  if (entry.objectiveRounds === 0 && !entry.survived) {
+    return `Destroyed in round ${entry.lostInRound} without holding anything.${denial}`;
+  }
+  if (entry.objectiveRounds === 0) {
+    // A formation that denied ground for the whole battle held plenty; what it did not do
+    // is hold ground THIS disposition scores, and the sentence has to say which.
+    return entry.deniedRounds > 0
+      ? `Held no ground you score.${denial}`
+      : "Held no scoring ground at any point.";
+  }
+  if (!entry.survived) return `Held ground for ${rounds(entry.objectiveRounds)} before it was destroyed in round ${entry.lostInRound}.${denial}`;
+  return `Held ground for ${rounds(entry.objectiveRounds)}.${denial}`;
+};

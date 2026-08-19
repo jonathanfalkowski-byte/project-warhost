@@ -1,0 +1,430 @@
+/* BATTLE ROUNDS — the second game mode. Kept deliberately spare: the operation screen
+   grew to twenty information regions and stopped being readable, so this one shows the
+   board, the army and the score, and adds nothing until there is something to say. */
+.battle-app { position: fixed; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); background: #070d0f; color: #e6efec; font-family: Barlow, system-ui, sans-serif; }
+.battle-header { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 20px; padding: 12px 18px; border-bottom: 1px solid #2a3a3e; background: #0b1416; }
+.battle-header .eyebrow { margin: 0; color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .18em; }
+.battle-header h1 { margin: 1px 0; font-size: 24px; letter-spacing: .02em; }
+.battle-header small { color: #93a8a2; font-size: 12px; }
+.battle-score { display: grid; grid-template-columns: auto auto auto; align-items: center; gap: 16px; }
+.battle-score > div { display: grid; justify-items: center; }
+.battle-score span { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.battle-score b { font-size: 34px; line-height: 1; }
+.battle-score > div:first-child b { color: #6fc8ea; }
+.battle-score > div:last-child b { color: #ef7655; }
+.battle-score em { color: #93a8a2; font-family: "Barlow Condensed"; font-size: 11px; font-style: normal; letter-spacing: .12em; }
+.battle-exit { padding: 6px 10px; border: 1px solid #4f6a74; background: rgba(12,22,26,.9); color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .1em; cursor: pointer; }
+
+.battle-body { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+.battle-board { position: relative; overflow: hidden; background: radial-gradient(circle at 50% 50%, #12201f 0%, #070d0f 70%); }
+.battle-zone { position: absolute; left: 0; right: 0; height: 16%; display: flex; align-items: center; justify-content: center; }
+.battle-zone span { color: #4d6169; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .22em; }
+.battle-zone-player { bottom: 0; border-top: 1px dashed #2f6076; background: rgba(24,54,66,.28); }
+.battle-zone-enemy { top: 0; border-bottom: 1px dashed #6d3a2c; background: rgba(58,26,20,.28); }
+
+/* The ground. Under the markers and the units, above the deployment zones — you are meant
+   to read the board through it, not past it. */
+.battle-terrain { position: absolute; transform: translate(-50%, -50%); z-index: 1; border-radius: 50%; display: grid; place-items: start center; }
+/* The name sits on the rim, not in the middle: the middle of a piece of terrain is very
+   often exactly where a marker or a formation is standing. */
+.battle-terrain span { margin-top: -7px; font-family: "Barlow Condensed"; font-size: 9px; font-weight: 700; letter-spacing: .12em; white-space: nowrap; }
+.battle-terrain-broken { border: 1px dashed #8a7550; background: rgba(48,38,20,.5); }
+.battle-terrain-broken span { color: #d7bd8b; }
+.battle-terrain-cover { border: 1px solid #4b7a6a; background: rgba(16,40,34,.5); }
+.battle-terrain-cover span { color: #9fd6c6; }
+.battle-terrain-blocking { border: 1px solid #6d7f8a; background: rgba(26,34,40,.85); }
+.battle-terrain-blocking span { color: #c3d2da; }
+
+.battle-objective { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 1px; z-index: 3; }
+.battle-objective i { width: var(--control); height: var(--control); border: 1px dashed #46595f; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.battle-objective b { padding: 2px 7px; border: 1px solid #5b7078; background: rgba(8,16,18,.95); font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .08em; }
+.battle-objective small { color: #93a8a2; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .1em; }
+.battle-objective.held-player b { border-color: #4f93b1; color: #8fdcf6; }
+.battle-objective.held-player i { border-color: #4f93b1; }
+.battle-objective.held-enemy b { border-color: #b1553c; color: #f09372; }
+.battle-objective.held-enemy i { border-color: #b1553c; }
+
+.battle-unit { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; z-index: 5; transition: left .5s ease-out, top .5s ease-out; }
+.battle-unit b { padding: 2px 6px; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; border: 1px solid; }
+.battle-unit i { display: block; width: 54px; height: 4px; background: #1d2a2e; border: 1px solid #3c5058; }
+.battle-unit em { display: block; height: 100%; }
+.battle-unit-player b { border-color: #4f93b1; background: rgba(14,36,46,.95); color: #8fdcf6; }
+.battle-unit-player em { background: #6fc8ea; }
+.battle-unit-enemy b { border-color: #b1553c; background: rgba(40,18,14,.95); color: #f09372; }
+.battle-unit-enemy em { background: #ef7655; }
+/* A wreck is still information — which of your formations died, and where. Fading the
+   label to 32% dropped it to a 2.2:1 contrast ratio and made that unreadable, so it is
+   dimmed by colour and marked by the strike-through instead. */
+.battle-unit.destroyed b { text-decoration: line-through; border-color: #4a5a60; background: rgba(8,14,16,.95); color: #93a5ab; }
+.battle-unit.destroyed i { opacity: .4; }
+@media (prefers-reduced-motion: reduce) { .battle-unit { transition: none; } }
+/* The profile, on hover and on focus. Absolute inside the marker so it travels with it,
+   and flipped to whichever side of the marker has room: an enemy card drawn upwards off
+   the top of the board is a card nobody reads. */
+.battle-unit:hover, .battle-unit:focus-within, .battle-unit:focus { z-index: 9; }
+.battle-unit:focus { outline: 1px solid #cfe6f4; outline-offset: 3px; }
+.battle-unit-card { display: none; position: absolute; left: 50%; transform: translateX(-50%); width: 208px; padding: 7px 9px; border: 1px solid #5f7a84; background: #0b1416; text-align: left; }
+.battle-unit:hover > .battle-unit-card, .battle-unit:focus > .battle-unit-card, .battle-unit:focus-within > .battle-unit-card { display: grid; gap: 2px; }
+/* The enemy deploys along the top, so its cards hang below; the warband's hang above. */
+.battle-unit-enemy .battle-unit-card { top: 100%; margin-top: 8px; }
+.battle-unit-player .battle-unit-card { bottom: 100%; margin-bottom: 8px; }
+/* Off a touchline marker, inwards: the board clips what it cannot fit. */
+.battle-unit.edge-left .battle-unit-card { left: 0; transform: none; }
+.battle-unit.edge-right .battle-unit-card { left: auto; right: 0; transform: none; }
+.battle-unit-card-name { color: #e6efec; font-family: "Barlow Condensed"; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; }
+.battle-unit-stats { color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .05em; }
+.battle-unit-card-state { color: #9fd6c6; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .05em; }
+.battle-unit-card-note { color: #a8bcb6; font-size: 11px; line-height: 1.35; }
+
+
+.battle-rail { border-left: 1px solid #2a3a3e; background: #0a1113; padding: 14px; overflow: auto; display: grid; gap: 10px; align-content: start; }
+.battle-rail h2 { margin: 0; font-size: 16px; letter-spacing: .06em; }
+.battle-hint { margin: 0; color: #93a8a2; font-size: 12px; line-height: 1.4; }
+.battle-slot { display: grid; gap: 4px; padding: 8px; border: 1px solid #33474e; background: rgba(14,24,27,.8); }
+.battle-slot > span { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.battle-slot select { padding: 5px; border: 1px solid #45585f; background: #101a1d; color: #e6efec; font-family: "Barlow Condensed"; font-size: 13px; }
+.battle-profile { color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 10.5px; letter-spacing: .06em; }
+.battle-note { color: #93a8a2; font-size: 11px; line-height: 1.35; }
+/* What a formation has done, under its name. */
+.battle-honours { color: #d8b775; font-family: "Barlow Condensed"; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; }
+
+/* The map. Three roads into the same engagement, one of which is the standing battle. */
+.battle-roads { display: grid; gap: 5px; padding: 8px; border: 1px solid #4a3f6a; background: rgba(26,20,38,.85); }
+.battle-roads > span { color: #b9a8e6; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.battle-road { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; padding: 7px 8px; border: 1px solid #5b4d84; background: rgba(18,14,28,.9); text-align: left; font: inherit; cursor: pointer; }
+.battle-road b { color: #d7c9ff; font-family: "Barlow Condensed"; font-size: 13px; letter-spacing: .08em; }
+.battle-road em { justify-self: end; color: #e8c98a; font-family: "Barlow Condensed"; font-size: 11px; font-style: normal; letter-spacing: .06em; }
+.battle-road small { grid-column: 1 / -1; color: #b2a6cc; font-size: 11px; line-height: 1.35; }
+.battle-road:hover:not(:disabled) { border-color: #8f7ed0; background: rgba(34,26,52,.95); }
+.battle-road.taken { border-color: #b4762f; background: rgba(42,26,12,.9); }
+.battle-road.taken b { color: #edc478; }
+.battle-road.given-up { border-color: #2e2840; }
+.battle-road.given-up b { color: #8b81a4; }
+.battle-road.given-up em, .battle-road.given-up small { color: #8b81a4; }
+
+/* The card you kept back, and the button that spends it while the battle is still running. */
+.battle-reserve { display: grid; gap: 3px; padding: 9px; border: 1px solid #b4762f; background: rgba(42,26,12,.9); }
+.battle-reserve > span { color: #edc478; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.battle-reserve b { color: #ffd89a; font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; }
+.battle-reserve small { color: #dcc29a; font-size: 11px; line-height: 1.35; }
+.battle-spend-now { margin-top: 4px; padding: 7px; border: 1px solid #edc478; background: #3a2410; color: #ffe6b8; font-family: "Barlow Condensed"; font-size: 13px; font-weight: 700; letter-spacing: .1em; cursor: pointer; }
+.battle-spend-now:hover { background: #4a2e12; }
+
+.battle-enemy-brief { padding: 9px; border-left: 3px solid #b1553c; background: rgba(34,16,12,.8); display: grid; gap: 4px; }
+.battle-enemy-brief > span { color: #f28a5c; font-family: "Barlow Condensed"; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+.battle-enemy-brief p { margin: 0; color: #e9b79c; font-size: 12px; line-height: 1.4; }
+.battle-enemy-brief ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.battle-enemy-brief li { display: grid; }
+.battle-enemy-brief li b { color: #f0b191; font-family: "Barlow Condensed"; font-size: 11.5px; letter-spacing: .06em; }
+.battle-enemy-brief li em { color: #b89383; font-size: 10.5px; font-style: normal; }
+/* The line that says they adapted. Marked out from the rest of the brief because it is the
+   only part of it that is about the player. */
+.battle-enemy-read { color: #ffc9a8; border-left: 2px solid #d0704c; padding-left: 7px; font-size: 12px; line-height: 1.4; }
+.battle-enemy-brief li small { color: #e0a887; font-family: "Barlow Condensed"; font-size: 10.5px; letter-spacing: .05em; }
+
+.battle-commit { padding: 12px; border: 1px solid #b4762f; background: #2a1a0c; color: #edc478; font-family: "Barlow Condensed"; font-size: 16px; font-weight: 700; letter-spacing: .12em; cursor: pointer; }
+.battle-commit:disabled { opacity: .45; cursor: default; }
+.battle-objective-list { display: grid; gap: 3px; }
+.battle-objective-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 8px; align-items: baseline; padding: 5px 7px; border-left: 3px solid #3d4b44; background: rgba(16,24,21,.82); }
+.battle-objective-row b { font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .06em; }
+.battle-objective-row span { color: #93a8a2; font-family: "Barlow Condensed"; font-size: 11px; }
+.battle-objective-row em { font-family: "Barlow Condensed"; font-size: 10px; font-style: normal; letter-spacing: .1em; }
+.battle-objective-row.held-player { border-left-color: #4f93b1; } .battle-objective-row.held-player em { color: #8fdcf6; }
+.battle-objective-row.held-enemy { border-left-color: #b1553c; } .battle-objective-row.held-enemy em { color: #f09372; }
+.battle-objective-row.held-contested em { color: #93a8a2; }
+
+.battle-log { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.battle-log li { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 4px 7px; background: rgba(14,22,25,.7); color: #c3d2cd; font-size: 11.5px; }
+.battle-log li b { font-weight: 700; }
+.battle-log li em { font-style: normal; font-family: "Barlow Condensed"; }
+.battle-log li.log-player { border-left: 2px solid #4f93b1; }
+.battle-log li.log-enemy { border-left: 2px solid #b1553c; }
+.battle-log li.log-quiet { color: #7d8b86; grid-template-columns: 1fr; }
+
+.battle-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.battle-controls button { padding: 8px; border: 1px solid #45585f; background: #101a1d; color: #cfe3ea; font-family: "Barlow Condensed"; font-size: 12px; font-weight: 700; letter-spacing: .08em; cursor: pointer; }
+.battle-controls button:disabled { opacity: .4; cursor: default; }
+.battle-result { display: grid; justify-items: center; gap: 2px; padding: 12px; border: 1px solid #4a5a52; background: rgba(12,20,18,.9); }
+.battle-result span { font-family: "Barlow Condensed"; font-size: 13px; font-weight: 700; letter-spacing: .12em; }
+.battle-result b { font-size: 30px; }
+.battle-result small { color: #93a8a2; font-size: 11px; }
+.battle-result.player span, .battle-result.player b { color: #8fdcf6; }
+.battle-result.enemy span, .battle-result.enemy b { color: #f09372; }
+
+/* Entry point into the second model from the original screen. */
+.mode-switch {
+  position: fixed; z-index: 200; right: 14px; bottom: 12px;
+  display: grid; gap: 1px; padding: 8px 12px; cursor: pointer;
+  border: 1px solid #b4762f; background: rgba(42,26,12,.96);
+  box-shadow: 0 8px 22px rgba(0,0,0,.6);
+}
+.mode-switch span { color: #edc478; font-family: "Barlow Condensed"; font-size: 13px; font-weight: 700; letter-spacing: .12em; }
+.mode-switch small { color: #b0996b; font-family: "Barlow Condensed"; font-size: 9.5px; letter-spacing: .1em; }
+.mode-switch:focus-visible { outline: 2px solid #edc478; outline-offset: 2px; }
+
+/* It plays itself; the controls are for reading it back, not for driving it. */
+.battle-rail h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.battle-state { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-style: normal; font-weight: 700; letter-spacing: .14em; }
+.battle-controls { grid-template-columns: repeat(4, 1fr); }
+.battle-play { border-color: #4f93b1 !important; color: #8fdcf6 !important; }
+
+/* Stratagems. The player's own are a plain priced list with a round to fire in — the
+   timing is the decision. The enemy's are shown as a pool it might hold and never as a
+   hand, because not knowing which two is where the battle's uncertainty comes from. */
+.battle-strat-panel { display: grid; gap: 6px; padding: 9px; border-left: 3px solid #4f93b1; background: rgba(12,28,36,.8); }
+.battle-strat-panel h3 { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-family: "Barlow Condensed"; font-size: 13px; letter-spacing: .12em; color: #8fdcf6; }
+.battle-strat-panel h3 em { font-style: normal; font-size: 12px; letter-spacing: .1em; color: #cfe6de; }
+.battle-strat-panel h3 em.over { color: #ff9c7a; }
+.battle-strat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 6px 7px; border: 1px solid #33474e; background: rgba(10,18,21,.7); }
+.battle-strat b { font-family: "Barlow Condensed"; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; }
+.battle-strat-cost { justify-self: end; padding: 0 5px; border: 1px solid #4f6a74; color: #9fd6c6; font-family: "Barlow Condensed"; font-size: 10.5px; letter-spacing: .08em; }
+.battle-strat small { grid-column: 1 / -1; color: #93a8a2; font-size: 11px; line-height: 1.35; }
+.battle-strat select { grid-column: 1 / -1; margin-top: 3px; padding: 4px; border: 1px solid #45585f; background: #101a1d; color: #e6efec; font-family: "Barlow Condensed"; font-size: 12px; }
+.battle-strat.chosen { border-color: #4f93b1; background: rgba(16,40,50,.85); }
+.battle-strat.chosen b { color: #8fdcf6; }
+/* A stratagem you cannot afford is an inactive control, but its name and cost still
+   have to be readable — you are being told what you are choosing not to take. */
+.battle-strat.unaffordable { border-color: #26343a; }
+.battle-strat.unaffordable b, .battle-strat.unaffordable small { color: #8b9aa0; }
+
+.battle-scouting { display: grid; gap: 4px; padding: 9px; border-left: 3px solid #7a5a2c; background: rgba(34,26,12,.7); }
+.battle-scouting > span { color: #e0b25f; font-family: "Barlow Condensed"; font-size: 11.5px; font-weight: 700; letter-spacing: .12em; }
+.battle-scouting p { margin: 0; color: #d9c69d; font-size: 11.5px; line-height: 1.4; }
+.battle-scouting ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.battle-scouting li { display: grid; }
+.battle-scouting li b { color: #edd09a; font-family: "Barlow Condensed"; font-size: 11.5px; letter-spacing: .06em; }
+.battle-scouting li em { color: #a99a7c; font-size: 10.5px; font-style: normal; line-height: 1.3; }
+
+.battle-spends { display: grid; gap: 5px; }
+.battle-spend { display: grid; gap: 1px; padding: 6px 8px; border-left: 3px solid; }
+.battle-spend span { font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.battle-spend b { font-family: "Barlow Condensed"; font-size: 15px; letter-spacing: .08em; }
+.battle-spend small { font-size: 11px; line-height: 1.35; }
+.battle-spend-player { border-color: #4f93b1; background: rgba(16,40,50,.9); }
+.battle-spend-player span { color: #6fa9c0; }
+.battle-spend-player b { color: #8fdcf6; }
+.battle-spend-player small { color: #a8c6cf; }
+.battle-spend-enemy { border-color: #b1553c; background: rgba(48,20,14,.92); }
+.battle-spend-enemy span { color: #d08462; }
+.battle-spend-enemy b { color: #ff9c7a; }
+.battle-spend-enemy small { color: #dcae94; }
+
+.battle-reveal { color: #e0b25f !important; font-family: "Barlow Condensed"; letter-spacing: .08em; }
+
+/* Detachment -> disposition -> strategy. Three selects, in the order the decisions
+   narrow: what you may declare, how you score, and which of the three authored plans you
+   are taking to do it. Placed above the deployment slots because it sets their defaults. */
+.battle-doctrine { display: grid; gap: 5px; padding: 9px; border-left: 3px solid #9a7cc0; background: rgba(26,20,38,.82); }
+.battle-doctrine h3 { margin: 0; color: #c8b0e6; font-family: "Barlow Condensed"; font-size: 13px; font-weight: 700; letter-spacing: .12em; }
+.battle-doctrine label { display: grid; gap: 2px; margin-top: 3px; }
+.battle-doctrine label > span { color: #a793c2; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.battle-doctrine select { padding: 5px; border: 1px solid #5c4d75; background: #17121f; color: #ede6f6; font-family: "Barlow Condensed"; font-size: 13px; }
+.battle-scoring { color: #d5c2ef; font-size: 11.5px; line-height: 1.35; }
+.battle-enemy-scoring { color: #e9b79c !important; font-size: 11px !important; opacity: .85; }
+
+.battle-gained { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 5px 8px; border: 1px solid #33474e; background: rgba(12,22,26,.8); }
+.battle-gained span { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.battle-gained b { font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .08em; }
+.battle-gained b.player { color: #8fdcf6; }
+.battle-gained b.enemy { color: #f09372; }
+
+/* The rail is a fixed 380px column. Long option text in a select has an intrinsic
+   min-content width and will push the whole column off the screen unless every level of
+   the grid is told it may shrink. */
+.battle-rail > *, .battle-doctrine, .battle-doctrine label, .battle-slot { min-width: 0; }
+.battle-rail select { max-width: 100%; min-width: 0; }
+
+/* The plan, drawn on the board. Solid for a slot that has a formation in it, dashed for
+   one that does not — so an empty slot reads as a route nobody is walking. The viewBox is
+   0-100 in both axes with preserveAspectRatio off, so route coordinates are the same
+   percentages the unit markers use and the two can never drift apart. */
+.battle-routes { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+.battle-route { fill: none; vector-effect: non-scaling-stroke; stroke-width: 1.5; }
+.battle-route-player { stroke: #4f93b1; stroke-dasharray: 3 4; opacity: .45; }
+.battle-route-player.staffed { stroke: #6fc8ea; stroke-dasharray: none; opacity: .85; }
+.battle-route-enemy { stroke: #b1553c; stroke-dasharray: 2 5; opacity: .4; }
+.battle-shape { color: #b39ad2; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .05em; }
+.battle-rule { color: #ffd68a; font-family: "Barlow Condensed"; font-size: 11.5px; letter-spacing: .05em; }
+
+/* A marker that pays nothing under the declared disposition. Declaring ERADICATION
+   darkens the whole board; declaring SAFEGUARD darkens everything past your own half. */
+/* Dimmed by colour, never by opacity. Fading a label to 38% multiplies it into the
+   background — the text below dropped to a 1.6:1 contrast ratio that way, well under the
+   4.5:1 floor, which the static contrast test caught the moment it was pointed here. */
+.battle-objective.dark b { border-style: dashed; border-color: #34464b; color: #8b9aa0; }
+.battle-objective.dark i { border-color: #222e32; }
+.battle-objective.dark small { color: #8b9aa0; letter-spacing: .12em; }
+.battle-board-note { color: #ffd68a; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .08em; }
+
+/* The after-action readout. Ported from the operation screen rather than lost with it:
+   "i kind of need to know what worked... maybe a percentage how effective the unit was". */
+.battle-debrief { display: grid; gap: 6px; padding: 9px; border-left: 3px solid #4f93b1; background: rgba(12,28,36,.8); }
+.battle-debrief h3 { margin: 0; color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 12.5px; font-weight: 700; letter-spacing: .12em; }
+.battle-contribution { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; align-items: baseline; }
+.battle-contribution b { font-family: "Barlow Condensed"; font-size: 12.5px; letter-spacing: .06em; color: #dcece9; }
+.battle-contribution em { font-family: "Barlow Condensed"; font-size: 13px; font-style: normal; color: #8fdcf6; }
+.battle-contribution i { grid-column: 1 / -1; display: block; height: 3px; background: #6fc8ea; min-width: 1px; }
+.battle-contribution small { grid-column: 1 / -1; color: #93a8a2; font-size: 11px; line-height: 1.35; }
+.battle-contribution.lost b { color: #d59a86; }
+.battle-contribution.lost i { background: #b1553c; }
+
+/* The run. Muster before it, regroup between engagements, and a ledger at the end. */
+.battle-engagement { display: grid; gap: 2px; padding: 8px 9px; border-left: 3px solid #9a7cc0; background: rgba(26,20,38,.82); }
+.battle-engagement > span { color: #a793c2; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.battle-engagement b { font-family: "Barlow Condensed"; font-size: 16px; letter-spacing: .08em; color: #c8b0e6; }
+.battle-engagement small { color: #d5c2ef; font-size: 11.5px; line-height: 1.35; }
+
+.battle-muster { display: grid; gap: 2px; padding: 9px; border: 1px solid #33474e; background: rgba(14,24,27,.8); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.battle-muster b { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; color: #dcece9; }
+.battle-muster em { font-style: normal; font-family: "Barlow Condensed"; font-size: 11.5px; letter-spacing: .05em; color: #ffd68a; }
+.battle-muster small { color: #93a8a2; font-size: 11px; line-height: 1.35; }
+.battle-muster .battle-gates { color: #a793c2; font-family: "Barlow Condensed"; letter-spacing: .1em; }
+.battle-muster.chosen { border-color: #6fc8ea; background: rgba(16,40,50,.85); }
+.battle-muster.chosen b { color: #8fdcf6; }
+.battle-seed { display: grid; gap: 3px; }
+.battle-seed > span { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.battle-seed select { padding: 5px; border: 1px solid #45585f; background: #101a1d; color: #e6efec; font-family: "Barlow Condensed"; font-size: 13px; }
+
+.battle-roster { display: grid; gap: 2px; padding: 8px; border: 1px solid #33474e; background: rgba(10,18,21,.7); }
+.battle-roster-row { display: flex; justify-content: space-between; gap: 10px; }
+.battle-roster-row b { font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .06em; color: #dcece9; }
+.battle-roster-row em { font-style: normal; font-family: "Barlow Condensed"; font-size: 11.5px; color: #93a8a2; }
+
+.battle-reward { display: grid; gap: 2px; padding: 9px; border: 1px solid #4f6a74; background: rgba(12,28,36,.8); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.battle-reward b { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .1em; color: #8fdcf6; }
+.battle-reward small { color: #a8c6cf; font-size: 11.5px; line-height: 1.35; }
+.battle-reward:hover { border-color: #6fc8ea; background: rgba(16,40,50,.9); }
+
+.battle-press-on { grid-column: 1 / -1; padding: 7px; border: 1px solid #6fc8ea; background: rgba(16,40,50,.9); color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 13px; font-weight: 700; letter-spacing: .12em; cursor: pointer; }
+.battle-run-log { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.battle-run-log li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 7px; border-left: 3px solid; }
+.battle-run-log li b { font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .06em; }
+.battle-run-log li em { font-style: normal; font-size: 11px; color: #93a8a2; }
+.battle-run-log li.won { border-color: #4f93b1; background: rgba(16,40,50,.7); }
+.battle-run-log li.won b { color: #8fdcf6; }
+.battle-run-log li.lost { border-color: #b1553c; background: rgba(40,18,14,.7); }
+.battle-run-log li.lost b { color: #f09372; }
+
+/* The market. Victory points are the currency, so the price is the loudest thing on the
+   card after the name, and anything out of reach is visibly out of reach. */
+.battle-offer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: baseline; padding: 9px; border: 1px solid #4f6a74; background: rgba(12,28,36,.8); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.battle-offer b { font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; color: #8fdcf6; }
+.battle-offer .battle-price { justify-self: end; padding: 0 6px; border: 1px solid #6fc8ea; font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .06em; color: #9fd6c6; }
+.battle-offer small { grid-column: 1 / -1; color: #a8c6cf; font-size: 11px; line-height: 1.35; }
+.battle-offer.service { border-color: #7a5a2c; background: rgba(34,26,12,.7); }
+.battle-offer.service b { color: #edd09a; }
+.battle-offer.service .battle-price { border-color: #a9873f; color: #e0b25f; }
+.battle-offer.service small { color: #d9c69d; }
+.battle-offer:hover:not(:disabled) { border-color: #6fc8ea; background: rgba(16,40,50,.9); }
+.battle-offer:disabled { cursor: default; border-color: #26343a; }
+.battle-offer:disabled b, .battle-offer:disabled small { color: #8b9aa0; }
+.battle-offer:disabled .battle-price { border-color: #4a3a2a; color: #b08d63; }
+
+/* One line on what just happened. Five rounds of markers sliding in silence is
+   confirmation, not suspense — this is the moment the round is about. */
+.battle-headline { padding: 7px 9px; border-left: 3px solid; font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .04em; }
+.battle-headline.loss { border-color: #b1553c; background: rgba(48,20,14,.9); color: #ff9c7a; }
+.battle-headline.kill { border-color: #4f93b1; background: rgba(16,40,50,.9); color: #8fdcf6; }
+.battle-headline.enemy { border-color: #a9873f; background: rgba(40,30,12,.85); color: #ffd68a; }
+.battle-headline.player { border-color: #4f93b1; background: rgba(14,32,40,.85); color: #a8c6cf; }
+.battle-headline.found { border-color: #ffc85c; background: rgba(46,34,8,.92); color: #ffd68a; font-weight: 700; }
+.battle-headline.quiet { border-color: #3c5058; background: rgba(12,22,26,.8); color: #93a8a2; }
+
+/* Who is shooting whom, drawn on the board for the round being shown. The board used to
+   say nothing while the log said everything; this is the log, on the board. Line weight
+   is the damage, so a heavy blow reads as one without having to read a number. */
+.battle-fire { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
+.battle-shot { vector-effect: non-scaling-stroke; stroke-width: var(--weight, 1); stroke-linecap: round; }
+.battle-shot-player { stroke: #6fc8ea; opacity: .7; stroke-dasharray: 2 3; }
+.battle-shot-enemy { stroke: #ef7655; opacity: .7; stroke-dasharray: 2 3; }
+.battle-shot.melee { stroke-dasharray: none; opacity: .95; }
+.battle-shot-player.melee { stroke: #b6f0ff; }
+.battle-shot-enemy.melee { stroke: #ffb59a; }
+
+/* What came back, and what did not. "How do I know which units survived" was a flat
+   failure of the screen: the roster shrank and nothing ever said why. */
+.battle-losses { display: grid; gap: 2px; padding: 8px 9px; border-left: 3px solid #b1553c; background: rgba(48,20,14,.85); }
+.battle-losses > span { color: #d08462; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.battle-losses b { color: #ff9c7a; font-family: "Barlow Condensed"; font-size: 13px; letter-spacing: .06em; text-decoration: line-through; }
+.battle-roster-head { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 3px; margin-bottom: 3px; border-bottom: 1px solid #26343a; }
+.battle-roster-head span { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.battle-roster-head em { color: #9fd6c6; font-family: "Barlow Condensed"; font-size: 11px; font-style: normal; letter-spacing: .08em; }
+.battle-standing { display: grid; gap: 1px; padding: 5px 7px; border-left: 3px solid #4f93b1; background: rgba(16,40,50,.8); }
+.battle-standing span { color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
+.battle-standing em { color: #d59a86; font-size: 11px; font-style: normal; }
+.battle-assignment { color: #a793c2; font-family: "Barlow Condensed"; font-size: 10.5px; letter-spacing: .06em; }
+.battle-spend-outcome { display: block; font-style: normal; font-family: "Barlow Condensed"; font-size: 12px; letter-spacing: .06em; opacity: .95; }
+.battle-spend-player .battle-spend-outcome { color: #b6f0ff; }
+.battle-spend-enemy .battle-spend-outcome { color: #ffc9b3; }
+.battle-roster-row { align-items: baseline; }
+/* Repairs are bought here, on the row of the hull that needs them, rather than off the
+   shelf. Two small buttons rather than one wide one: the choice is which formation, and
+   the row is where the wounds are already written down. */
+.battle-roster-acts { display: flex; gap: 4px; align-items: baseline; margin-left: auto; }
+.battle-mend { padding: 0 5px; border: 1px solid #4c6a4f; background: rgba(14,30,18,.7); color: #9fd6a8; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .1em; cursor: pointer; }
+.battle-mend span { color: #cfe6b4; margin-left: 3px; padding-left: 4px; border-left: 1px solid #4c6a4f; }
+.battle-mend:hover:not(:disabled) { border-color: #7fc48c; color: #c2f2c9; }
+.battle-mend:disabled { cursor: default; border-color: #2c3a2f; color: #7d8f80; }
+.battle-retire { padding: 0 5px; border: 1px solid #5b3f38; background: rgba(40,18,14,.7); color: #d59a86; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .1em; cursor: pointer; }
+.battle-retire:hover:not(:disabled) { border-color: #b1553c; color: #ff9c7a; }
+.battle-retire:disabled { cursor: default; opacity: .4; }
+
+/* Who is helping whom. The combos have been in the rules since the profiles were written
+   and the screen never showed one: a SHIELD soaking for a neighbour, a COMMAND improving
+   what is near it, a REPAIR patching instead of shooting. A combo nobody can see is a
+   combo nobody has. */
+.battle-support { vector-effect: non-scaling-stroke; stroke-width: 1; stroke-dasharray: 1 4; opacity: .5; }
+.battle-support-shield { stroke: #7fe3c0; }
+.battle-support-command { stroke: #c8b0e6; }
+/* A pairing is the only thing on the board that was written on no card, so it is drawn
+   solid and bright rather than as another dotted support line. */
+.battle-support-pairing { stroke: #ffc85c; stroke-width: 1.6; stroke-dasharray: none; opacity: .8; }
+.battle-shot.repair { stroke: #7fe3c0; stroke-dasharray: 4 2; opacity: .9; }
+
+/* What you have, with the stat line visible BEFORE the choice rather than after it. A
+   dropdown of names tells you nothing about what you are picking. */
+.battle-warband { display: grid; gap: 4px; padding: 8px 9px; border: 1px solid #33474e; background: rgba(10,18,21,.72); }
+.battle-warband-head { display: flex; justify-content: space-between; gap: 10px; }
+.battle-warband-head span { color: #7fa3b0; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.battle-warband-head em { color: #9fd6c6; font-family: "Barlow Condensed"; font-size: 11px; font-style: normal; letter-spacing: .08em; }
+.battle-warband-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 3px 0; border-top: 1px solid #1b262a; }
+.battle-warband-row b { font-family: "Barlow Condensed"; font-size: 12.5px; letter-spacing: .05em; color: #dcece9; }
+.battle-warband-row em { font-family: "Barlow Condensed"; font-size: 10.5px; font-style: normal; letter-spacing: .08em; color: #9fd6c6; }
+.battle-warband-row small { grid-column: 1 / -1; color: #93a8a2; font-size: 10.5px; font-family: "Barlow Condensed"; letter-spacing: .04em; }
+.battle-warband-row .battle-warband-refit { color: #9fd6c6; letter-spacing: .08em; }
+.battle-warband-row.placed b { color: #8fdcf6; }
+.battle-warband-row.placed em { color: #6fa9c0; }
+
+/* The pairing badge. Named on the board because the line between two hulls ten units apart
+   is not a line anyone can see. */
+.battle-pairing { position: absolute; z-index: 7; transform: translate(-50%, -230%); padding: 1px 5px; border: 1px solid #ffc85c; background: rgba(46,34,8,.92); color: #ffd68a; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .12em; white-space: nowrap; pointer-events: none; }
+
+/* Field notes: what the run has found out for itself. Deliberately styled apart from the
+   warband block above it — that is what you own, this is what you know. */
+.battle-notes { display: grid; gap: 4px; padding: 8px 9px; border: 1px solid #6a5a2c; background: rgba(26,20,8,.72); }
+.battle-notes-head { display: flex; justify-content: space-between; gap: 10px; }
+.battle-notes-head span { color: #d9bd77; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.battle-notes-head em { color: #e0b25f; font-family: "Barlow Condensed"; font-size: 11px; font-style: normal; letter-spacing: .08em; }
+.battle-note-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 3px 0; border-top: 1px solid #3a2f14; }
+/* An unfound pairing is a lead, not a record: dimmed by COLOUR, never by opacity, so its
+   contrast can still be checked. */
+.battle-note-row b { font-family: "Barlow Condensed"; font-size: 12.5px; letter-spacing: .05em; color: #b9a375; }
+.battle-note-row.found b { color: #ffd68a; }
+.battle-note-where { color: #a8a08c; font-style: italic; }
+/* Ground the declared disposition does not pay for. A warning, not an error — the plans
+   send formations there on purpose, to deny it. */
+.battle-assignment-unpaid { color: #e0b25f; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.battle-note-row em { font-family: "Barlow Condensed"; font-size: 10.5px; font-style: normal; letter-spacing: .08em; color: #d9bd77; }
+.battle-note-row small { grid-column: 1 / -1; color: #c4ab7c; font-size: 10.5px; font-family: "Barlow Condensed"; letter-spacing: .04em; }
+.battle-notes-empty { margin: 0; color: #c4ab7c; font-size: 11px; line-height: 1.4; }
+
+/* The market's roster block was cramped: a long name and a status on one line with no room
+   for either, and a button crushed against both. */
+/* Name, condition, and what can be done about it — on one line while it fits and wrapping
+   rather than colliding when it does not. As a three-column grid the two fixed columns
+   pushed the name column to nothing and a long hull name was drawn straight through the
+   wound count. */
+.battle-roster-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; border-top: 1px solid #1b262a; }
+.battle-roster-row b { flex: 1 1 140px; min-width: 0; }
+.battle-roster-row em { white-space: nowrap; }
+.battle-roster-row .battle-honours { flex-basis: 100%; }

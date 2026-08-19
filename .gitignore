@@ -3,12 +3,11 @@ dist/
 vite.stdout.log
 vite.stderr.log
 
-
+# Transfer archives and the staging directories they are unpacked into. Work reaches this
+# machine as a tarball that is extracted to _stage<letter>/ and copied into place; none of
+# that is the repository. _to_delete/ is where files go that cannot be removed from this
+# side of the mount.
 *.tar.gz
 *.patch
-
-*.tar.gz
-*.patch
-
-*.tar.gz
-*.patch
+_stage*/
+_to_delete/

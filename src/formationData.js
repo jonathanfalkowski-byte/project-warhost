@@ -1,14 +1,11 @@
-import {
-  Anchor,
-  Crosshair,
-  Fire,
-  Flag,
-  Hammer,
-  Lightning,
-  Radio,
-  Shield,
-  Truck,
-} from "@phosphor-icons/react";
+// The shared roster. Both resolution models were built on these nine formations, and the
+// battle model still is — src/battle/battleProfiles.js gives each one wargame stats
+// authored from the identity described here rather than derived by formula.
+//
+// The icons and the `defaultNode` field went with the operation screen: nothing renders an
+// icon any more, and importing the icon set for data nobody draws was most of the bundle.
+// The refits and capabilities are kept — weapon options are a very 40k shape and the
+// battle model has not used them yet.
 
 export const FORMATIONS = [
   {
@@ -27,8 +24,6 @@ export const FORMATIONS = [
     creates: "DISPLACED",
     uses: ["SCREENED", "SUPPLIED", "FORWARD HOLD"],
     asset: "/assets/harpoon-rig.png",
-    icon: Anchor,
-    defaultNode: "alphaApproach",
   },
   {
     id: "furnace",
@@ -46,8 +41,6 @@ export const FORMATIONS = [
     creates: "OVERHEATED",
     uses: ["DISPLACED", "SCREENED", "SUPPLIED", "FORWARD HOLD"],
     asset: "/assets/furnace-crew.png",
-    icon: Fire,
-    defaultNode: "fireLine",
   },
   {
     id: "breaker",
@@ -65,8 +58,6 @@ export const FORMATIONS = [
     creates: "BREACHED",
     uses: ["DISPLACED", "OVERHEATED", "SCREENED", "SUPPLIED", "KILL ZONE", "SEALED LANE"],
     asset: "/assets/breaker-exo.png",
-    icon: Hammer,
-    defaultNode: "breachLine",
   },
   {
     id: "railjack",
@@ -84,8 +75,6 @@ export const FORMATIONS = [
     creates: "SCREENED",
     uses: ["DISPLACED", "OVERHEATED", "BREACHED", "SUPPLIED", "OPEN CORE", "FRACTURED ARMOR"],
     asset: "/assets/railjack.png",
-    icon: Shield,
-    defaultNode: "anchorLine",
   },
   {
     id: "hauler",
@@ -103,8 +92,6 @@ export const FORMATIONS = [
     creates: "SUPPLIED",
     uses: ["OVERHEATED", "BREACHED", "SCREENED", "OPEN CORE", "SECURED BREACH", "SECURED CORRIDOR"],
     asset: "/assets/salvage-hauler.png",
-    icon: Truck,
-    defaultNode: "recoveryLine",
   },
   {
     id: "skimmer",
@@ -123,8 +110,6 @@ export const FORMATIONS = [
     uses: ["SCREENED", "SUPPLIED", "OPEN CORE"],
     // Placeholder art: reuses the recon portrait until a skimmer asset exists.
     asset: "/assets/harpoon-rig.png",
-    icon: Lightning,
-    defaultNode: "alphaApproach",
   },
   {
     id: "carriage",
@@ -143,8 +128,6 @@ export const FORMATIONS = [
     uses: ["DISPLACED", "SCREENED", "BREACHED", "FORWARD HOLD"],
     // Placeholder art: reuses the flame support portrait until a carriage asset exists.
     asset: "/assets/furnace-crew.png",
-    icon: Crosshair,
-    defaultNode: "fireLine",
   },
   {
     id: "command",
@@ -163,8 +146,6 @@ export const FORMATIONS = [
     uses: ["DISPLACED", "OVERHEATED", "BREACHED", "SECURED BREACH"],
     // Placeholder art: reuses the battle tank portrait until a command asset exists.
     asset: "/assets/railjack.png",
-    icon: Radio,
-    defaultNode: "highWalk",
   },
   {
     id: "bastion",
@@ -183,8 +164,6 @@ export const FORMATIONS = [
     uses: ["DISPLACED", "OVERHEATED", "KILL ZONE", "SUPPLIED"],
     // Placeholder art: reuses the assault walker portrait until a shield walker asset exists.
     asset: "/assets/breaker-exo.png",
-    icon: Flag,
-    defaultNode: "breachLine",
   },
 ];
 

@@ -1,0 +1,64 @@
+# Everything this project already checks by hand, run on every push and pull request.
+#
+# There was no CI before this. The 180-test suite, the Sites deploy guard and the balance
+# sweep were all real and all manual, which meant a 98-file rewrite could open a pull
+# request with nothing verifying it. The sweep in particular is the project's whole method
+# of knowing whether a rule is any good — running it only when someone remembers is the
+# same failure that let docs/balance.md drift three commits behind the code.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The findings-freshness guard compares commit times, so it needs real history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: findings are not stale
+        run: npm run check:findings
+
+      - name: game tests
+        run: npm run test:game
+
+      - name: build
+        run: npm run build
+
+      # AFTER the build, because its last case asserts dist/client/index.html,
+      # dist/server/index.js and dist/.openai/hosting.json exist - the three artifacts
+      # AGENTS.md requires for a Sites handoff. Run before a build it passes only on a
+      # machine that happens to have a stale dist/ lying around, which is exactly how it
+      # passed locally and failed here.
+      - name: sites worker tests
+        run: npm run test:sites
+
+      # The sweep prints verdicts, not numbers to interpret. A FAIL is a balance claim that
+      # has stopped being true, and it should stop a merge exactly like a failing test.
+      - name: balance sweep reports no FAIL
+        run: |
+          if ! npm run analyse > sweep.txt 2>&1; then
+            cat sweep.txt
+            echo "::error::the balance sweep did not complete"
+            exit 1
+          fi
+          cat sweep.txt
+          if grep -qE '^[[:space:]]+FAIL' sweep.txt; then
+            echo "::error::the balance sweep reported a FAIL"
+            grep -E '^[[:space:]]+FAIL' sweep.txt
+            exit 1
+          fi
+          echo "no FAIL verdicts"
