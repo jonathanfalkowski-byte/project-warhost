@@ -93,6 +93,9 @@
 .battle-enemy-brief li { display: grid; }
 .battle-enemy-brief li b { color: #f0b191; font-family: "Barlow Condensed"; font-size: 11.5px; letter-spacing: .06em; }
 .battle-enemy-brief li em { color: #b89383; font-size: 10.5px; font-style: normal; }
+/* The line that says they adapted. Marked out from the rest of the brief because it is the
+   only part of it that is about the player. */
+.battle-enemy-read { color: #ffc9a8; border-left: 2px solid #d0704c; padding-left: 7px; font-size: 12px; line-height: 1.4; }
 .battle-enemy-brief li small { color: #e0a887; font-family: "Barlow Condensed"; font-size: 10.5px; letter-spacing: .05em; }
 
 .battle-commit { padding: 12px; border: 1px solid #b4762f; background: #2a1a0c; color: #edc478; font-family: "Barlow Condensed"; font-size: 16px; font-weight: 700; letter-spacing: .12em; cursor: pointer; }

@@ -146,9 +146,12 @@ export const buildEnemyForce = (mission = CIRCUIT_CLASH, army = armyFor(mission.
   planId = army.plan,
   strength = mission.enemyDeployment.length,
   seed = 0,
+  // WHAT THE PLAYER FIELDED LAST ENGAGEMENT. Empty on the first engagement of a run and for
+  // the sweep's control enemy, which has to stay blind or it stops being a control.
+  counter = [],
 } = {}) => {
   const plan = planFor(disposition, planId);
-  const roster = buildArmyList({ mission, plan, disposition, strength, seed });
+  const roster = buildArmyList({ mission, plan, disposition, strength, seed, counter });
   const units = [];
   const orders = {};
   const paths = {};
@@ -165,7 +168,7 @@ export const buildEnemyForce = (mission = CIRCUIT_CLASH, army = armyFor(mission.
     orders[id] = (plan ? routeDestinationFor(plan, slotIndex, mission.objectives, mission.id, true) : null)
       ?? mission.objectives[Math.min(slotIndex, mission.objectives.length - 1)]?.id;
   }
-  return { units, orders, paths, plan, disposition, army };
+  return { units, orders, paths, plan, disposition, army, counter };
 };
 
 export const buildPlayerForce = ({

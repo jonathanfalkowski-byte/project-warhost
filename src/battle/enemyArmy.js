@@ -22,7 +22,8 @@
 // This is also the PvP groundwork. "Enemy" stops being a category and becomes a warband.
 
 import { BATTLE_PROFILES, battleProfileFor } from "./battleProfiles.js";
-import { routeDestinationFor, routePointsFor } from "./battlePlans.js";
+import { planFor, routeDestinationFor, routePointsFor } from "./battlePlans.js";
+import { deployUnit, resolveBattle } from "./battleRules.js";
 import { routeCost } from "./battleTerrain.js";
 import { FORMATIONS } from "../formationData.js";
 
@@ -95,11 +96,90 @@ const spareSpeed = (profile, role) => Math.max(0, profile.move - role.needsMove)
 // enemy identical for a given plan; the whole roster would make the list noise. Two means
 // the army is always sensible and never the same twice.
 export const SHORTLIST = 2;
+// How many a slot considers when the enemy has something to answer. Wider, because the
+// counter is choosing between hulls that can all do the job rather than adding to their
+// fit: three candidates is a real choice, and every one of them still walks the route.
+export const COUNTER_SHORTLIST = 4;
+// How many times it goes back over the list. Swapping one slot changes what the others
+// should be, so a single pass answers the early slots against a list the enemy no longer
+// has; it stops early as soon as a pass changes nothing.
+export const COUNTER_PASSES = 3;
+
+// THE REHEARSAL — how the enemy answers what the player brought.
+//
+// The first attempt scored hulls against the player's list by fighting them one against one
+// on bare ground and taking the best matchup. It made the enemy WORSE: the number of player
+// lists that beat every enemy went UP from 32 to 282. A duel says a breaker eats everything
+// and this is not a game of duels — it is five hulls, five routes and five markers, and the
+// enemy's own best lists turn out to be full of cheap fast objective hulls that would lose
+// every duel on the board.
+//
+// So the enemy does not consult a table of counters. It REPLAYS THE LAST ENGAGEMENT: the
+// same five formations the player fielded, in the same slots, walking the same plan, and
+// tries its own alternatives against them one slot at a time. What it keeps is what actually
+// scored better against that army on this ground. It is one ply deep and it is honest — the
+// thing being optimised is the thing being played.
+//
+// The information is fair: it is what the player themselves put on the board last time, and
+// the brief says plainly which hulls were changed because of it.
+const rehearsalForce = (mission, counter) => {
+  const plan = planFor(counter.disposition, counter.planId);
+  const units = [];
+  const orders = {};
+  const paths = {};
+  counter.order.forEach((formationId, index) => {
+    if (!formationId || !BATTLE_PROFILES[formationId] || !mission.playerDeployment[index]) return;
+    const id = `rehearsal-${formationId}#${index}`;
+    units.push(deployUnit({ formationId, name: formationId.toUpperCase(), position: mission.playerDeployment[index], id }));
+    const route = plan ? routePointsFor(plan, index, mission.id) : [];
+    if (route.length > 0) paths[id] = route;
+    orders[id] = (plan ? routeDestinationFor(plan, index, mission.objectives, mission.id) : null)
+      ?? mission.objectives[Math.min(index, mission.objectives.length - 1)]?.id;
+  });
+  return { units, orders, paths };
+};
+
+// One trial: this list, walking this plan, against the army the player last fielded. Scored
+// from the ENEMY's side, because that is who is choosing.
+const rehearse = ({ mission, plan, disposition, chosen, fielded, rehearsal, counter }) => {
+  const units = [];
+  const orders = {};
+  const paths = {};
+  for (const role of fielded) {
+    const formationId = chosen.get(role.slotIndex);
+    if (!formationId) continue;
+    const id = `trial-${formationId}#${role.slotIndex}`;
+    units.push(deployUnit({ formationId, name: formationId.toUpperCase(), position: mission.enemyDeployment[role.slotIndex], id }));
+    const route = plan ? routePointsFor(plan, role.slotIndex, mission.id, true) : [];
+    if (route.length > 0) paths[id] = route;
+    orders[id] = (plan ? routeDestinationFor(plan, role.slotIndex, mission.objectives, mission.id, true) : null)
+      ?? mission.objectives[Math.min(role.slotIndex, mission.objectives.length - 1)]?.id;
+  }
+  const result = resolveBattle({
+    playerUnits: rehearsal.units, enemyUnits: units, objectives: mission.objectives,
+    playerOrders: rehearsal.orders, enemyOrders: orders,
+    playerPaths: rehearsal.paths, enemyPaths: paths,
+    playerDisposition: counter.disposition, enemyDisposition: disposition,
+    rounds: mission.rounds, missionId: mission.id,
+  });
+  return result.enemyScore - result.playerScore;
+};
+
+// A run rebuilds the same enemy on every render. Fifteen trial battles is nothing on its
+// own and everything when it happens sixty times a second.
+const REHEARSED = new Map();
+const REHEARSAL_CACHE_LIMIT = 512;
 
 // The list. Slots are filled in order of how demanding they are rather than left to right,
 // so the hardest brief gets first pick of the roster — which is what anyone does when they
 // build a list, and what stops the long flank route being handed whatever is left.
-export const buildArmyList = ({ mission, plan, disposition = "dominion", strength = 5, seed = 0, pool = FORMATIONS }) => {
+export const buildArmyList = ({ mission, plan, disposition = "dominion", strength = 5, seed = 0, pool = FORMATIONS, counter = null }) => {
+  const reading = counter?.order?.some(Boolean) ? counter : null;
+  const cacheKey = reading
+    ? [mission.id, plan?.id, disposition, strength, seed, reading.disposition, reading.planId, reading.order.join("+")].join("|")
+    : null;
+  if (cacheKey && REHEARSED.has(cacheKey)) return REHEARSED.get(cacheKey);
+
   const scoresGround = disposition !== "eradication";
   const slots = mission.enemyDeployment.map((unused, slotIndex) => slotRoleFor({ mission, plan, slotIndex }));
   // Contiguous, centre-out: a screening force of three is the middle three slots, not the
@@ -110,18 +190,63 @@ export const buildArmyList = ({ mission, plan, disposition = "dominion", strengt
     .slice(0, Math.max(1, Math.min(strength, slots.length)))
     .sort((left, right) => left.slotIndex - right.slotIndex);
 
+  const order = [...fielded].sort((left, right) => right.needsMove - left.needsMove);
   const taken = new Set();
   const chosen = new Map();
-  for (const role of [...fielded].sort((left, right) => right.needsMove - left.needsMove)) {
+  const shortlists = new Map();
+  for (const role of order) {
     const ranked = pool
       .filter((formation) => !taken.has(formation.id) && BATTLE_PROFILES[formation.id])
       .map((formation) => ({ formation, fit: fitFor(battleProfileFor(formation.id), role, { scoresGround }) }))
       .sort((left, right) => right.fit - left.fit || left.formation.id.localeCompare(right.formation.id));
     if (ranked.length === 0) continue;
-    const shortlist = ranked.slice(0, Math.min(SHORTLIST, ranked.length));
+    const shortlist = ranked.slice(0, Math.min(reading ? COUNTER_SHORTLIST : SHORTLIST, ranked.length));
+    shortlists.set(role.slotIndex, shortlist.map((entry) => entry.formation.id));
     const pick = shortlist[shuffleKey(seed, role.slotIndex) % shortlist.length].formation;
     taken.add(pick.id);
     chosen.set(role.slotIndex, pick.id);
   }
-  return fielded.map((role) => ({ slotIndex: role.slotIndex, formationId: chosen.get(role.slotIndex) })).filter((entry) => entry.formationId);
+
+  // Having read them: keep the seeded list as the opening bid and try each slot's other
+  // candidates against the army the player last fielded, keeping whatever scored best. One
+  // slot at a time, in the same order the slots were filled, so the hardest brief is
+  // answered first. Never outside the shortlist — every candidate can still walk the route.
+  if (reading) {
+    const rehearsal = rehearsalForce(mission, reading);
+    if (rehearsal.units.length > 0) {
+      let best = rehearse({ mission, plan, disposition, chosen, fielded, rehearsal, counter: reading });
+      // Passes, not one sweep. Swapping the hardest slot changes what the easy ones should
+      // be doing, and a single pass leaves the first slots answered against a list the
+      // enemy no longer has. It stops as soon as a whole pass changes nothing.
+      for (let pass = 0; pass < COUNTER_PASSES; pass += 1) {
+        let moved = false;
+        for (const role of order) {
+          for (const candidate of shortlists.get(role.slotIndex) ?? []) {
+            const current = chosen.get(role.slotIndex);
+            if (candidate === current || taken.has(candidate)) continue;
+            chosen.set(role.slotIndex, candidate);
+            const margin = rehearse({ mission, plan, disposition, chosen, fielded, rehearsal, counter: reading });
+            if (margin > best) {
+              best = margin;
+              taken.delete(current);
+              taken.add(candidate);
+              moved = true;
+            } else {
+              chosen.set(role.slotIndex, current);
+            }
+          }
+        }
+        if (!moved) break;
+      }
+    }
+  }
+
+  const list = fielded
+    .map((role) => ({ slotIndex: role.slotIndex, formationId: chosen.get(role.slotIndex) }))
+    .filter((entry) => entry.formationId);
+  if (cacheKey) {
+    if (REHEARSED.size > REHEARSAL_CACHE_LIMIT) REHEARSED.clear();
+    REHEARSED.set(cacheKey, list);
+  }
+  return list;
 };

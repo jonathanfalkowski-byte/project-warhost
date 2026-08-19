@@ -170,7 +170,12 @@ export const engagementFor = (run) => {
   const planId = control
     ? doctrine.plan
     : (plans[shuffleKey(seed, 23) % Math.max(1, plans.length)] ?? {}).id ?? doctrine.plan;
-  const foe = buildEnemyForce(mission, doctrine, { disposition, planId, strength, seed: control ? 0 : seed });
+  // WHAT THEY LEARNED LAST TIME. The control enemy never reads — it is the measuring
+  // instrument for everything the player chooses, and an opponent that changes in response
+  // to the player is the one thing a control cannot do. The first engagement of a run has
+  // nothing to read either.
+  const counter = control ? null : (run.history.at(-1)?.fielded ?? null);
+  const foe = buildEnemyForce(mission, doctrine, { disposition, planId, strength, seed: control ? 0 : seed, counter });
   return {
     ...rung,
     number: run.battle,
@@ -187,6 +192,14 @@ export const engagementFor = (run) => {
       planName: foe.plan?.name ?? null,
       units: foe.units.map((unit) => ({ formationId: unit.id.replace(/^enemy-/, ""), name: unit.name })),
     },
+    // What they were built against, and what they would have brought without it. The
+    // difference between the two lists is the whole of what reading the player did, and
+    // the screen says so rather than leaving the player to notice.
+    read: counter,
+    blind: counter
+      ? buildEnemyForce(mission, doctrine, { disposition, planId, strength, seed })
+        .units.map((unit) => unit.id.replace(/^enemy-/, ""))
+      : null,
     enemyHand: drawEnemyHand({ detachment, seed, size: rung.handSize }),
   };
 };
@@ -226,7 +239,14 @@ const withDiscoveries = (run, result) => {
   return [...(run.discovered ?? []), ...fresh];
 };
 
-export const applyBattle = ({ run, result, deployedIds = [], won, disposition = "dominion", commandSpent = 0 }) => {
+// `fielded` is what the player put on the board and how: the formation in each deployment
+// slot, the plan they walked and what they declared. It is kept because the ENEMY READS IT
+// — the next engagement's list is built by replaying this one. Nothing else uses it, and
+// nothing about it is hidden from the player: it is their own last engagement.
+export const applyBattle = ({
+  run, result, deployedIds = [], won, disposition = "dominion", commandSpent = 0,
+  fielded = null, planId = null,
+}) => {
   const survivors = new Map((result?.rounds?.at(-1)?.players ?? []).map((unit) => [unit.id, unit.wounds]));
   const roster = [];
   const lost = [];
@@ -273,6 +293,10 @@ export const applyBattle = ({ run, result, deployedIds = [], won, disposition = 
       // What was standing at the end and what did not come back, so the run's ledger can
       // answer "which of mine survived" without anyone having to reconstruct it.
       survivors: roster.filter((entry) => deployedIds.includes(entry.id)).map((entry) => entry.name),
+      // The engagement as the enemy will remember it.
+      fielded: Array.isArray(fielded) && fielded.some(Boolean)
+        ? { order: fielded, planId, disposition }
+        : null,
     }],
     // The shelf is drawn once, here, against the roster as it stands after the battle —
     // so a purchase takes one thing off it rather than re-rolling the other two.

@@ -831,6 +831,41 @@ mutate "the repair buttons are dimmed out of contrast" src/battle/battle.css \
       '.battle-mend { padding: 0 5px; border: 1px solid #4c6a4f; background: rgba(14,30,18,.7); color: #33443a;' \
       "tests/accessibility.test.mjs"
 
+
+echo "=== the enemy reads you ==="
+mutate "the enemy ignores what the player last fielded" src/battle/enemyArmy.js \
+      '  const reading = counter?.order?.some(Boolean) ? counter : null;' \
+      '  const reading = null;' \
+      "tests/battle-counterplay.test.mjs"
+mutate "the rehearsal is scored from the player's side of the board" src/battle/enemyArmy.js \
+      '  return result.enemyScore - result.playerScore;' \
+      '  return result.playerScore - result.enemyScore;' \
+      "tests/battle-counterplay.test.mjs"
+mutate "it goes over the list once, answering early slots against a list it no longer has" src/battle/enemyArmy.js \
+      'export const COUNTER_PASSES = 3;' \
+      'export const COUNTER_PASSES = 1;' \
+      "tests/battle-counterplay.test.mjs"
+mutate "a slot considers no more candidates when it has something to answer" src/battle/enemyArmy.js \
+      'export const COUNTER_SHORTLIST = 4;' \
+      'export const COUNTER_SHORTLIST = 2;' \
+      "tests/battle-counterplay.test.mjs"
+mutate "the control enemy reads the player too" src/battle/campaign.js \
+      '  const counter = control ? null : (run.history.at(-1)?.fielded ?? null);' \
+      '  const counter = run.history.at(-1)?.fielded ?? null;' \
+      "tests/battle-counterplay.test.mjs"
+mutate "the run does not remember what it fielded" src/battle/campaign.js \
+      '      fielded: Array.isArray(fielded) && fielded.some(Boolean)' \
+      '      fielded: false && Array.isArray(fielded) && fielded.some(Boolean)' \
+      "tests/battle-counterplay.test.mjs"
+mutate "the screen never says the enemy studied them" src/battle/BattleApp.jsx \
+      '                      THEY HAVE STUDIED YOUR LAST ENGAGEMENT.{" "}' \
+      '                      {" "}' \
+      "tests/battle-counterplay.test.mjs"
+mutate "the screen stops passing what was fielded to the run" src/battle/BattleApp.jsx \
+      '      fielded: mission.playerDeployment.map((slot) => planned[slot.id]?.formationId ?? null),' \
+      '      fielded: null,' \
+      "tests/app-render.test.mjs"
+
 echo
 echo "killed $pass mutants, $fail survived"
 [ "$fail" -eq 0 ]

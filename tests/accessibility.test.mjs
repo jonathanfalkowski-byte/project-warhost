@@ -93,6 +93,7 @@ test("every text colour on the battle screen clears WCAG AA", () => {
     [".battle-enemy-brief li b", "#1c100d"],
     [".battle-enemy-brief li em", "#1c100d"],
     [".battle-enemy-brief li small", "#1c100d"],
+    [".battle-enemy-read", "#1c100d"],
     [".battle-strat-cost", "#0a1215"],
     [".battle-spend-player b", "#102832"],
     [".battle-spend-enemy b", "#301410"],

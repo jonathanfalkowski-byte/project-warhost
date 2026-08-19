@@ -181,6 +181,11 @@ export default function BattleApp({ onExit }) {
     const after = applyBattle({
       run, result, deployedIds, won: result.winner === "player", disposition: dispositionId,
       commandSpent: budget.spent,
+      // What the enemy will have read by the next engagement: the formation in each slot,
+      // and the plan it walked. Ordered by SLOT, because where a hull stood is half of
+      // what there is to read.
+      fielded: mission.playerDeployment.map((slot) => planned[slot.id]?.formationId ?? null),
+      planId: strategyId,
     });
     setRun(after.status === "active" ? repair(after) : after);
     setPhase(after.status === "active" ? "reward" : "over");
@@ -801,6 +806,26 @@ export default function BattleApp({ onExit }) {
                   run and field the front N of a fixed list. */}
               <div className="battle-enemy-brief">
                 <span>{army.name} · {enemyDisposition.name}</span>
+                {/* THEY READ YOU. The list they brought was built by replaying your last
+                    engagement — so the screen has to say so, and say what it changed. An
+                    opponent that adapts silently is not a mind game, it is difficulty
+                    arriving from nowhere. What they read is the player's own last five;
+                    what stays hidden is still only the hand. */}
+                {engagement?.read && (() => {
+                  const now = enemy.units.map((unit) => unit.id.replace(/^enemy-/, ""));
+                  const was = engagement.blind ?? [];
+                  const added = now.filter((id) => !was.includes(id));
+                  const dropped = was.filter((id) => !now.includes(id));
+                  const named = (list) => list.map((id) => FORMATIONS.find((formation) => formation.id === id)?.name ?? id.toUpperCase()).join(", ");
+                  return (
+                    <p className="battle-enemy-read">
+                      THEY HAVE STUDIED YOUR LAST ENGAGEMENT.{" "}
+                      {added.length > 0
+                        ? `Against the five you fielded they have brought ${named(added)} instead of ${named(dropped)}.`
+                        : "They found nothing in it worth changing their list for."}
+                    </p>
+                  );
+                })()}
                 <p>{ENEMY_DETACHMENT.rule.name} — {ENEMY_DETACHMENT.rule.text}</p>
                 <p>{enemy.plan ? `${enemy.plan.name} — ${enemy.plan.summary}` : army.intent}</p>
                 <p className="battle-enemy-scoring">THEY SCORE: {enemyDisposition.scoring}</p>

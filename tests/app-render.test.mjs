@@ -174,7 +174,7 @@ test("damage comes home to the formation that took it", () => {
   const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
   const at = source.indexOf("const pressOn");
   assert.notEqual(at, -1, "the screen no longer ends an engagement");
-  const pressOn = source.slice(at, at + 900);
+  const pressOn = source.slice(at, at + 1800);
   assert.match(pressOn, /deployedIds = Object\.values\(planned\)\.map\(\(entry\) => entry\?\.id\)/,
     "the battle result is applied to formations rather than to the hulls that fought");
   assert.ok(!/deployedIds[\s\S]{0,120}formationId/.test(pressOn), "the deployed list is still keyed on the formation");
@@ -182,4 +182,10 @@ test("damage comes home to the formation that took it", () => {
   // same hull do not both fight carrying the first one's damage.
   assert.match(source, /run\?\.roster\.find\(\(item\) => item\.id === entry\.id\)/,
     "the wounds a slot deploys with are read off the formation rather than the hull");
+  // And what was fielded goes home with it, because the next enemy is built by replaying
+  // this engagement. Passing nothing leaves the enemy permanently blind and the whole
+  // counter-play layer silently off.
+  assert.match(pressOn, /fielded: mission\.playerDeployment\.map\(\(slot\) => planned\[slot\.id\]\?\.formationId/,
+    "the engagement is not recorded, so the enemy never has anything to read");
+  assert.match(pressOn, /planId: strategyId/, "the enemy cannot replay the plan the player walked");
 });

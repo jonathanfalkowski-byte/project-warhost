@@ -294,7 +294,7 @@ console.log(`  ${answers.size > 1 ? "NOTE" : "NOTE"}  best answer per enemy hand
 // better than the others no matter what army you bring. Every list is played under every
 // disposition and every one of its three strategies.
 const { DISPOSITIONS } = await import("../src/battle/doctrine.js");
-const { BATTLE_PLANS, plansFor, routePointsFor } = await import("../src/battle/battlePlans.js");
+const { BATTLE_PLANS, plansFor, routeDestinationFor, routePointsFor } = await import("../src/battle/battlePlans.js");
 const { DETACHMENTS: DETS } = await import("../src/battle/stratagems.js");
 
 const doctrineRows = [];
@@ -454,6 +454,11 @@ const playRun = ({ detachmentId, seed, dispositionId, planIndex, rewardPolicy, e
       // with. Their scarcity is a player decision, not something a fixed policy models.
       commandSpent: 0,
       deployedIds: fielded.map((entry) => entry.id),
+      // What the enemy reads before the next engagement. The control arm never reads it —
+      // `engagementFor` refuses on a control run — but the run has to record it either way
+      // or the two arms would differ in more than the enemy.
+      fielded: engagement.mission.playerDeployment.map((slot) => deployment[slot.id]?.formationId ?? null),
+      planId: battlePlan?.id ?? null,
     });
     if (run.status !== "active") break;
     run = C.repair(run);
@@ -772,3 +777,108 @@ const reordered = byPlanGround.some((entry) => entry.ground !== entry.flat);
 const stillGood = byPlanGround.filter((entry) => entry.flat > 0.3 && entry.ground > 0.3).length;
 console.log(`  ${reordered ? "PASS" : "FAIL"}  the ground reorders the plans (${byPlanGround.filter((entry) => entry.ground !== entry.flat).length} of ${byPlanGround.length} moved)`);
 console.log(`  ${stillGood > 0 ? "PASS" : "FAIL"}  it does not decide the whole game on its own (${stillGood} plans work on both)`);
+
+// ---- axis I: is it solvable ----
+//
+// The question this axis exists for, in Jonathan's words: "I want the skill of the player
+// to decipher the enemy units and strat and then counter attack it — but once they figure
+// that out it can't be 'I win'."
+//
+// Both halves are measurable. Deciphering pays if the best answer to an enemy is much
+// better than an average one. It stops being "I win" if no answer keeps working — which is
+// not a claim about the player at all, it is a claim about whether ONE LIST BEATS EVERY
+// ENEMY THE GAME CAN FIELD. It did: thirty-two of them, before the enemy started reading.
+//
+// So every answer is played twice against every enemy: once against an enemy that has never
+// seen it, and once against the enemy that was built by replaying it. The second is what
+// happens when the player finds something that works and brings it again.
+const solveLists = combinations(ids, 5).filter((list) => new Set(list).size === 5);
+const solvePlans = plansFor("dominion");
+// REDUCED, and reported as reduced: one seed rather than two, and each list in one
+// arrangement rather than all 120. The full space here is the sweep's most expensive
+// measurement by a distance — every "read" enemy is itself built by playing up to thirty
+// trial battles — and it is the only axis that does not resolve its space in full.
+const solveConfigs = [];
+for (const disposition of ["dominion", "eradication"]) {
+  for (const plan of plansFor(disposition)) solveConfigs.push({ disposition, planId: plan.id, seed: 0 });
+}
+const solveArmy = armyFor(CIRCUIT_CLASH.id);
+const solveBlind = solveConfigs.map((config) => buildEnemyForce(CIRCUIT_CLASH, solveArmy, config));
+
+const playAnswer = (order, plan, foe) => {
+  const units = order.map((formationId, index) => deployUnit({
+    formationId, name: nameById.get(formationId), position: CIRCUIT_CLASH.playerDeployment[index], id: `${formationId}#${index}`,
+  }));
+  const orders = {};
+  const paths = {};
+  order.forEach((formationId, index) => {
+    const id = `${formationId}#${index}`;
+    const route = routePointsFor(plan, index, CIRCUIT_CLASH.id);
+    if (route.length > 0) paths[id] = route;
+    orders[id] = routeDestinationFor(plan, index, CIRCUIT_CLASH.objectives, CIRCUIT_CLASH.id) ?? CIRCUIT_CLASH.objectives[2].id;
+  });
+  const outcome = resolveBattle({
+    playerUnits: units, enemyUnits: foe.units, objectives: CIRCUIT_CLASH.objectives,
+    playerOrders: orders, enemyOrders: foe.orders, playerPaths: paths, enemyPaths: foe.paths,
+    playerDisposition: "dominion", enemyDisposition: foe.disposition, missionId: CIRCUIT_CLASH.id,
+  });
+  return { won: outcome.winner === "player", margin: outcome.playerScore - outcome.enemyScore };
+};
+
+const solveAnswers = solveLists.flatMap((list) => solvePlans.map((plan) => ({ list, plan })));
+let blindEverywhere = 0;
+let readEverywhere = 0;
+let blindWon = 0;
+let readWon = 0;
+let solvePlayed = 0;
+const headroom = [];
+const readMargins = solveConfigs.map(() => []);
+for (const answer of solveAnswers) {
+  let allBlind = true;
+  let allRead = true;
+  solveConfigs.forEach((config, index) => {
+    const blindOutcome = playAnswer(answer.list, answer.plan, solveBlind[index]);
+    const read = buildEnemyForce(CIRCUIT_CLASH, solveArmy, {
+      ...config,
+      counter: { order: answer.list, planId: answer.plan.id, disposition: "dominion" },
+    });
+    const readOutcome = playAnswer(answer.list, answer.plan, read);
+    if (!blindOutcome.won) allBlind = false;
+    if (!readOutcome.won) allRead = false;
+    blindWon += blindOutcome.won ? 1 : 0;
+    readWon += readOutcome.won ? 1 : 0;
+    solvePlayed += 1;
+    readMargins[index].push(readOutcome.margin);
+  });
+  if (allBlind) blindEverywhere += 1;
+  if (allRead) readEverywhere += 1;
+}
+// Deciphering has to PAY: against each enemy, how much better is the best answer than the
+// middle one. Measured against the enemy that has read the player, because that is the one
+// they will actually be looking at.
+solveConfigs.forEach((config, index) => {
+  const sorted = readMargins[index].slice().sort((left, right) => left - right);
+  headroom.push({
+    key: `${config.disposition}/${config.planId}`,
+    best: sorted.at(-1),
+    median: sorted[Math.floor(sorted.length / 2)],
+    winning: readMargins[index].filter((margin) => margin > 0).length,
+  });
+});
+
+console.log(`\nSOLVABILITY — ${solveAnswers.length} answers against ${solveConfigs.length} enemies, each played twice: against an enemy that has never seen it, and against the enemy built by replaying it`);
+console.log(`  NOTE: reduced, and the only axis that is. One seed per enemy, one arrangement per list — every "read" enemy is itself built out of trial battles.`);
+console.log(`  answers that beat every enemy that has NOT read them: ${blindEverywhere} of ${solveAnswers.length}`);
+console.log(`  answers that beat every enemy that HAS read them:     ${readEverywhere} of ${solveAnswers.length}`);
+console.log(`  win rate   unread ${percent(blindWon / solvePlayed)}   read ${percent(readWon / solvePlayed)}`);
+for (const entry of headroom) {
+  console.log(`  ${entry.key.padEnd(24)} best answer ${String(entry.best).padStart(3)} VP   median ${String(entry.median).padStart(3)}   headroom ${String(entry.best - entry.median).padStart(3)}   answers that beat it ${entry.winning}`);
+}
+
+console.log("\nSOLVABILITY VERDICT");
+console.log(`  ${readEverywhere === 0 ? "PASS" : "FAIL"}  no list keeps winning once it has been read (${readEverywhere} answers beat every enemy that had seen them)`);
+console.log(`  ${readWon < blindWon ? "PASS" : "FAIL"}  bringing the same list again is punished (${percent(blindWon / solvePlayed)} unread against ${percent(readWon / solvePlayed)} read)`);
+const answerable = headroom.filter((entry) => entry.winning > 0).length;
+console.log(`  ${answerable === headroom.length ? "PASS" : "FAIL"}  every enemy has an answer (${answerable} of ${headroom.length} can be beaten)`);
+const paying = headroom.filter((entry) => entry.best - entry.median >= 3).length;
+console.log(`  ${paying === headroom.length ? "PASS" : "FAIL"}  reading the enemy pays (${paying} of ${headroom.length} reward the best answer by 3+ VP over the median)`);

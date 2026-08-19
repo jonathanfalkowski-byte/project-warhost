@@ -505,3 +505,117 @@ The stat line is written **once**, in `statLineFor`. There were four copies of t
 `buy({ run, offerId, targetId })`. Field repair and full rebuild used to go to whichever formation was worst off, which is a sensible default and not a decision. With a dozen hulls in the warband and two of some of them, *which* one you patch before the next engagement is the question the money is asking — the wreck you are about to deploy is often not the wreck with the fewest wounds left.
 
 They are bought from the warband list, on the row of the hull, where the wounds are already written down; only REQUISITION is left on the shelf. Naming a formation that is not damaged, or is not in the warband, **refuses the purchase** rather than quietly doing the work somewhere else and charging for it. Naming nobody still repairs the worst-off hull, which is what the sweep buys — so the measured value of a repair stays the value of the cheapest sensible policy rather than the value of playing it well.
+
+## The enemy reads you back (19 Aug 2026)
+
+*"I want the skill of the player to decipher the enemy units and strat and then counter
+attack it — but once they figure that out it can't be 'I win', and I'm not sure how we go
+about that to make it a challenge for them each time."*
+
+### It was already solved, and that was measurable
+
+Before designing anything: every enemy the game can field on the Circuit — both
+declarations, three plans each, two seeds — against 1,890 player answers (list ×
+arrangement × plan). 22,680 battles.
+
+```
+distinct best answers across the 12 enemies:   9
+answers that beat EVERY enemy:                32 of 1890
+  skimmer+carriage+command+harpoon+hauler | TRAPLINE   +70 VP across all twelve
+headroom (best answer vs median):              5–10 VP
+```
+
+Deciphering paid — the right answer was worth 5–10 VP over an average one — and it did not
+matter, because a player who stumbled onto one of thirty-two lists never had to decipher
+anything again. **Numbers cannot fix that.** While the player picks their five with full
+knowledge, no commitment and no cost, the best generalist list wins by construction.
+
+With no dice, an opponent that responds to you is the only renewable source of a new problem
+each time. Everything else is memorised eventually.
+
+### The duel table, and why it made the enemy worse
+
+First attempt: score each hull against the player's list by fighting it one-against-one on
+bare ground, and weight that into the slot fit. Two failures, in order.
+
+1. **Weighted into the fit**, it fielded hulls that answered the player's list and could not
+   walk the route they were given. Lists that beat every enemy went from 32 to 58.
+2. **Choosing inside the shortlist** instead — every candidate can still do the job — was
+   worse again: 282.
+
+The measure was wrong, not the wiring. A duel says a breaker eats everything; **this is not
+a game of duels.** Asked directly — for a fixed player list, try all 126 enemy lists and
+sort — the enemy's own best lists are full of cheap fast objective hulls that would lose
+every duel on the board. Five hulls, five routes and five markers is a different game from
+one hull against one hull.
+
+Worth recording separately: scoring by how much better a hull does against THIS list than
+against the roster at large — the interaction term, the textbook way to strip out "that hull
+is just good" — **fields haulers.** A hull that loses to everything loses by no more to a
+strong list than to a weak one, so its relative score against a strong list is the best in
+the roster. Relative improvement on something that cannot win is not an answer.
+
+### The rehearsal
+
+The enemy does not consult a table of counters. It **replays the last engagement**: the same
+five formations the player fielded, in the same slots, walking the same plan, and tries its
+own alternatives against them one slot at a time, keeping whatever actually scored better on
+this ground. One ply deep, `COUNTER_SHORTLIST = 4` candidates a slot, `COUNTER_PASSES = 3`
+sweeps until nothing moves — about thirty trial battles per enemy, cached, and a battle costs
+half a millisecond.
+
+The thing being optimised is the thing being played. That is the whole difference between
+this and the duel table.
+
+Fairness is structural: what it reads is what the player themselves put on the board last
+time, and the brief says which hulls were changed because of it — *"THEY HAVE STUDIED YOUR
+LAST ENGAGEMENT. Against the five you fielded they have brought FLAME SUPPORT VEHICLE,
+ASSAULT WALKER instead of ARMOURED RECOVERY VEHICLE, SHIELD WALKER."* An opponent that
+adapts silently is not a mind game, it is difficulty arriving from nowhere. The only thing
+still hidden is the hand.
+
+**The control enemy never reads.** It is the instrument every claim about the player's
+choices is measured on, and an opponent that changes in response to the player is the one
+thing a control cannot do.
+
+### What it did
+
+```
+answers that beat every enemy that has NOT read them:   30 of 378
+answers that beat every enemy that HAS read them:        0 of 378
+win rate   unread 67.6%   read 38.3%
+
+bring the same list again, against the enemy that read it:  45.5%
+the same list against an enemy that has not read it:        75.6%
+bring a DIFFERENT list against the enemy that read you:     52.9%
+a winning answer existed against the read enemy in 156 of 156 engagements
+```
+
+Repeating yourself costs about thirty points of win rate; changing wins most of it back; and
+there is always something that beats what they brought. That is the loop the game is made
+of. Against the shipping enemy a run now takes four or more 16.7% of the time and all five
+2.0% (was 23.9% and 3.8%) — the sweep's policies field the healthiest five every engagement,
+which is to say they repeat themselves, which is exactly what this punishes.
+
+### Axis I, and the standing verdicts
+
+`SOLVABILITY` plays every answer twice against every enemy: once against one that has never
+seen it, once against the enemy built by replaying it.
+
+- **no list keeps winning once it has been read** — 0, and this is the verdict the whole
+  layer exists to hold
+- **bringing the same list again is punished** — 67.6% against 38.3%
+- **every enemy has an answer** — 6 of 6
+- **reading the enemy pays** — best answer beats the median by 3+ VP against all six
+
+It is the only axis that does not resolve its space in full: one seed per enemy, one
+arrangement per list. Every "read" enemy is itself built out of trial battles, so the axis
+costs more than the rest of the sweep put together at full width. The reduction is printed
+where the numbers are.
+
+### Still open
+
+The enemy's declaration still swings an engagement 43.4% — 69.3% player wins against
+ERADICATION, 25.8% against DOMINION — which is wider than any choice the player makes. Skill
+at reading the enemy can only show up in the part of the result the *draw* did not already
+decide, so this gap is now the ceiling on everything above.
