@@ -35,22 +35,16 @@ jobs:
       - name: game tests
         run: npm run test:game
 
-      - name: sites worker tests
-        run: npm run test:sites
-
       - name: build
         run: npm run build
 
-      # AGENTS.md: the build must leave these three or the Sites handoff is broken.
-      - name: the Sites handoff produced its three artifacts
-        run: |
-          for artifact in dist/client/index.html dist/server/index.js dist/.openai/hosting.json; do
-            if [ ! -f "$artifact" ]; then
-              echo "::error::build did not produce $artifact"
-              exit 1
-            fi
-            echo "ok  $artifact"
-          done
+      # AFTER the build, because its last case asserts dist/client/index.html,
+      # dist/server/index.js and dist/.openai/hosting.json exist - the three artifacts
+      # AGENTS.md requires for a Sites handoff. Run before a build it passes only on a
+      # machine that happens to have a stale dist/ lying around, which is exactly how it
+      # passed locally and failed here.
+      - name: sites worker tests
+        run: npm run test:sites
 
       # The sweep prints verdicts, not numbers to interpret. A FAIL is a balance claim that
       # has stopped being true, and it should stop a merge exactly like a failing test.
