@@ -668,6 +668,9 @@ console.log(`  ${formed.length < pairingRows.length ? "PASS" : "FAIL"}  a pairin
 //
 // Measured on the same 1080 policy-and-seed combinations as the run axis above, so the only
 // thing that differs between the two sets of rows is the enemy.
+// How far apart the two enemy declarations may be before the draw is deciding the game.
+const DECLARATION_GAP_LIMIT = 0.30;
+
 const enemyOf = (rows) => rows.reduce((sum, row) => sum + row.won, 0) / Math.max(1, rows.length);
 const controlWon = enemyOf(runRows);
 const variedWon = enemyOf(variedRows);
@@ -713,11 +716,14 @@ console.log(`  ${freeWin < 0.95 ? "PASS" : "FAIL"}  no enemy declaration is a fr
 console.log(`  ${wall > 0.05 ? "PASS" : "FAIL"}  no enemy declaration is an unloseable wall (worst is ${percent(wall)})`);
 console.log(`  ${clearedLadder < 0.35 ? "PASS" : "FAIL"}  clearing the ladder is a result rather than the default (${percent(clearedLadder)} of runs took all five)`);
 console.log(`  ${fourOrMore > 0.02 ? "PASS" : "FAIL"}  and it is reachable (${percent(fourOrMore)} took four or more)`);
-// The gap between the two declarations is the open question this measurement exists to
-// keep in view: the enemy choosing what to score for decides more of the run than anything
-// the player picks. Reported as a number rather than asserted, because what an acceptable
-// gap IS has not been decided yet.
-console.log(`  NOTE  the enemy's declaration swings the engagement ${percent(freeWin - wall)} — wider than any player choice measured above`);
+// THE DECLARATION GAP, and it is a verdict now rather than a note. The enemy choosing what
+// to score for used to decide more of the run than everything the player picks put
+// together — 43.4%, against a spread of 17.8% across the player's own three declarations —
+// and skill cannot show up inside a result the draw has already settled. Thirty percent is
+// the line: wide enough that which opponent you drew still matters, narrow enough that it
+// is no longer the biggest thing in the game.
+const declarationGap = freeWin - wall;
+console.log(`  ${declarationGap <= DECLARATION_GAP_LIMIT ? "PASS" : "FAIL"}  the enemy's declaration does not decide the engagement on its own (${percent(declarationGap)} between its best and worst, ceiling ${percent(DECLARATION_GAP_LIMIT)})`);
 
 // ---- axis H: the ground ----
 //

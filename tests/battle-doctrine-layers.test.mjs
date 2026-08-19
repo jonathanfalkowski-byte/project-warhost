@@ -179,8 +179,11 @@ test("a disposition decides which markers are live, not just what holding one pa
   assert.deepEqual(liveIds("safeguard"), ["home"], "safeguard's live set is not its own half");
   // The halves are mirrored, so the same rule reads correctly from the other edge.
   assert.deepEqual(liveIds("safeguard", "enemy"), ["deep"]);
-  // And SAFEGUARD's fewer markers are worth more, which is the trade it is making.
-  assert.equal(liveSitesFor({ disposition: "safeguard", side: "player", objectives: board })[0].points, 4);
+  // And SAFEGUARD's fewer markers are worth more, which is the trade it is making. Read
+  // through the multiplier rather than written out: a guard that hardcodes the number it
+  // is guarding stops guarding the moment the number is tuned.
+  assert.ok(DISPOSITIONS.safeguard.homeMultiplier > 1, "safeguard's own ground is not worth more than anyone else's");
+  assert.equal(liveSitesFor({ disposition: "safeguard", side: "player", objectives: board })[0].points, 2 * DISPOSITIONS.safeguard.homeMultiplier);
   assert.equal(liveSitesFor({ disposition: "dominion", side: "player", objectives: board })[0].points, 2);
   // Re-valuing must not scribble on the mission.
   assert.equal(board[0].points, 2, "the live set mutated the mission's objectives");
@@ -196,17 +199,18 @@ test("DOMINION pays for ground, ERADICATION pays for damage, SAFEGUARD pays for 
   assert.equal(scoreRound({ disposition: "dominion", side: "player", objectives: held, damage: 30, destroyed: 2 }), 2, "dominion was paid for kills");
 
   assert.equal(scoreRound({ disposition: "eradication", side: "player", objectives: held }), 0, "eradication was paid for ground");
-  assert.equal(scoreRound({ disposition: "eradication", side: "player", damage: 8 }), 2);
-  assert.equal(scoreRound({ disposition: "eradication", side: "player", damage: 8, destroyed: 1 }), 5);
+  const forDamage = (wounds) => Math.floor(wounds / DISPOSITIONS.eradication.damagePerPoint);
+  assert.equal(scoreRound({ disposition: "eradication", side: "player", damage: 8 }), forDamage(8));
+  assert.equal(scoreRound({ disposition: "eradication", side: "player", damage: 8, destroyed: 1 }), forDamage(8) + DISPOSITIONS.eradication.wreckBounty);
   // What has already been paid for is subtracted, so a wound is never cashed twice.
-  assert.equal(scoreRound({ disposition: "eradication", side: "player", damage: 8, damagePaid: 1 }), 1);
+  assert.equal(scoreRound({ disposition: "eradication", side: "player", damage: 8, damagePaid: 1 }), forDamage(8) - 1);
 
-  // Safeguard's own half pays double; anything outside it is dark and pays nothing.
-  assert.equal(scoreRound({ disposition: "safeguard", side: "player", objectives: held, lost: 1 }), 4);
-  assert.equal(scoreRound({ disposition: "safeguard", side: "player", objectives: held, lost: 0 }), 5);
+  // Safeguard's own half pays its multiplier; anything outside it is dark and pays nothing.
+  assert.equal(scoreRound({ disposition: "safeguard", side: "player", objectives: held, lost: 1 }), 2 * DISPOSITIONS.safeguard.homeMultiplier);
+  assert.equal(scoreRound({ disposition: "safeguard", side: "player", objectives: held, lost: 0 }), 2 * DISPOSITIONS.safeguard.homeMultiplier + 1);
   assert.equal(scoreRound({ disposition: "safeguard", side: "player", objectives: deep, lost: 1 }), 0, "safeguard cashed ground in the enemy half");
   assert.equal(scoreRound({ disposition: "safeguard", side: "player", objectives: centre, lost: 1 }), 0, "safeguard cashed the centre line");
-  assert.equal(scoreRound({ disposition: "safeguard", side: "enemy", objectives: [{ ...deep[0], holder: "enemy" }], lost: 1 }), 4);
+  assert.equal(scoreRound({ disposition: "safeguard", side: "enemy", objectives: [{ ...deep[0], holder: "enemy" }], lost: 1 }), 2 * DISPOSITIONS.safeguard.homeMultiplier);
   assert.equal(scoreRound({ disposition: "safeguard", side: "enemy", objectives: [{ ...held[0], holder: "enemy" }], lost: 1 }), 0);
 });
 
@@ -348,9 +352,10 @@ test("a formation is only ever paid for once under ERADICATION", () => {
     playerDisposition: "safeguard", enemyDisposition: "dominion",
   });
   const clean = safeguarded.rounds.map((round) => round.playerGained);
-  // Holding a 1 VP objective in its own half pays 2; a clean round adds the third point.
-  assert.equal(clean[0], 2, "the round the formation died still counted as a clean round");
-  assert.deepEqual(clean.slice(1), [3, 3, 3, 3], "rounds after the loss never became clean again");
+  // Holding a 1 VP objective in its own half pays the multiplier; a clean round adds one.
+  const ground = 1 * DISPOSITIONS.safeguard.homeMultiplier;
+  assert.equal(clean[0], ground, "the round the formation died still counted as a clean round");
+  assert.deepEqual(clean.slice(1), [ground + 1, ground + 1, ground + 1, ground + 1], "rounds after the loss never became clean again");
 
   // And with no ground held at all, a clean round pays nothing.
   const hiding = resolveBattle({

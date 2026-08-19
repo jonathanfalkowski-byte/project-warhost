@@ -76,10 +76,15 @@ export const DISPOSITIONS = {
     // costs you. Raising the field alone made ERADICATION stronger (73.7% from 65.4%),
     // because it cut the penalty and left the reward untouched — a tuning knob wired to
     // half the thing it names.
-    damagePerPoint: 3,
+    // MEASURED AGAINST THE OTHER DECLARATION, not in isolation. At 3 wounds a point an
+    // eradicating army scored about 5.9 against a dominion army's 11.4 on the same board —
+    // half the score for declaring the other thing — and the player's win rate against the
+    // two differed by 43.4%, which is wider than every choice the player makes put
+    // together. Nothing you decide can show up inside a result the draw already settled.
+    damagePerPoint: 2,
     // Named for the same reason the divisor is: a number that appears in `score` and
     // nowhere else is a number nobody can tune without reading the function.
-    wreckBounty: 3,
+    wreckBounty: 5,
     sites: () => [],
     score: ({ destroyed, damage, damagePaid }) => (Math.floor(damage / DISPOSITIONS.eradication.damagePerPoint) - damagePaid) + (DISPOSITIONS.eradication.wreckBounty * destroyed),
   },
@@ -87,14 +92,25 @@ export const DISPOSITIONS = {
     id: "safeguard",
     name: "SAFEGUARD",
     summary: "Give up nothing. Hold your own ground and bring the army home.",
-    scoring: "Only your own half is live, and it pays double. Holding it and losing nobody pays 1 VP more.",
+    get scoring() {
+      return `Only your own half is live, and it pays ${DISPOSITIONS.safeguard.homeMultiplier}x. Holding it and losing nobody pays 1 VP more.`;
+    },
     board: "Everything past your own half goes dark.",
+    // What your own ground is worth to you. A literal 2 inside `sites` was a number nobody
+    // could tune without reading the function — the same fault the eradication divisor had.
+    //
+    // Left at double, and that is a measurement rather than an omission. Cutting it to 1.5
+    // was tried against the run axis: it made the enemy's declaration matter MORE (the gap
+    // went from 32.7% to 34.9%) and took runs that reach four wins from 16.7% to 8.3%,
+    // because it takes the whole top off the player's scoring without touching the enemy's.
+    // The declaration gap is not a SAFEGUARD problem.
+    homeMultiplier: 2,
     // The narrowest of the three: one or two markers, worth double, and the rest of its
     // score has to come from rounds where nothing dies. It should be the answer for a list
     // that cannot survive a push, never the answer for a list that can.
     sites: (objectives, side) => objectives
       .filter((objective) => inOwnHalf(objective, side))
-      .map((objective) => ({ ...objective, points: objective.points * 2 })),
+      .map((objective) => ({ ...objective, points: objective.points * DISPOSITIONS.safeguard.homeMultiplier })),
     // The clean-round point requires actually holding your ground, not merely avoiding
     // contact. Paying it for a quiet round rewarded hiding, and across a five-battle run
     // that compounded into 3.24 battles won against 1.44 for the other two dispositions —

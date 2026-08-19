@@ -6,7 +6,7 @@
 # a session ended. 149 mutants is too much measurement to keep re-deriving, so it is in the
 # repo now. Run it from anywhere: `bash scripts/mutants.sh`.
 cd "$(dirname "$0")/.." || exit 1
-pass=0; fail=0
+pass=0; fail=0; skipped=0; skips=""
 
 # An interrupted run used to leave a mutated source file on disk — a killed script skips
 # its restore, and the next sweep then measures a deliberately broken build. Restore every
@@ -30,7 +30,12 @@ if s.count(frm) != 1:
     print(f"SKIP-PATTERN({s.count(frm)})"); sys.exit(3)
 open(path, "w").write(s.replace(frm, to))
 PY
-  if [ $? -eq 3 ]; then mv "$file.bak" "$file"; echo "?? $label — pattern not unique"; return; fi
+  if [ $? -eq 3 ]; then
+    mv "$file.bak" "$file"
+    echo "?? $label — pattern not unique"
+    skipped=$((skipped+1)); skips="$skips\n    $label"
+    return
+  fi
   if node --test $tests >/dev/null 2>&1; then
     echo "!! SURVIVED: $label — the guard does not catch this"; fail=$((fail+1))
   else
@@ -893,6 +898,26 @@ mutate "a part-strength warband takes a slice out of the middle of its plan" src
       '    const route = battlePlan ? routePointsFor(battlePlan, slotIndex, mission.id, false, size) : [];' \
       "tests/battle-lanes.test.mjs"
 
+
+echo "=== what a declaration pays ==="
+mutate "the eradication payout is stated in one place and paid in another" src/battle/doctrine.js \
+      'score: ({ destroyed, damage, damagePaid }) => (Math.floor(damage / DISPOSITIONS.eradication.damagePerPoint) - damagePaid) + (DISPOSITIONS.eradication.wreckBounty * destroyed),' \
+      'score: ({ destroyed, damage, damagePaid }) => (Math.floor(damage / 3) - damagePaid) + (3 * destroyed),' \
+      "tests/battle-doctrine-layers.test.mjs"
+mutate "safeguard's own ground is worth what everyone else's is" src/battle/doctrine.js \
+      '      .map((objective) => ({ ...objective, points: objective.points * DISPOSITIONS.safeguard.homeMultiplier })),' \
+      '      .map((objective) => ({ ...objective })),' \
+      "tests/battle-doctrine-layers.test.mjs"
+
 echo
-echo "killed $pass mutants, $fail survived"
+echo "killed $pass mutants, $fail survived, $skipped skipped"
+# A SKIPPED MUTANT IS AN UNGUARDED ONE. The pattern it edits no longer appears exactly once
+# in the file — usually because the code was refactored — so the guard it was checking has
+# quietly stopped being checked. Printed at the end rather than only where it happened,
+# because a line in the middle of two hundred is a line nobody reads.
+if [ "$skipped" -gt 0 ]; then
+  echo
+  echo "NOT RUN — these patterns no longer appear exactly once, so what they guarded is unmeasured:"
+  printf "$skips\n"
+fi
 [ "$fail" -eq 0 ]

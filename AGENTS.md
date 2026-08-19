@@ -700,3 +700,45 @@ And the thing to say out loud: **above about six hulls the sweep stops being exh
 The five-hull board stays as the instrument that resolves its space in full, the same
 discipline as the control enemy, and the big-army claims become sampled with stated sample
 sizes.
+
+## What a declaration pays (19 Aug 2026)
+
+The standing imbalance, closed enough to stop being the biggest thing in the game. It was
+**43.4%** — the player won 69.3% of engagements against an ERADICATION enemy and 25.8%
+against a DOMINION one — against a spread of 17.8% across every choice the player makes.
+Nothing you decide can show up inside a result the draw has already settled.
+
+Where it came from, measured rather than guessed: on the same board, against the same
+answers, an eradicating army scored **5.9** and a dominion army **11.4**. Declaring
+ERADICATION halved your score. It was underpaid, for both armies — the player's own
+eradication won 2.6% of its battles against a dominion enemy.
+
+`damagePerPoint` 3 → **2**, `wreckBounty` 3 → **5**. Measured on a reduced copy of the run
+axis rather than on a fixture, one candidate per process (the enemy's counter-built lists are
+cached and the key says nothing about the scoring rules, so two settings in one process
+measure the second against lists built for the first — the first grid run was quietly wrong
+in exactly that way).
+
+```
+              enemy gap   your dispositions   runs reaching four wins
+was (3, 3)       43.4%    35.0/52.8/36.8              16.7%
+now (2, 5)       26.5%    34.9/53.0/44.7              11.7%
+```
+
+ERADICATION stops being a trap (36.8% → 44.7%) without becoming the answer, and the gap is
+down by 39%. It is a **verdict** now rather than a note: the sweep fails if the two
+declarations are more than 30 points apart.
+
+**SAFEGUARD was left at double, and that is a measurement.** Cutting `homeMultiplier` to 1.5
+made the enemy's declaration matter MORE (32.7% → 34.9%) and halved the runs that reach four
+wins, because it takes the top off the player's scoring without touching the enemy's. The
+declaration gap was never a SAFEGUARD problem.
+
+### Twenty-nine mutants were not running
+
+`scripts/mutants.sh` reported "killed 161, 0 survived" and quietly skipped **29** more whose
+patterns no longer appear exactly once in the file — refactors moved the code out from under
+them. A guard that has stopped being checked reports the same as a guard that passes, which
+is the single most recurring failure in this project. The summary line counts skips now and
+prints every one of them at the end, so the number cannot hide again. They still need
+re-pointing at the code as it stands.
