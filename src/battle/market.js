@@ -15,7 +15,7 @@
 
 import { FORMATIONS } from "../formationData.js";
 import { battleProfileFor, statLineFor } from "./battleProfiles.js";
-import { REFITS, REFIT_COST, refitsFor } from "./refits.js";
+import { REFITS, REFIT_COST, profileWithRefit, refitsFor } from "./refits.js";
 
 // What a formation costs to bring into the warband, in victory points.
 // Prices are low on purpose. At 3-to-7 against roughly eleven points an engagement you
@@ -127,6 +127,17 @@ export const shelfUnitsFor = ({ seed = 0, battle = 1, roster = [], lost = [] } =
 
 export const marketFor = ({ seed = 0, battle = 1, roster = [], purse = 0, shelf = null, refitShelf = null } = {}) => {
   const damaged = roster.some((entry) => Number.isFinite(entry.wounds));
+  // FULL REBUILD is only a purchase when it does something FIELD REPAIR cannot. A patch
+  // heals FIELD_REPAIR_WOUNDS and completes to full when that reaches the cap, so against a
+  // hull down four or less the two buy the IDENTICAL result and the rebuild asks twice the
+  // points for it. Reported from play as exactly that: "why would i do a full recovery 4
+  // for when i get it for 2". The shelf does not offer a dominated option, so rebuild
+  // appears only when something is further from full than a patch can carry it.
+  // Measured THROUGH the refit, for the same reason repair is: four refits move a hull's
+  // wounds, and reading the base profile would misjudge how far from full a reinforced hull
+  // actually is.
+  const beyondPatch = roster.some((entry) => Number.isFinite(entry.wounds)
+    && profileWithRefit(entry.formationId, entry.refit).wounds - entry.wounds > FIELD_REPAIR_WOUNDS);
   const drawn = shelf ?? shelfUnitsFor({ seed, battle, roster });
   // Anything bought is taken off the shelf EXPLICITLY, by `buy` removing it from the run's
   // held shelf. It used to be implicit — the shelf was filtered by what the warband already
@@ -164,7 +175,7 @@ export const marketFor = ({ seed = 0, battle = 1, roster = [], purse = 0, shelf 
       affordable: REFIT_COST <= purse,
     }));
   const services = Object.values(SERVICES)
-    .filter((service) => (service.id === "requisition" ? true : damaged))
+    .filter((service) => (service.id === "requisition" ? true : service.id === "rebuild" ? beyondPatch : damaged))
     .map((service) => ({ kind: "service", ...service, affordable: service.cost <= purse }));
   return [...units, ...refits, ...services];
 };

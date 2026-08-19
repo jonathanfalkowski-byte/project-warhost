@@ -74,13 +74,13 @@ DOCTRINE VERDICT
 RUNS — 1080 runs (12 seeds x every detachment, disposition, plan and spending rule)
   NOTE: exhaustive over policies, sampled over seeds. Every other axis above resolves its space in full.
   NOTE: fought against the CONTROL enemy, so what changes is only what the player chose.
-  battles won 0..5: 0:268  1:200  2:158  3:252  4:81  5:121
+  battles won 0..5: 0:268  1:200  2:159  3:250  4:82  5:121
   armies broken before the ladder ended: 48 (4.4%)
   dominion     won 1.72 of 4.91 fought   win rate 34.9%
-  safeguard    won 2.65 of 5.00 fought   win rate 53.0%
+  safeguard    won 2.66 of 5.00 fought   win rate 53.1%
   eradication  won 2.20 of 4.83 fought   win rate 44.7%
   victory points earned per run: 56.1   spent: 44.9
-  warband size at the end: 9.91 (started 6)
+  warband size at the end: 9.93 (started 6)
   formations carrying a refit at the end: 3.75
   widen        won 2.11 of 5.00 fought   win rate 42.2%
   patch        won 2.37 of 4.75 fought   win rate 49.4%
@@ -91,11 +91,11 @@ RUNS — 1080 runs (12 seeds x every detachment, disposition, plan and spending 
 RUN VERDICT
   PASS  a run is a spread rather than pass-or-fail (6 of 6 outcomes reached)
   PASS  both endings happen (4.4% of armies break)
-  PASS  which disposition you run matters, without deciding it (18.1% apart on win rate)
+  PASS  which disposition you run matters, without deciding it (18.2% apart on win rate)
   PASS  how long an army lasts depends on how it fights (dominion 0.42, safeguard 0.34, eradication 0.50 lost per engagement)
   PASS  the reward you take changes the run (14.2% apart on win rate)
-  PASS  formations get refitted rather than only replaced (69.4% of runs ended carrying at least one)
-  PASS  what you score turns into an army, wider or deeper (13.66 formations-plus-refits from 6, 88.5% of runs ended ahead)
+  PASS  formations get refitted rather than only replaced (69.8% of runs ended carrying at least one)
+  PASS  what you score turns into an army, wider or deeper (13.68 formations-plus-refits from 6, 88.5% of runs ended ahead)
   PASS  the purse is spent rather than hoarded (0.0% of runs left 7+ points unspent at the last shelf)
   PASS  preserving the army pays across a run (SAFEGUARD lasts 5.00 battles v 4.88 for the rest)
 
@@ -118,19 +118,19 @@ PAIRING VERDICT
 
 THE ENEMY — the same 1080 policies against the control enemy and against the one the game ships
   battles won per run: control 2.04   varied 1.95
-  runs the enemy changed: 793 of 1080
+  runs the enemy changed: 792 of 1080
   faced eradication   2556 engagements   player won 54.3%
-  faced dominion      2564 engagements   player won 27.8%
-  battles won 0..5 against the shipping enemy: 0:150  1:250  2:337  3:217  4:104  5:22
-  runs that took four or more: 11.7%   all five: 2.0%
+  faced dominion      2564 engagements   player won 27.9%
+  battles won 0..5 against the shipping enemy: 0:150  1:250  2:335  3:218  4:105  5:22
+  runs that took four or more: 11.8%   all five: 2.0%
 
 ENEMY VERDICT
-  PASS  which enemy you drew changes the run (793 of 1080 ran differently)
+  PASS  which enemy you drew changes the run (792 of 1080 ran differently)
   PASS  the enemy declares more than one way to win (eradication, dominion)
   PASS  no enemy declaration is a free win (best is 54.3%)
-  PASS  no enemy declaration is an unloseable wall (worst is 27.8%)
+  PASS  no enemy declaration is an unloseable wall (worst is 27.9%)
   PASS  clearing the ladder is a result rather than the default (2.0% of runs took all five)
-  PASS  and it is reachable (11.7% took four or more)
+  PASS  and it is reachable (11.8% took four or more)
   PASS  the enemy's declaration does not decide the engagement on its own (26.4% between its best and worst, ceiling 30.0%)
 
 THE GROUND — 5292 list-and-plan pairs, each fought on the Circuit and on a flat plain
@@ -184,13 +184,13 @@ THE SKILLED RUN — 180 runs played by choosing the plan, the five and the order
   NOTE: chooses by resolving each candidate, so it sees the enemy hand. A ceiling, not a player.
   battles resolved to make the choices: 243941
   battles won 0..5   skilled: 0:0  1:2  2:0  3:6  4:40  5:132
-  battles won 0..5   fixed:   0:44  1:121  2:162  3:127  4:68  5:18
+  battles won 0..5   fixed:   0:44  1:121  2:163  3:126  4:68  5:18
   battles won per run   skilled 4.67   fixed 2.20
   cleared the ladder    skilled 73.3%   fixed 3.3%
   armies broken         skilled 1.1%   fixed 14.8%
   faced eradication  skilled 99.7%   fixed 64.9%
-  faced dominion     skilled 90.1%   fixed 34.4%
-  declaration gap       skilled 9.6%   fixed 30.5%
+  faced dominion     skilled 90.1%   fixed 34.3%
+  declaration gap       skilled 9.6%   fixed 30.6%
 
 SKILLED RUN VERDICT
   PASS  playing well beats playing a fixed plan (4.67 battles won against 2.20)

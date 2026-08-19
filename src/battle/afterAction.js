@@ -84,7 +84,7 @@ export const pairingLinksFor = ({ round } = {}) => (round?.synergies?.player ?? 
 // silent markers sliding around is confirmation, not suspense — there is no moment where
 // something HAPPENS. This picks it out: a wreck first, then a stratagem, then the heaviest
 // blow, and stays quiet if the round genuinely had nothing in it.
-export const headlineFor = ({ round, previous, known = [] } = {}) => {
+export const headlineFor = ({ round, previous, known = [], disposition = null } = {}) => {
   if (!round) return null;
   // A pairing forming for the FIRST TIME outranks everything, including a casualty. It is
   // the only moment in the game where the player learns a rule that was written nowhere,
@@ -112,7 +112,19 @@ export const headlineFor = ({ round, previous, known = [] } = {}) => {
   }
   const brokeThisRound = round.enemies.filter((unit) => unit.wounds <= 0 && (wasAliveEnemy.get(unit.id) ?? true));
   if (brokeThisRound.length > 0) {
-    return { tone: "kill", text: `You wrecked ${brokeThisRound.map((unit) => unit.name).join(" and ")}.` };
+    // SAY WHAT IT WAS WORTH. Only ERADICATION pays a wreck bounty; DOMINION scores held
+    // ground and nothing else, SAFEGUARD the ground in its own half. Announcing a kill the
+    // same way under all three told a DOMINION player they had done something scoring while
+    // the battle was being decided on objective-rounds they were losing — which is how you
+    // reach the end of a fight certain you should have won it.
+    const rule = disposition ? dispositionFor(disposition) : null;
+    const wrecked = brokeThisRound.map((unit) => unit.name).join(" and ");
+    return {
+      tone: "kill",
+      text: !rule || rule.wreckBounty
+        ? `You wrecked ${wrecked}.`
+        : `You wrecked ${wrecked} — ${rule.name} pays nothing for it.`,
+    };
   }
   const enemySpend = (round.spends ?? []).find((spend) => spend.side === "enemy");
   if (enemySpend) return { tone: "enemy", text: `Helioch spends ${enemySpend.name}.` };
