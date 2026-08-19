@@ -32,14 +32,18 @@ const shuffleKey = (seed, index) => ((Math.abs(Math.floor(seed)) + 1) * 26544357
 // What a deployment slot is being asked to do, read off the plan rather than declared.
 // A plan is a set of routes; a route says how far a formation has to walk and what it is
 // standing on when it stops. That is the whole brief for the hull that fills the slot.
-export const slotRoleFor = ({ mission, plan, slotIndex }) => {
+// `index` is which of the ARMY this slot is, west to east, and `size` is how big that army
+// is — the plan is lanes, and which lane a slot walks depends on how many are walking.
+// Left out they fall back to the slot's own index, which is what they were when a plan was
+// five routes and an army was always five formations.
+export const slotRoleFor = ({ mission, plan, slotIndex, index = slotIndex, size = null }) => {
   const start = mission.enemyDeployment[slotIndex];
-  const points = plan ? routePointsFor(plan, slotIndex, mission.id, true) : [];
+  const points = plan ? routePointsFor(plan, index, mission.id, true, size) : [];
   // Priced in MOVEMENT, not in distance — a route across the slag is longer than it looks,
   // and the whole reason this number exists is to work out how fast the hull filling the
   // slot has to be. Reading plain distance would put the slowest hull on the rubble lane.
   const walk = routeCost(start, points, mission.id);
-  const destination = plan ? routeDestinationFor(plan, slotIndex, mission.objectives, mission.id, true) : null;
+  const destination = plan ? routeDestinationFor(plan, index, mission.objectives, mission.id, true, size) : null;
   const objective = mission.objectives.find((entry) => entry.id === destination) ?? null;
   return {
     slotIndex,
@@ -127,14 +131,18 @@ const rehearsalForce = (mission, counter) => {
   const units = [];
   const orders = {};
   const paths = {};
-  counter.order.forEach((formationId, index) => {
-    if (!formationId || !BATTLE_PROFILES[formationId] || !mission.playerDeployment[index]) return;
-    const id = `rehearsal-${formationId}#${index}`;
-    units.push(deployUnit({ formationId, name: formationId.toUpperCase(), position: mission.playerDeployment[index], id }));
-    const route = plan ? routePointsFor(plan, index, mission.id) : [];
+  const walking = counter.order.filter((formationId) => formationId && BATTLE_PROFILES[formationId]).length;
+  let walked = 0;
+  counter.order.forEach((formationId, slotIndex) => {
+    if (!formationId || !BATTLE_PROFILES[formationId] || !mission.playerDeployment[slotIndex]) return;
+    const id = `rehearsal-${formationId}#${slotIndex}`;
+    const index = walked;
+    walked += 1;
+    units.push(deployUnit({ formationId, name: formationId.toUpperCase(), position: mission.playerDeployment[slotIndex], id }));
+    const route = plan ? routePointsFor(plan, index, mission.id, false, walking) : [];
     if (route.length > 0) paths[id] = route;
-    orders[id] = (plan ? routeDestinationFor(plan, index, mission.objectives, mission.id) : null)
-      ?? mission.objectives[Math.min(index, mission.objectives.length - 1)]?.id;
+    orders[id] = (plan ? routeDestinationFor(plan, index, mission.objectives, mission.id, false, walking) : null)
+      ?? mission.objectives[Math.min(slotIndex, mission.objectives.length - 1)]?.id;
   });
   return { units, orders, paths };
 };
@@ -145,16 +153,16 @@ const rehearse = ({ mission, plan, disposition, chosen, fielded, rehearsal, coun
   const units = [];
   const orders = {};
   const paths = {};
-  for (const role of fielded) {
+  fielded.forEach((role, index) => {
     const formationId = chosen.get(role.slotIndex);
-    if (!formationId) continue;
+    if (!formationId) return;
     const id = `trial-${formationId}#${role.slotIndex}`;
     units.push(deployUnit({ formationId, name: formationId.toUpperCase(), position: mission.enemyDeployment[role.slotIndex], id }));
-    const route = plan ? routePointsFor(plan, role.slotIndex, mission.id, true) : [];
+    const route = plan ? routePointsFor(plan, index, mission.id, true, fielded.length) : [];
     if (route.length > 0) paths[id] = route;
-    orders[id] = (plan ? routeDestinationFor(plan, role.slotIndex, mission.objectives, mission.id, true) : null)
+    orders[id] = (plan ? routeDestinationFor(plan, index, mission.objectives, mission.id, true, fielded.length) : null)
       ?? mission.objectives[Math.min(role.slotIndex, mission.objectives.length - 1)]?.id;
-  }
+  });
   const result = resolveBattle({
     playerUnits: rehearsal.units, enemyUnits: units, objectives: mission.objectives,
     playerOrders: rehearsal.orders, enemyOrders: orders,
@@ -181,14 +189,19 @@ export const buildArmyList = ({ mission, plan, disposition = "dominion", strengt
   if (cacheKey && REHEARSED.has(cacheKey)) return REHEARSED.get(cacheKey);
 
   const scoresGround = disposition !== "eradication";
-  const slots = mission.enemyDeployment.map((unused, slotIndex) => slotRoleFor({ mission, plan, slotIndex }));
-  // Contiguous, centre-out: a screening force of three is the middle three slots, not the
-  // two flanks and one wing, which would leave a gap the player walks through.
+  // WHICH SLOTS STAND, before what they are being asked to do — because what a slot is being
+  // asked to do now depends on how many of them there are. Contiguous, centre-out: a
+  // screening force of three is the middle three slots, not the two flanks and one wing,
+  // which would leave a gap the player walks through.
   const centre = (mission.enemyDeployment.length - 1) / 2;
-  const fielded = [...slots]
-    .sort((left, right) => Math.abs(left.slotIndex - centre) - Math.abs(right.slotIndex - centre))
-    .slice(0, Math.max(1, Math.min(strength, slots.length)))
-    .sort((left, right) => left.slotIndex - right.slotIndex);
+  const standing = mission.enemyDeployment
+    .map((unused, slotIndex) => slotIndex)
+    .sort((left, right) => Math.abs(left - centre) - Math.abs(right - centre))
+    .slice(0, Math.max(1, Math.min(strength, mission.enemyDeployment.length)))
+    .sort((left, right) => left - right);
+  const fielded = standing.map((slotIndex, index) => slotRoleFor({
+    mission, plan, slotIndex, index, size: standing.length,
+  }));
 
   const order = [...fielded].sort((left, right) => right.needsMove - left.needsMove);
   const taken = new Set();

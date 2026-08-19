@@ -619,3 +619,84 @@ The enemy's declaration still swings an engagement 43.4% — 69.3% player wins a
 ERADICATION, 25.8% against DOMINION — which is wider than any choice the player makes. Skill
 at reading the enemy can only show up in the part of the result the *draw* did not already
 decide, so this gap is now the ceiling on everything above.
+
+## A plan is lanes (19 Aug 2026)
+
+*"I think multiple units on the battlefield is the way to go — start with 5 and increase
+every 3 to 5 missions until you hit 12... We could plan the list like Warhammer 40k and have
+a certain amount of points per battle. That means the strategies would have to be somewhat
+dynamic to fit the list. What do you think?"*
+
+Phase one of that: **the strategies, at the current five.** Nothing else moved, and the
+sweep still resolves its space in full — 45 verdicts, and the SOLVABILITY numbers came out
+byte-identical afterwards (30 / 0 / 67.6% / 38.3%), which is the whole point of doing this
+first.
+
+### Why it is the precondition and not a detail
+
+Measured before designing anything. Grow the armies and cycle the extra hulls onto the five
+authored routes — the obvious way — and:
+
+```
+hulls      5    6    7    8    9   10   12
+headroom   9    7    4    5    5    2    1     ← best list vs median list, in VP
+```
+
+At twelve a side the best possible list beat the median by one victory point. Everything
+clumps on five routes, nothing is distinguishable, and what you brought stops mattering.
+Give the same twelve hulls orders that actually spread them and headroom is 9 to 17 instead.
+**The problem was never the number of formations. It was writing a plan as a list of slots.**
+
+### The shape
+
+A plan is a handful of LANES, each a route to named ground with a `share` of whatever army
+walks it. The fill is proportional, largest remainder first, never fewer than one formation
+in a lane the plan still has; an army smaller than the plan has lanes keeps the heaviest of
+them, so one formation walking SPEAR walks the Spine.
+
+Every plan converts with no change to any battle at the size it was written for — the nine
+route sets are frozen in `tests/battle-lanes.test.mjs` and compared against the fill, and
+that guard is not derived from the source. SPEAR stops being "five routes, three of which
+are the same" and becomes what it always meant: **three fifths of whatever you have, on the
+Spine.**
+
+`routePointsFor(plan, index, missionId, mirrored, size)` — `index` is which of the ARMY, west
+to east, not which deployment slot. They are the same number while an army is always five.
+
+### The bug it fixed on the way
+
+A part-strength enemy — early engagements field three or four — used to take **slots two,
+three and four of a plan written for five**: a slice out of the middle of a doctrine rather
+than the doctrine at three-fifths strength. Under TRAPLINE that is an army that never goes
+near either flank. Both sides now share their plan out among whoever turned up.
+
+### What phase two has to answer
+
+Lanes are necessary and not sufficient. Re-measured with the real lane plans at larger sizes,
+headroom still decays past about eight hulls — because with **five markers** on the board, a
+massing plan (SPEAR at twelve puts seven on the Spine) beats a spreading one whatever the
+lists are, and the list choice drowns. The board has to grow with the army:
+
+```
+hulls  markers  rounds   headroom
+   5        5        5         11
+  12        5        5          9
+  12        9        8         17
+```
+
+More ground to argue over is where the extra hulls get jobs, and more rounds is what lets a
+bigger army arrive at all. So the escalation is not one number but three that move together:
+**army size, markers, rounds.**
+
+Points, when they land, are the right way to express the first of those — one budget instead
+of a slot count, escalation as a curve instead of a staircase, and "bring something
+different" (which the reading enemy now demands every engagement) gains the whole
+many-cheap-against-few-expensive axis. Measured on the current costs at a 30-point budget
+against a fixed 30-point enemy: seven hulls 58.2%, eight 41.0%, nine 46.2% — a real trade
+with no dominant size. Six premium hulls wins 4.5%, so the elite end of the cost table needs
+re-deriving before it ships.
+
+And the thing to say out loud: **above about six hulls the sweep stops being exhaustive.**
+The five-hull board stays as the instrument that resolves its space in full, the same
+discipline as the control enemy, and the big-army claims become sampled with stated sample
+sizes.

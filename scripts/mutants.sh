@@ -866,6 +866,33 @@ mutate "the screen stops passing what was fielded to the run" src/battle/BattleA
       '      fielded: null,' \
       "tests/app-render.test.mjs"
 
+
+echo "=== a plan is lanes ==="
+mutate "the lanes are shared out evenly, whatever weight they were given" src/battle/battlePlans.js \
+      '  const exact = lanes.map((entry) => (entry.share / total) * wanted);' \
+      '  const exact = lanes.map(() => wanted / lanes.length);' \
+      "tests/battle-lanes.test.mjs"
+mutate "a lane the plan kept can end up with nobody in it" src/battle/battlePlans.js \
+      '  const counts = exact.map((value) => Math.max(1, Math.floor(value)));' \
+      '  const counts = exact.map((value) => Math.floor(value));' \
+      "tests/battle-lanes.test.mjs"
+mutate "a small army keeps the plan's lightest lanes and drops its heaviest" src/battle/battlePlans.js \
+      '      .sort((left, right) => right.entry.share - left.entry.share || left.index - right.index)' \
+      '      .sort((left, right) => left.entry.share - right.entry.share || left.index - right.index)' \
+      "tests/battle-lanes.test.mjs"
+mutate "the plan is resolved at the size it was authored for whatever army is walking it" src/battle/battlePlans.js \
+      '    ? fillLanes(battlePlan.lanes, size ?? laneTotal(battlePlan.lanes))' \
+      '    ? fillLanes(battlePlan.lanes, laneTotal(battlePlan.lanes))' \
+      "tests/battle-lanes.test.mjs"
+mutate "a part-strength enemy takes a slice out of the middle of its doctrine" src/battle/battleMission.js \
+      '    const route = plan ? routePointsFor(plan, index, mission.id, true, size) : [];' \
+      '    const route = plan ? routePointsFor(plan, slotIndex, mission.id, true, size) : [];' \
+      "tests/battle-lanes.test.mjs"
+mutate "a part-strength warband takes a slice out of the middle of its plan" src/battle/battleMission.js \
+      '    const route = battlePlan ? routePointsFor(battlePlan, index, mission.id, false, size) : [];' \
+      '    const route = battlePlan ? routePointsFor(battlePlan, slotIndex, mission.id, false, size) : [];' \
+      "tests/battle-lanes.test.mjs"
+
 echo
 echo "killed $pass mutants, $fail survived"
 [ "$fail" -eq 0 ]

@@ -155,6 +155,11 @@ export const buildEnemyForce = (mission = CIRCUIT_CLASH, army = armyFor(mission.
   const units = [];
   const orders = {};
   const paths = {};
+  // The plan is walked by THIS army, not by five. A three-formation force under a plan
+  // written for five used to take slots two, three and four of it — the middle slice of a
+  // doctrine rather than the doctrine at three-fifths strength.
+  const size = roster.length;
+  let walking = 0;
   for (const { slotIndex, formationId } of roster) {
     const slot = mission.enemyDeployment[slotIndex];
     const id = `enemy-${formationId}`;
@@ -163,9 +168,11 @@ export const buildEnemyForce = (mission = CIRCUIT_CLASH, army = armyFor(mission.
     // The plan is walked MIRRORED — the same doctrine, from the other edge. Its landmark
     // names are written from the southern edge, so reflecting the resolved points is what
     // makes one authored plan mean the same thing to both armies.
-    const route = plan ? routePointsFor(plan, slotIndex, mission.id, true) : [];
+    const index = walking;
+    walking += 1;
+    const route = plan ? routePointsFor(plan, index, mission.id, true, size) : [];
     if (route.length > 0) paths[id] = route;
-    orders[id] = (plan ? routeDestinationFor(plan, slotIndex, mission.objectives, mission.id, true) : null)
+    orders[id] = (plan ? routeDestinationFor(plan, index, mission.objectives, mission.id, true, size) : null)
       ?? mission.objectives[Math.min(slotIndex, mission.objectives.length - 1)]?.id;
   }
   return { units, orders, paths, plan, disposition, army, counter };
@@ -178,11 +185,17 @@ export const buildPlayerForce = ({
   const units = [];
   const orders = {};
   const paths = {};
-  mission.playerDeployment.forEach((slot, index) => {
+  // How many are actually walking this plan, and which of them each one is — counted across
+  // the ARMY west to east rather than across the deployment slots, because a plan is lanes
+  // now and the lanes are shared out among whoever turned up.
+  const filled = mission.playerDeployment.filter((slot) => deployment[slot.id]?.formationId && byId.get(deployment[slot.id].formationId));
+  const size = filled.length;
+  mission.playerDeployment.forEach((slot, slotIndex) => {
     const entry = deployment[slot.id];
     if (!entry?.formationId) return;
     const formation = byId.get(entry.formationId);
     if (!formation) return;
+    const index = filled.indexOf(slot);
     // Keyed on the INSTANCE, so a warband holding two of the same hull deploys two units
     // with two orders and two routes rather than one unit counted twice.
     const id = entry.id ?? formation.id;
@@ -193,10 +206,10 @@ export const buildPlayerForce = ({
     // The plan's route decides both where the formation walks and, from where that walk
     // ends, the ground it is holding. Deriving the second from the first means a plan can
     // never claim an objective its own path does not reach.
-    const route = battlePlan ? routePointsFor(battlePlan, index, mission.id) : [];
+    const route = battlePlan ? routePointsFor(battlePlan, index, mission.id, false, size) : [];
     if (route.length > 0) paths[id] = route;
     orders[id] = entry.objectiveId
-      ?? (battlePlan ? routeDestinationFor(battlePlan, index, mission.objectives, mission.id) : null)
+      ?? (battlePlan ? routeDestinationFor(battlePlan, index, mission.objectives, mission.id, false, size) : null)
       ?? mission.objectives[2].id;
   });
   return { units, orders, paths };

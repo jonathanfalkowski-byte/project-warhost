@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
-    "test:game": "node --test tests/accessibility.test.mjs tests/app-render.test.mjs tests/battle-rules.test.mjs tests/battle-stratagems.test.mjs tests/battle-doctrine-layers.test.mjs tests/battle-plans.test.mjs tests/battle-missions.test.mjs tests/battle-after-action.test.mjs tests/battle-campaign.test.mjs tests/battle-counterplay.test.mjs tests/battle-refits.test.mjs tests/battle-support.test.mjs tests/battle-synergies.test.mjs tests/battle-terrain.test.mjs",
+    "test:game": "node --test tests/accessibility.test.mjs tests/app-render.test.mjs tests/battle-rules.test.mjs tests/battle-stratagems.test.mjs tests/battle-doctrine-layers.test.mjs tests/battle-plans.test.mjs tests/battle-lanes.test.mjs tests/battle-missions.test.mjs tests/battle-after-action.test.mjs tests/battle-campaign.test.mjs tests/battle-counterplay.test.mjs tests/battle-refits.test.mjs tests/battle-support.test.mjs tests/battle-synergies.test.mjs tests/battle-terrain.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "analyse": "node scripts/battle-sweep.mjs"
   },

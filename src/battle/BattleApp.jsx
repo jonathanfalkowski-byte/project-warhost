@@ -388,7 +388,14 @@ export default function BattleApp({ onExit }) {
           {!committed && (
             <svg className="battle-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               {mission.playerDeployment.map((slot, index) => {
-                const route = routePointsFor(battlePlan, index, mission.id);
+                // A staffed slot is drawn walking the route the FORCE says it walks — the
+                // same object the battle resolves from, so the drawn plan cannot disagree
+                // with the fought one now that a plan redistributes by army size. An empty
+                // slot is drawn at full strength, as what the plan would ask of it.
+                const walking = player.units.find((unit) => unit.x === slot.x && unit.y === slot.y);
+                const route = walking && player.paths[walking.id]
+                  ? player.paths[walking.id]
+                  : routePointsFor(battlePlan, index, mission.id, false, mission.playerDeployment.length);
                 if (route.length === 0) return null;
                 const filled = Boolean(deployment[slot.id]?.formationId);
                 return (
@@ -769,8 +776,15 @@ export default function BattleApp({ onExit }) {
                         it still denies them the point, which is why the plans do it, but
                         that is a thing to be told before committing, not after. */}
                     {(() => {
+                      // Read off the force where there is one, for the same reason the
+                      // route is: what this slot is walking to depends on how many slots
+                      // are filled, and the deploy list saying otherwise is the screen
+                      // lying about the battle it is about to resolve.
                       const index = mission.playerDeployment.indexOf(slot);
-                      const destination = routeDestinationFor(battlePlan, index, mission.objectives, mission.id);
+                      const walking = player.units.find((unit) => unit.x === slot.x && unit.y === slot.y);
+                      const destination = walking
+                        ? player.orders[walking.id]
+                        : routeDestinationFor(battlePlan, index, mission.objectives, mission.id, false, mission.playerDeployment.length);
                       const objective = mission.objectives.find((entry) => entry.id === destination);
                       if (!objective) return <small className="battle-assignment">THIS SLOT HOLDS NO SCORING GROUND</small>;
                       const pays = live.has(objective.id);
