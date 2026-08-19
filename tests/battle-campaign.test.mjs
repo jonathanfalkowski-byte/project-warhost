@@ -1,4 +1,5 @@
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 
 import {
@@ -12,6 +13,7 @@ import {
   RETIRE_REFUND,
   COMMAND_REGEN_CAP,
   buy,
+  FIELD_REPAIR_WOUNDS,
   engagementFor,
   fieldableFrom,
   offersFor,
@@ -22,12 +24,13 @@ import {
   startRun,
   startingRoster,
 } from "../src/battle/campaign.js";
-import { SERVICES, SHELF_UNITS, UNIT_COSTS, costOf, marketFor, shelfRefitsFor } from "../src/battle/market.js";
+
+import { MAX_COPIES, MENDS, SERVICES, SHELF_UNITS, UNIT_COSTS, copiesOf, costOf, marketFor, shelfRefitsFor } from "../src/battle/market.js";
 import { profileWithRefit, refitsFor } from "../src/battle/refits.js";
 import { plansFor } from "../src/battle/battlePlans.js";
 import { armyFor } from "../src/battle/battleMission.js";
 import { DETACHMENTS } from "../src/battle/stratagems.js";
-import { battleProfileFor } from "../src/battle/battleProfiles.js";
+import { battleProfileFor, statLineFor } from "../src/battle/battleProfiles.js";
 import { deployUnit, resolveBattle } from "../src/battle/battleRules.js";
 import { CIRCUIT_CLASH, buildEnemyForce, buildPlayerForce } from "../src/battle/battleMission.js";
 import { FORMATIONS } from "../src/formationData.js";
@@ -98,7 +101,7 @@ test("a losing battle does not end the run; an army too small to field does", ()
   // at the first fight and let 0.1% finish the ladder — the sweep said so before anyone
   // played it. What a loss costs is the casualties and the reward.
   const run = startRun({ seed: 1 });
-  const deployedIds = run.roster.slice(0, 5).map((entry) => entry.formationId);
+  const deployedIds = run.roster.slice(0, 5).map((entry) => entry.id);
   const survived = Object.fromEntries(deployedIds.map((id) => [id, 4]));
   const lostBattle = applyBattle({ run, result: battleEndingWith(survived), deployedIds, won: false });
   assert.equal(lostBattle.status, "active", "one lost battle ended the run");
@@ -114,10 +117,10 @@ test("a losing battle does not end the run; an army too small to field does", ()
 test("wounds carry, wrecks are struck off, and the bench is untouched", () => {
   const run = startRun({ seed: 2 });
   const [first, second, ...rest] = run.roster;
-  const deployedIds = [first.formationId, second.formationId];
+  const deployedIds = [first.id, second.id];
   const after = applyBattle({
     run,
-    result: battleEndingWith({ [first.formationId]: 3.456, [second.formationId]: 0 }),
+    result: battleEndingWith({ [first.id]: 3.456, [second.id]: 0 }),
     deployedIds,
     won: true,
   });
@@ -157,7 +160,7 @@ test("each disposition leaves something behind that outlives the battle", () => 
   // If only SAFEGUARD had a run-level payoff it would simply be the right answer: on that
   // reading it won 3.24 battles to 1.44 for the other two.
   const run = startRun({ seed: 6 });
-  const deployedIds = run.roster.slice(0, 3).map((entry) => entry.formationId);
+  const deployedIds = run.roster.slice(0, 3).map((entry) => entry.id);
   const withEnemies = {
     rounds: [{
       players: deployedIds.map((id) => ({ id, name: id, wounds: 5 })),
@@ -192,7 +195,7 @@ test("victory points are the currency, and income is what you scored", () => {
   // while you were losing it, for the same reason a lost battle does not end the run.
   const run = startRun({ seed: 8 });
   assert.equal(run.purse, 0);
-  const deployedIds = run.roster.slice(0, 3).map((entry) => entry.formationId);
+  const deployedIds = run.roster.slice(0, 3).map((entry) => entry.id);
   const survived = Object.fromEntries(deployedIds.map((id) => [id, 5]));
   const scored = { ...battleEndingWith(survived), playerScore: 12, enemyScore: 15 };
   const afterLoss = applyBattle({ run, result: scored, deployedIds, won: false });
@@ -216,17 +219,17 @@ test("every formation is priced, and nothing is free", () => {
   assert.equal(costOf("not-a-formation"), 5, "an unknown formation is not priced at all");
 });
 
-test("the shelf offers what you do not have and what would do something", () => {
+test("the shelf sells hulls you already own, and does not run dry", () => {
   const run = { ...startRun({ seed: 8 }), purse: 20 };
   const shelf = offersFor(run);
   const held = new Set(run.roster.map((entry) => entry.formationId));
   const units = shelf.filter((offer) => offer.kind === "unit");
-  // The shelf is as wide as SHELF_UNITS, or as wide as the formations you do not already
-  // hold if that is narrower — there are only so many hulls in the game.
-  const unheld = FORMATIONS.filter((formation) => !held.has(formation.id)).length;
-  assert.equal(units.length, Math.min(SHELF_UNITS, unheld), "the shelf is the wrong width");
+  // Full width regardless of what the warband already holds. It used to filter out
+  // everything owned, so the shelf emptied as the run went on and the market ran out of
+  // things to sell — which is most of why a bench never really formed.
+  assert.equal(units.length, SHELF_UNITS, "the shelf is the wrong width");
+  assert.ok(units.some((offer) => held.has(offer.id)), "the shelf still refuses to sell a second of anything");
   for (const offer of units) {
-    assert.equal(held.has(offer.id), false, `${offer.name} is already in the warband`);
     assert.ok(offer.text.includes("WOUNDS"), "the shelf does not say what the money buys");
   }
   // Nothing is damaged, so repairs are not on the shelf.
@@ -253,8 +256,18 @@ test("buying spends the purse, and what you cannot afford is refused", () => {
   const dear = offersFor(broke).find((offer) => offer.cost > 1);
   assert.deepEqual(buy({ run: broke, offerId: dear.id }), broke);
   assert.deepEqual(buy({ run, offerId: "not-on-the-shelf" }), run);
-  // A formation already held is never on the shelf, so it can never be bought twice.
-  assert.equal(new Set(bought.roster.map((entry) => entry.formationId)).size, bought.roster.length);
+  // Buying a hull you already own gives you a SECOND ONE — its own entry, its own id, its
+  // own damage track — rather than a duplicate the resolution cannot tell apart.
+  const owned = run.roster[0].formationId;
+  const stocked = { ...run, purse: 20, shelf: [owned, ...(run.shelf ?? [])] };
+  const twice = buy({ run: stocked, offerId: owned });
+  const instances = twice.roster.filter((entry) => entry.formationId === owned);
+  assert.equal(instances.length, 2, "buying a hull you own did not give you a second one");
+  assert.equal(new Set(twice.roster.map((entry) => entry.id)).size, twice.roster.length,
+    "two formations share an id, so the battle cannot tell them apart");
+  // And it comes off the shelf, so the same offer cannot be bought twice over.
+  assert.equal((twice.shelf ?? []).filter((id) => id === owned).length,
+    (stocked.shelf ?? []).filter((id) => id === owned).length - 1);
 });
 
 test("services do what they charge for", () => {
@@ -277,18 +290,105 @@ test("services do what they charge for", () => {
   assert.equal(offersFor(whole).some((offer) => offer.id === "rebuild"), false);
 });
 
+test("the stat line is written once", () => {
+  // The shelf, the deploy list and the card under a marker all print the same five
+  // numbers. Three copies of the template is how the shelf ends up advertising a profile
+  // the board does not have — which has already happened once here, with refits.
+  const line = statLineFor(battleProfileFor("railjack"));
+  assert.match(line, /^MOVE 8 · RANGE 30 · 3 SHOTS · 12 WOUNDS · CONTROL 4$/);
+  // One shot is a SHOT. A profile that reads "1 SHOTS" is a profile nobody proofread.
+  assert.match(statLineFor(battleProfileFor("bastion")), /1 SHOT · /);
+  const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
+  // Both spellings: the template literal and the JSX one. Only checking the first left a
+  // fourth copy of the line in the deploy list, printing "1 SHOTS" beside a card that said
+  // "1 SHOT" for the same hull.
+  assert.equal((source.match(/MOVE [{$]/g) ?? []).length, 0, "the screen still writes a stat line by hand");
+  for (const file of ["market.js", "BattleApp.jsx"]) {
+    const text = readFileSync(new URL(`../src/battle/${file}`, import.meta.url), "utf8");
+    assert.ok(!/SHOTS ·/.test(text), `${file} prints its own stat line`);
+  }
+});
+
+test("a repair goes to the formation you name, not to the worst-off one", () => {
+  // The decision the money is asking about. With two of the same hull in the warband and a
+  // dozen hulls in it, patching "whichever is worst" is a default, not a choice: the wreck
+  // you are about to deploy is very often not the wreck with the fewest wounds left.
+  const base = startRun({ seed: 10 });
+  const hurt = {
+    ...base,
+    purse: 20,
+    roster: base.roster.map((entry, index) => {
+      if (index === 0) return { ...entry, wounds: 1 };
+      if (index === 1) return { ...entry, wounds: 3 };
+      return entry;
+    }),
+  };
+  const worst = hurt.roster[0];
+  const chosen = hurt.roster[1];
+
+  const patched = buy({ run: hurt, offerId: "field-repair", targetId: chosen.id });
+  assert.equal(patched.roster[0].wounds, 1, "the worst-off formation was patched instead of the named one");
+  // The EXACT amount the shelf advertises. "more than it had" passes against a repair that
+  // puts back one wound and charges for four.
+  const whole = battleProfileFor(chosen.formationId).wounds;
+  const expected = 3 + FIELD_REPAIR_WOUNDS;
+  assert.equal(patched.roster[1].wounds, expected >= whole ? null : expected,
+    `field repair put back something other than ${FIELD_REPAIR_WOUNDS} wounds`);
+  assert.equal(patched.purse, 20 - SERVICES["field-repair"].cost);
+
+  const rebuilt = buy({ run: hurt, offerId: "rebuild", targetId: chosen.id });
+  assert.equal(rebuilt.roster[1].wounds, null, "the named formation was not rebuilt");
+  assert.equal(rebuilt.roster[0].wounds, 1, "the rebuild went to the wrong hull");
+
+  // Naming nobody is still the old behaviour, which is what the sweep buys and therefore
+  // what the measured value of a repair is the value of.
+  const defaulted = buy({ run: hurt, offerId: "rebuild" });
+  assert.equal(defaulted.roster[0].wounds, null, "with nobody named the worst-off hull is no longer the one repaired");
+  assert.equal(defaulted.roster[1].wounds, 3);
+
+  // Naming a hull that does not need the work, or is not in the warband, refuses the
+  // purchase. Quietly doing the work somewhere else and charging for it is the failure
+  // this is guarding: the player would see the points leave and never learn where they went.
+  const undamaged = hurt.roster.find((entry) => entry.wounds === null);
+  assert.deepEqual(buy({ run: hurt, offerId: "field-repair", targetId: undamaged.id }), hurt);
+  assert.deepEqual(buy({ run: hurt, offerId: "rebuild", targetId: "no-such-formation#9" }), hurt);
+  assert.notEqual(worst.id, chosen.id);
+});
+
+test("the shelf names the two things that need a formation named first", () => {
+  // The screen splits the market on this list: what you buy for the warband stays on the
+  // shelf, and what you buy FOR a formation is bought on that formation's row. If the list
+  // and the buying code ever disagree, a service silently becomes unbuyable.
+  assert.deepEqual([...MENDS].sort(), ["field-repair", "rebuild"]);
+  for (const id of MENDS) {
+    assert.ok(SERVICES[id], `${id} is listed as needing a target but is not a service`);
+    assert.match(SERVICES[id].text, /choosing/, `${SERVICES[id].name} does not say the formation is yours to pick`);
+    assert.ok(SERVICES[id].short.length <= 10, `${SERVICES[id].name} has no short label for the row button`);
+  }
+  assert.ok(!MENDS.includes("requisition"), "requisition is not done to a formation");
+  // And the amount the shelf advertises is the amount the buying code puts back.
+  assert.match(SERVICES["field-repair"].text, new RegExp(String(FIELD_REPAIR_WOUNDS)));
+});
+
 test("buying takes one thing off the shelf rather than re-rolling it", () => {
   // Deriving the shelf from the roster on every read meant a purchase silently replaced
   // the other offers, so you could churn the shelf by spending. It is drawn once, when the
   // market opens, and then held.
-  const run = startRun({ seed: 3 });
-  const deployedIds = run.roster.map((entry) => entry.formationId);
+  // A DELIBERATELY SMALL warband, so there are more formations off the shelf than on it.
+  // With a full starting roster only three hulls are unheld, the shelf is three wide, and
+  // re-rolling it after a purchase happens to return the same two — so the guard passed
+  // whether the shelf was held or redrawn. A fixture that cannot tell the two apart is not
+  // a guard.
+  const base = startRun({ seed: 3 });
+  const run = { ...base, roster: base.roster.slice(0, 2) };
+  const deployedIds = run.roster.map((entry) => entry.id);
   const rich = applyBattle({
     run,
     result: { ...battleEndingWith(Object.fromEntries(deployedIds.map((id) => [id, 5]))), playerScore: 25, enemyScore: 5 },
     deployedIds,
     won: true,
   });
+  assert.ok(FORMATIONS.length - rich.roster.length > SHELF_UNITS, "the fixture cannot fill a shelf");
   const before = offersFor(rich).filter((offer) => offer.kind === "unit").map((offer) => offer.id);
   const unheld = FORMATIONS.filter((formation) => !rich.roster.some((entry) => entry.formationId === formation.id)).length;
   assert.equal(before.length, Math.min(SHELF_UNITS, unheld));
@@ -302,7 +402,7 @@ test("buying takes one thing off the shelf rather than re-rolling it", () => {
 
 test("a hull carries one refit, and the shelf stops offering it one", () => {
   const run = startRun({ seed: 5 });
-  const deployedIds = run.roster.map((entry) => entry.formationId);
+  const deployedIds = run.roster.map((entry) => entry.id);
   const rich = applyBattle({
     run,
     result: { ...battleEndingWith(Object.fromEntries(deployedIds.map((id) => [id, 5]))), playerScore: 30, enemyScore: 5 },
@@ -357,7 +457,7 @@ test("command points do not refill between engagements", () => {
   const run = startRun({ seed: 4 });
   const opening = run.commandPoints;
   assert.ok(opening > 0);
-  const deployedIds = run.roster.map((entry) => entry.formationId);
+  const deployedIds = run.roster.map((entry) => entry.id);
   // A loss with nobody in command regains nothing, so the drain is visible on its own.
   const bleak = battleEndingWith(Object.fromEntries(deployedIds.map((id) => [id, 5])));
   const after = applyBattle({ run, result: bleak, deployedIds, won: false, commandSpent: 2 });
@@ -378,7 +478,7 @@ test("command points come back from the army you fielded, not only from the purs
   // keyword makes the COMMAND VEHICLE — and the SPOTTER MAST refit that grants COMMAND —
   // into an economy rather than a stat line.
   const run = startRun({ seed: 4 });
-  const deployedIds = run.roster.map((entry) => entry.formationId);
+  const deployedIds = run.roster.map((entry) => entry.id);
   const ending = (commanderIds) => ({
     rounds: [{
       players: deployedIds.map((id) => ({
@@ -414,10 +514,10 @@ test("a battle records who came back, not just who did not", () => {
   // ever said why.
   const run = startRun({ seed: 6 });
   const [first, second, ...bench] = run.roster;
-  const deployedIds = [first.formationId, second.formationId];
+  const deployedIds = [first.id, second.id];
   const after = applyBattle({
     run,
-    result: battleEndingWith({ [first.formationId]: 4, [second.formationId]: 0 }),
+    result: battleEndingWith({ [first.id]: 4, [second.id]: 0 }),
     deployedIds,
     won: true,
   });
@@ -436,21 +536,28 @@ test("a formation can be retired for half of what it cost", () => {
   // has to be possible, and lossy.
   const run = { ...startRun({ seed: 7 }), purse: 0 };
   const sold = run.roster[0];
-  const after = retire({ run, formationId: sold.formationId });
+  const after = retire({ run, id: sold.id });
   assert.equal(after.roster.length, run.roster.length - 1);
   assert.equal(after.purse, Math.floor(costOf(sold.formationId) * RETIRE_REFUND));
   assert.ok(after.purse < costOf(sold.formationId), "retiring paid back the full price");
-  assert.equal(after.roster.some((entry) => entry.formationId === sold.formationId), false);
+  assert.equal(after.roster.some((entry) => entry.id === sold.id), false);
+  // ONE of them. Keyed on the formation it sold every railjack in the warband at once and
+  // paid for a single one.
+  const twinned = { ...run, roster: [...run.roster, { ...sold, id: `${sold.formationId}#twin` }] };
+  const one = retire({ run: twinned, id: sold.id });
+  assert.equal(one.roster.filter((entry) => entry.formationId === sold.formationId).length, 1,
+    "retiring one hull sold every hull of that kind");
+  assert.equal(one.purse, Math.floor(costOf(sold.formationId) * RETIRE_REFUND), "and paid for only one of them");
   // Retiring down to an army that cannot take the field is refused, not allowed and then
   // punished — ending a run by selling your own army is not a decision anyone means to make.
   let stripped = run;
   for (let guard = 0; guard < 10; guard += 1) {
-    const next = retire({ run: stripped, formationId: stripped.roster.at(-1)?.formationId });
+    const next = retire({ run: stripped, id: stripped.roster.at(-1)?.id });
     if (next === stripped) break;
     stripped = next;
   }
   assert.equal(fieldableFrom(stripped).length, MINIMUM_FORCE);
-  assert.deepEqual(retire({ run, formationId: "not-in-the-warband" }), run);
+  assert.deepEqual(retire({ run, id: "not-in-the-warband" }), run);
 });
 
 test("the market is drawn from the run rather than from nowhere", () => {
@@ -460,9 +567,11 @@ test("the market is drawn from the run rather than from nowhere", () => {
   const across = new Set([1, 2, 3, 4].map((battle) => marketFor({ seed: 1, battle, roster: [], purse: 99 })
     .filter((offer) => offer.kind === "unit").map((offer) => offer.id).join("+")));
   assert.ok(across.size > 1, "the shelf never changes across a run");
-  // A warband holding everything is offered no formations at all rather than duplicates.
-  const everything = FORMATIONS.map((formation) => ({ formationId: formation.id, wounds: null }));
-  assert.equal(marketFor({ seed: 1, battle: 1, roster: everything, purse: 99 }).some((offer) => offer.kind === "unit"), false);
+  // A warband holding one of everything is still offered formations — a second of one of
+  // them. The shelf running dry is what made a bench impossible to build.
+  const everything = FORMATIONS.map((formation) => ({ id: `${formation.id}#x`, formationId: formation.id, wounds: null }));
+  assert.equal(marketFor({ seed: 1, battle: 1, roster: everything, purse: 99 }).filter((offer) => offer.kind === "unit").length,
+    SHELF_UNITS, "a warband holding one of each is offered nothing");
 });
 
 test("a whole run plays through and reports what it cost", () => {
@@ -483,7 +592,7 @@ test("a whole run plays through and reports what it cost", () => {
       playerOrders: built.orders, enemyOrders: foe.orders, enemyPaths: foe.paths,
       enemyHand: engagement.enemyHand, rounds: engagement.mission.rounds,
     });
-    run = applyBattle({ run, result, deployedIds: fielded.map((entry) => entry.formationId), won: result.winner === "player" });
+    run = applyBattle({ run, result, deployedIds: fielded.map((entry) => entry.id), won: result.winner === "player" });
     if (run.status !== "active") break;
     run = advance(repair(run));
   }
@@ -594,4 +703,100 @@ test("the control enemy never varies, because it is the measuring instrument", (
     return `${drawn.army.disposition}/${drawn.army.plan}`;
   });
   assert.ok(varied.some((entry) => entry !== `${doctrine.disposition}/${doctrine.plan}`), "the varied enemy never varied");
+});
+
+test("a warband may hold two of a hull, and no more", () => {
+  // Duplicates are what opened list-building up without a single new formation being
+  // authored — nine hulls choose five is 126 lists, with repeats it is 1287. Unrestricted
+  // it opened straight onto a degenerate answer: three RECON TANKS and two RECOVERY
+  // VEHICLES won 100% of its deployments, and ninety-five lists won from every single one.
+  const base = startRun({ seed: 12 });
+  const hull = base.roster[0].formationId;
+  const stocked = (roster) => ({ ...base, purse: 40, roster, shelf: [hull, hull, hull] });
+
+  const one = stocked(base.roster);
+  assert.ok(offersFor(one).some((offer) => offer.kind === "unit" && offer.id === hull),
+    "a hull already in the warband is not for sale");
+  const two = buy({ run: one, offerId: hull });
+  assert.equal(copiesOf(two.roster, hull), 2);
+
+  // A third is off the shelf entirely, and cannot be bought even by asking for it.
+  const atLimit = stocked(two.roster);
+  assert.equal(offersFor(atLimit).some((offer) => offer.kind === "unit" && offer.id === hull), false,
+    "a warband at its limit was still offered another");
+  assert.deepEqual(buy({ run: atLimit, offerId: hull }), atLimit);
+  assert.equal(MAX_COPIES, 2);
+});
+
+test("two of the same hull are two formations, not one counted twice", () => {
+  const base = startRun({ seed: 13 });
+  const hull = base.roster[0].formationId;
+  const twinned = {
+    ...base,
+    roster: [...base.roster, { ...base.roster[0], id: `${hull}#twin`, wounds: null }],
+  };
+  const [first, second] = twinned.roster.filter((entry) => entry.formationId === hull);
+  assert.notEqual(first.id, second.id, "two hulls of the same kind share an id");
+
+  // One is deployed and wrecked; the other is on the bench and untouched.
+  const after = applyBattle({
+    run: twinned,
+    result: battleEndingWith({ [first.id]: 0 }),
+    deployedIds: [first.id],
+    won: true,
+  });
+  assert.equal(copiesOf(after.roster, hull), 1, "losing one hull struck off every hull of that kind");
+  assert.equal(after.roster.some((entry) => entry.id === second.id), true, "the one on the bench was struck off too");
+
+  // And damage lands on the one that took it.
+  const hurt = applyBattle({
+    run: twinned,
+    result: battleEndingWith({ [first.id]: 3 }),
+    deployedIds: [first.id],
+    won: true,
+  });
+  assert.equal(hurt.roster.find((entry) => entry.id === first.id).wounds, 3);
+  assert.equal(hurt.roster.find((entry) => entry.id === second.id).wounds, null,
+    "the benched hull carried the other one's damage");
+});
+
+test("deploying two of a hull puts two formations on the board", () => {
+  // The whole of what makes them two railjacks rather than one counted twice. A unit's id
+  // used to BE its formation id, so two of the same hull shared an order, walked one route
+  // and had every wound land on whichever the lookup found first.
+  const mission = CIRCUIT_CLASH;
+  const twins = [
+    { id: "railjack#a", formationId: "railjack", name: "TANK I", wounds: null, refit: null },
+    { id: "railjack#b", formationId: "railjack", name: "TANK II", wounds: 4, refit: null },
+  ];
+  const deployment = {
+    [mission.playerDeployment[0].id]: { ...twins[0], objectiveId: "west-works" },
+    [mission.playerDeployment[1].id]: { ...twins[1], objectiveId: "east-gantry" },
+  };
+  const built = buildPlayerForce({ mission, deployment, formations: FORMATIONS });
+  assert.equal(built.units.length, 2, "two of the same hull deployed as one unit");
+  assert.equal(new Set(built.units.map((unit) => unit.id)).size, 2, "both units share an id");
+  for (const unit of built.units) assert.equal(unit.formationId, "railjack", "the formation was lost");
+  // Two ids, two orders, and the damage one is carrying does not touch the other.
+  assert.equal(Object.keys(built.orders).length, 2, "two of the same hull shared one order");
+  assert.notEqual(built.orders[built.units[0].id], built.orders[built.units[1].id]);
+  const whole = built.units.find((unit) => unit.id === "railjack#a");
+  const battered = built.units.find((unit) => unit.id === "railjack#b");
+  assert.equal(whole.wounds, whole.maxWounds);
+  assert.equal(battered.wounds, 4, "the damaged one came to the field whole");
+  assert.equal(whole.maxWounds, battered.maxWounds);
+
+  // And they resolve as two: a battle between them and one enemy logs both of them acting.
+  const result = resolveBattle({
+    playerUnits: built.units,
+    enemyUnits: [{ ...deployUnit({ formationId: "bastion", name: "WALL", position: { x: 50, y: 5 } }), id: "enemy-wall" }],
+    objectives: mission.objectives, playerOrders: built.orders, enemyOrders: {}, missionId: mission.id,
+  });
+  const moved = result.rounds.at(-1).players;
+  assert.equal(moved.length, 2);
+  assert.notDeepEqual(
+    { x: moved[0].x, y: moved[0].y },
+    { x: moved[1].x, y: moved[1].y },
+    "two of the same hull ended the battle standing on the same spot",
+  );
 });

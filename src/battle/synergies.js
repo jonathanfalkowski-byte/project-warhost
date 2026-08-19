@@ -38,6 +38,8 @@
 // as a punishment for synergy rather than a rule of the board.
 export const PACKED_DAMAGE_STEP = 0.06;
 
+import { SHIELD_SOAK } from "./battleProfiles.js";
+
 // Tighter than SHIELD (14) and much tighter than COMMAND (24), because the whole idea is
 // standing TOGETHER — close enough that it is a deployment decision rather than a
 // side effect of both being on the same board.
@@ -67,7 +69,11 @@ export const SYNERGIES = {
   "dug-in": {
     id: "dug-in", name: "DUG IN", pair: ["OBJECTIVE", "SUPPORT"],
     reveal: "Kept fed and kept standing, it holds far more ground than it should.",
-    effect: { controlScale: 1.5 },
+    // Trimmed from 1.5 when duplicates arrived. It was already the most-formed pairing on
+    // the board by a distance, and OBJECTIVE-plus-SUPPORT is exactly the pair a warband
+    // holding two haulers assembles without trying — the space of lists that can form it
+    // grew tenfold overnight, so what it pays came down.
+    effect: { controlScale: 1.25 },
   },
   "wolf-pair": {
     id: "wolf-pair", name: "WOLF PAIR", pair: ["FAST", "FAST"],
@@ -79,6 +85,40 @@ export const SYNERGIES = {
     reveal: "Coordinated recovery: the patch goes where it is needed and goes further.",
     effect: { repairBonus: 1 },
   },
+};
+
+// WHAT IT DOES, in words, DERIVED FROM THE EFFECT rather than typed beside it.
+//
+// The notes recorded a flavour line and nothing else — "the screen anchors on the heavy
+// hull" tells you a pairing happened and not one thing about what it was worth, so a player
+// who found one still could not decide whether to build for it again. Written by hand it
+// would be a second copy of every number in this file, and the ERADICATION scoring line
+// already proved how that ends: it read "1 VP per 4 wounds" for as long as the rule paid
+// 1 in 3, because the sentence was typed once and the number was tuned later.
+const PHRASES = {
+  damageScale: (value) => `shoots at ${value}×`,
+  meleeScale: (value) => `fights at ${value}×`,
+  controlScale: (value) => `holds ground at ${value}×`,
+  soak: (value) => `soaks ${Math.round(value * 100)}% of the fire aimed at what it screens, up from ${Math.round(SHIELD_SOAK * 100)}%`,
+  repairBonus: (value) => `patches ${1 + value} instead of 1`,
+};
+
+export const mechanicsOf = (synergy) => Object.entries(synergy?.effect ?? {})
+  .map(([key, value]) => PHRASES[key]?.(value))
+  .filter(Boolean)
+  .join(", ");
+
+// What the player is told about a pairing they have NOT found: its name and the two
+// keywords, so there is something to hunt for and the refit market has a target. What it
+// does is the part you find out by standing them together.
+export const leadsFor = (found = []) => {
+  const known = new Set(found.map((entry) => entry.id ?? entry));
+  return synergyList().map((synergy) => ({
+    id: synergy.id,
+    name: synergy.name,
+    pair: synergy.pair,
+    found: known.has(synergy.id),
+  }));
 };
 
 export const synergyFor = (id) => SYNERGIES[id] ?? null;

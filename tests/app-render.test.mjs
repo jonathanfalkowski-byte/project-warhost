@@ -117,3 +117,69 @@ test("the screen fights on the ground it draws", () => {
   assert.match(source, /missionId:\s*mission\.id/, "the app resolves its battles on a flat plain");
   assert.match(source, /terrainFor\(mission\.id\)/, "the app draws terrain from somewhere other than the mission");
 });
+
+test("the deploy screen says when a slot is walking to ground you do not score", () => {
+  // Every SAFEGUARD plan sends two or three of its five slots to markers that disposition
+  // scores nothing on. Holding them denies the enemy the point, which is why the plans do
+  // it — but that is a thing to be told before committing, and the only place it was said
+  // was the debrief afterwards.
+  const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
+  assert.match(source, /battle-assignment-unpaid/, "the deploy screen never flags unpaid ground");
+  assert.match(source, /live\.has\(objective\.id\)/, "the flag is not read from the live sites");
+});
+
+test("the enemy's profile can be read off the board, and its hand cannot", () => {
+  // "I should be able to see the enemy units if I hover over them — at least what they can
+  // do, as in stats, not their combo." A profile is public in any wargame: the army list is
+  // on the table. Hiding it only meant guessing whether the thing walking at you outranges
+  // you. The hand stays hidden, because that is the only uncertainty this game has.
+  const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
+  const at = source.indexOf("{markers.map(");
+  assert.notEqual(at, -1, "the board no longer draws markers");
+  assert.ok(source.includes('className="battle-unit-card"'), "markers carry no profile card");
+  const card = source.slice(at, source.indexOf("battle-pairing", at));
+  assert.ok(card.includes('className="battle-unit-card"'), "the card is not on the marker");
+  assert.ok(card.includes("statLineFor(profile)"), "the card writes its own stat line instead of the one the shelf shows");
+  // Read from the forces, so the card shows what a hull can do THROUGH its refit rather
+  // than the factory numbers — the same failure the deploy list had.
+  assert.match(source, /profiles = new Map\(/);
+  assert.match(source, /player\.units\.map\(\(unit\) => \[`player:\$\{unit\.id\}`/);
+  assert.match(source, /enemy\.units\.map\(\(unit\) => \[`enemy:\$\{unit\.id\}`/);
+  // And the card says nothing about the hand or the pairings.
+  for (const leak of ["enemyHand", "stratagem", "synergies", "leadsFor", "mechanics"]) {
+    assert.ok(!card.includes(leak), `the marker card leaks ${leak}, which is the hidden information`);
+  }
+  // Hover alone is information only some players have.
+  assert.ok(card.includes("tabIndex={0}"), "the marker cannot be reached by keyboard");
+  assert.ok(card.includes("aria-label"), "the marker has no accessible name carrying the profile");
+  const css = readFileSync(new URL("../src/battle/battle.css", import.meta.url), "utf8");
+  assert.match(css, /\.battle-unit:focus > \.battle-unit-card/, "the card only opens under a pointer");
+});
+
+test("a repair is bought against a formation the player names", () => {
+  // Two of the same hull in the warband makes "which one do I patch" a real question, and
+  // a shelf button that healed the worst-off formation was answering it for them.
+  const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
+  assert.match(source, /buy\(\{ run, offerId, targetId \}\)/, "the screen never names a target");
+  assert.match(source, /mends\.map\(\(service\)/, "the repairs are not offered on the roster rows");
+  assert.match(source, /const shelf = offers\.filter/, "the mends are still on the shelf as well, so they can be bought blind");
+});
+
+test("damage comes home to the formation that took it", () => {
+  // The campaign matches the roster on INSTANCE ids — it has to, or one of two railjacks
+  // dying strikes off both — and the screen was handing it formation ids. They never
+  // matched, so nothing was ever damaged, nothing was ever lost, the repairs in the market
+  // could not be bought because nothing needed them, and a run could not be lost. A whole
+  // economy sat there looking implemented.
+  const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
+  const at = source.indexOf("const pressOn");
+  assert.notEqual(at, -1, "the screen no longer ends an engagement");
+  const pressOn = source.slice(at, at + 900);
+  assert.match(pressOn, /deployedIds = Object\.values\(planned\)\.map\(\(entry\) => entry\?\.id\)/,
+    "the battle result is applied to formations rather than to the hulls that fought");
+  assert.ok(!/deployedIds[\s\S]{0,120}formationId/.test(pressOn), "the deployed list is still keyed on the formation");
+  // And what a slot carries INTO the battle is read off the same instance, so two of the
+  // same hull do not both fight carrying the first one's damage.
+  assert.match(source, /run\?\.roster\.find\(\(item\) => item\.id === entry\.id\)/,
+    "the wounds a slot deploys with are read off the formation rather than the hull");
+});

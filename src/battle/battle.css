@@ -58,6 +58,24 @@
 .battle-unit.destroyed b { text-decoration: line-through; border-color: #4a5a60; background: rgba(8,14,16,.95); color: #93a5ab; }
 .battle-unit.destroyed i { opacity: .4; }
 @media (prefers-reduced-motion: reduce) { .battle-unit { transition: none; } }
+/* The profile, on hover and on focus. Absolute inside the marker so it travels with it,
+   and flipped to whichever side of the marker has room: an enemy card drawn upwards off
+   the top of the board is a card nobody reads. */
+.battle-unit:hover, .battle-unit:focus-within, .battle-unit:focus { z-index: 9; }
+.battle-unit:focus { outline: 1px solid #cfe6f4; outline-offset: 3px; }
+.battle-unit-card { display: none; position: absolute; left: 50%; transform: translateX(-50%); width: 208px; padding: 7px 9px; border: 1px solid #5f7a84; background: #0b1416; text-align: left; }
+.battle-unit:hover > .battle-unit-card, .battle-unit:focus > .battle-unit-card, .battle-unit:focus-within > .battle-unit-card { display: grid; gap: 2px; }
+/* The enemy deploys along the top, so its cards hang below; the warband's hang above. */
+.battle-unit-enemy .battle-unit-card { top: 100%; margin-top: 8px; }
+.battle-unit-player .battle-unit-card { bottom: 100%; margin-bottom: 8px; }
+/* Off a touchline marker, inwards: the board clips what it cannot fit. */
+.battle-unit.edge-left .battle-unit-card { left: 0; transform: none; }
+.battle-unit.edge-right .battle-unit-card { left: auto; right: 0; transform: none; }
+.battle-unit-card-name { color: #e6efec; font-family: "Barlow Condensed"; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; }
+.battle-unit-stats { color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .05em; }
+.battle-unit-card-state { color: #9fd6c6; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .05em; }
+.battle-unit-card-note { color: #a8bcb6; font-size: 11px; line-height: 1.35; }
+
 
 .battle-rail { border-left: 1px solid #2a3a3e; background: #0a1113; padding: 14px; overflow: auto; display: grid; gap: 10px; align-content: start; }
 .battle-rail h2 { margin: 0; font-size: 16px; letter-spacing: .06em; }
@@ -75,6 +93,7 @@
 .battle-enemy-brief li { display: grid; }
 .battle-enemy-brief li b { color: #f0b191; font-family: "Barlow Condensed"; font-size: 11.5px; letter-spacing: .06em; }
 .battle-enemy-brief li em { color: #b89383; font-size: 10.5px; font-style: normal; }
+.battle-enemy-brief li small { color: #e0a887; font-family: "Barlow Condensed"; font-size: 10.5px; letter-spacing: .05em; }
 
 .battle-commit { padding: 12px; border: 1px solid #b4762f; background: #2a1a0c; color: #edc478; font-family: "Barlow Condensed"; font-size: 16px; font-weight: 700; letter-spacing: .12em; cursor: pointer; }
 .battle-commit:disabled { opacity: .45; cursor: default; }
@@ -311,6 +330,14 @@
 .battle-spend-player .battle-spend-outcome { color: #b6f0ff; }
 .battle-spend-enemy .battle-spend-outcome { color: #ffc9b3; }
 .battle-roster-row { align-items: baseline; }
+/* Repairs are bought here, on the row of the hull that needs them, rather than off the
+   shelf. Two small buttons rather than one wide one: the choice is which formation, and
+   the row is where the wounds are already written down. */
+.battle-roster-acts { display: flex; gap: 4px; align-items: baseline; margin-left: auto; }
+.battle-mend { padding: 0 5px; border: 1px solid #4c6a4f; background: rgba(14,30,18,.7); color: #9fd6a8; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .1em; cursor: pointer; }
+.battle-mend span { color: #cfe6b4; margin-left: 3px; padding-left: 4px; border-left: 1px solid #4c6a4f; }
+.battle-mend:hover:not(:disabled) { border-color: #7fc48c; color: #c2f2c9; }
+.battle-mend:disabled { cursor: default; border-color: #2c3a2f; color: #7d8f80; }
 .battle-retire { padding: 0 5px; border: 1px solid #5b3f38; background: rgba(40,18,14,.7); color: #d59a86; font-family: "Barlow Condensed"; font-size: 10px; letter-spacing: .1em; cursor: pointer; }
 .battle-retire:hover:not(:disabled) { border-color: #b1553c; color: #ff9c7a; }
 .battle-retire:disabled { cursor: default; opacity: .4; }
@@ -352,12 +379,24 @@
 .battle-notes-head span { color: #d9bd77; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
 .battle-notes-head em { color: #e0b25f; font-family: "Barlow Condensed"; font-size: 11px; font-style: normal; letter-spacing: .08em; }
 .battle-note-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 3px 0; border-top: 1px solid #3a2f14; }
-.battle-note-row b { font-family: "Barlow Condensed"; font-size: 12.5px; letter-spacing: .05em; color: #ffd68a; }
+/* An unfound pairing is a lead, not a record: dimmed by COLOUR, never by opacity, so its
+   contrast can still be checked. */
+.battle-note-row b { font-family: "Barlow Condensed"; font-size: 12.5px; letter-spacing: .05em; color: #b9a375; }
+.battle-note-row.found b { color: #ffd68a; }
+.battle-note-where { color: #a8a08c; font-style: italic; }
+/* Ground the declared disposition does not pay for. A warning, not an error — the plans
+   send formations there on purpose, to deny it. */
+.battle-assignment-unpaid { color: #e0b25f; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 .battle-note-row em { font-family: "Barlow Condensed"; font-size: 10.5px; font-style: normal; letter-spacing: .08em; color: #d9bd77; }
 .battle-note-row small { grid-column: 1 / -1; color: #c4ab7c; font-size: 10.5px; font-family: "Barlow Condensed"; letter-spacing: .04em; }
 .battle-notes-empty { margin: 0; color: #c4ab7c; font-size: 11px; line-height: 1.4; }
 
 /* The market's roster block was cramped: a long name and a status on one line with no room
    for either, and a button crushed against both. */
-.battle-roster-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 8px; align-items: baseline; padding: 3px 0; border-top: 1px solid #1b262a; }
-.battle-roster-row b { min-width: 0; }
+/* Name, condition, and what can be done about it — on one line while it fits and wrapping
+   rather than colliding when it does not. As a three-column grid the two fixed columns
+   pushed the name column to nothing and a long hull name was drawn straight through the
+   wound count. */
+.battle-roster-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; border-top: 1px solid #1b262a; }
+.battle-roster-row b { flex: 1 1 140px; min-width: 0; }
+.battle-roster-row em { white-space: nowrap; }

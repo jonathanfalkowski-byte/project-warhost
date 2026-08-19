@@ -32,6 +32,13 @@ what it buys. A battle you lost still pays for what you took while you were losi
 The market offers five formations you do not already have, at authored prices from 2 to 5
 points, three **refits** for formations you do own, plus repairs and an extra command point.
 
+**A warband may hold two of any one formation**, and no more. Duplicates are what open
+list-building up without a single new hull being authored — nine formations choose five is
+126 lists, with repeats it is 882 — and the cap is what stops that opening onto three of the
+best one. Two of the same hull are two formations: two ids, two damage tracks, two orders,
+and they are told apart on screen as I and II. Stacking one buys consistency and spends
+deployment decision, which is a trade you are allowed to make.
+
 Prices are low on purpose. A warband is meant to grow past its five deployment slots over a
 run, so that **the warband is the collection and the deployment is the counter-pick** — which
 five you field against this particular enemy is the decision, and it does not exist until
@@ -50,6 +57,10 @@ soaks, COMMAND improves what is near it, REPAIR patches, and every refit names w
 those it hands over. That is legible, and it means a player who reads the cards knows the
 whole game before the first battle. A pairing is the one thing you can only find by standing
 two hulls together and seeing what happens.
+
+FIELD NOTES lists every pairing from the first muster by name and by the two keywords it
+wants, so there is something to hunt for — what it *does* is what you find out by standing
+them together, and once found it is recorded with its mechanics, both hulls and the board.
 
 They are keyed on keywords rather than on formations, which makes the refit market the
 discovery engine: a FLAME SUPPORT VEHICLE that bought an ASH CRUCIBLE has SHIELD, and can

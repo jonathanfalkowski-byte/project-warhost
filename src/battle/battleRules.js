@@ -25,7 +25,7 @@
 // sampled, which is how every balance claim in this project is checked. Hit and save
 // values are thresholds on a fixed scale rather than rolls.
 
-import { MELEE_RANGE, OBJECTIVE_CONTROL_RANGE } from "./battleProfiles.js";
+import { MELEE_RANGE, OBJECTIVE_CONTROL_RANGE, SHIELD_SOAK } from "./battleProfiles.js";
 import { coverScaleAt, moveScaleBetween, sightBlocked } from "./battleTerrain.js";
 import { STRATAGEMS, enemyPlaysAt } from "./stratagems.js";
 import { damagePointsFor, dispositionFor, scoreRound } from "./doctrine.js";
@@ -187,7 +187,7 @@ const applyDamage = (units, targetId, amount, pairings = true) => {
     && distance(unit, target) <= SHIELD_RANGE);
   // A shield anchored on a heavy hull soaks harder — that is LOCKED SHIELDS, and it is
   // read from the board rather than from anything either card says.
-  const soaked = shield ? amount * Math.max(0.28, synergyBonusFor(shield, units).soak) : 0;
+  const soaked = shield ? amount * Math.max(SHIELD_SOAK, synergyBonusFor(shield, units).soak) : 0;
   return units.map((unit) => {
     if (unit.id === targetId) return { ...unit, wounds: unit.wounds - (amount - soaked) };
     if (shield && unit.id === shield.id) return { ...unit, wounds: unit.wounds - soaked };
@@ -285,17 +285,27 @@ export const scoreObjectives = ({
   };
 });
 
-export const deployUnit = ({ formationId, name, position, wounds, refit = null }) => {
+// `id` is the INSTANCE, not the formation. Everything in the resolution keys on it —
+// orders, routes, who took the damage, who came back — and it used to be the formation id
+// itself, which made two of the same hull the same unit: they shared an order, walked one
+// route, and every wound landed on whichever the lookup found first. A warband that can
+// hold two railjacks needs to be able to tell them apart, and this is where that starts.
+export const deployUnit = ({ formationId, name, position, wounds, refit = null, id = null }) => {
   // The refit changes the profile before anything else reads it, so every rule on the
   // board — SHIELD soaking, COMMAND bonuses, the REPAIR phase — sees the formation as it
   // actually is rather than as the roster says it should be.
   const profile = profileWithRefit(formationId, refit);
   return {
-    id: formationId,
+    // The profile is spread FIRST and the identity written over it. `profileWithRefit`
+    // carries an `id` of its own — the formation it is a profile OF — and spreading it last
+    // silently overwrote the instance id with the formation id, which is precisely the
+    // collision this whole change exists to remove.
+    ...profile,
+    id: id ?? formationId,
+    formationId,
     name,
     x: position.x,
     y: position.y,
-    ...profile,
     // A formation carries its damage into the next battle of a run. maxWounds stays what
     // the profile says, so a battered formation reads as battered rather than as a
     // smaller one — half a tank is still a tank that has been shot.

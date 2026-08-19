@@ -180,15 +180,19 @@ export const buildPlayerForce = ({
     if (!entry?.formationId) return;
     const formation = byId.get(entry.formationId);
     if (!formation) return;
+    // Keyed on the INSTANCE, so a warband holding two of the same hull deploys two units
+    // with two orders and two routes rather than one unit counted twice.
+    const id = entry.id ?? formation.id;
     units.push(deployUnit({
-      formationId: formation.id, name: formation.name, position: slot, wounds: entry.wounds, refit: entry.refit,
+      formationId: formation.id, name: entry.name ?? formation.name, position: slot,
+      wounds: entry.wounds, refit: entry.refit, id,
     }));
     // The plan's route decides both where the formation walks and, from where that walk
     // ends, the ground it is holding. Deriving the second from the first means a plan can
     // never claim an objective its own path does not reach.
     const route = battlePlan ? routePointsFor(battlePlan, index, mission.id) : [];
-    if (route.length > 0) paths[formation.id] = route;
-    orders[formation.id] = entry.objectiveId
+    if (route.length > 0) paths[id] = route;
+    orders[id] = entry.objectiveId
       ?? (battlePlan ? routeDestinationFor(battlePlan, index, mission.objectives, mission.id) : null)
       ?? mission.objectives[2].id;
   });

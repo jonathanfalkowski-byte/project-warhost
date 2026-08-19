@@ -8,15 +8,20 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { FORMATIONS } from "../formationData.js";
-import { BATTLE_PROFILES, OBJECTIVE_CONTROL_RANGE } from "./battleProfiles.js";
+import { BATTLE_PROFILES, OBJECTIVE_CONTROL_RANGE, statLineFor } from "./battleProfiles.js";
 import { armyFor, buildEnemyForce, buildPlayerForce, missionFor, missionList } from "./battleMission.js";
 import { TERRAIN_KINDS, terrainFor } from "./battleTerrain.js";
+
+// Enough to tell a warband's worth of the same hull apart. Roman rather than "2", because
+// "MAIN BATTLE TANK 2" reads as a mark number and these are two of the same mark.
+const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 import { resolveBattle } from "./battleRules.js";
 import { DETACHMENTS, detachmentFor, detachmentList, scoutedPool, stratagemFor } from "./stratagems.js";
 import { dispositionFor, dispositionsFor, liveSitesFor } from "./doctrine.js";
 import { afterActionFor, headlineFor, pairingLinksFor, supportLinksFor } from "./afterAction.js";
 import { profileWithRefit, refitFor } from "./refits.js";
-import { SYNERGY_COUNT } from "./synergies.js";
+import { SYNERGY_COUNT, leadsFor } from "./synergies.js";
+import { MENDS } from "./market.js";
 import {
   MINIMUM_FORCE, advance as advanceRun, applyBattle, buy, engagementFor, fieldableFrom,
   offersFor, repair, retire, runSummary, startRun,
@@ -95,11 +100,15 @@ export default function BattleApp({ onExit }) {
     mission.playerDeployment.forEach((slot, index) => {
       const entry = deployment[slot.id];
       if (!entry?.formationId) return;
-      const carried = run?.roster.find((item) => item.formationId === entry.formationId);
+      // Matched on the INSTANCE. Keyed on the formation, a warband holding two railjacks
+      // deployed both of them carrying the first one's damage — the shot-up one and the
+      // fresh one fought as two copies of whichever came first in the roster.
+      const carried = run?.roster.find((item) => item.id === entry.id);
       next[slot.id] = {
         ...entry,
         objectiveId: entry.objectiveId ?? undefined,
         wounds: Number.isFinite(carried?.wounds) ? carried.wounds : undefined,
+        refit: carried?.refit ?? entry.refit ?? null,
       };
     });
     return next;
@@ -129,7 +138,28 @@ export default function BattleApp({ onExit }) {
   }), [player, enemy, playerStratagems, enemyHand, dispositionId, detachment, mission, army]);
 
   const placed = Object.values(deployment).filter((entry) => entry?.formationId).length;
-  const used = new Set(Object.values(deployment).map((entry) => entry?.formationId).filter(Boolean));
+  // The warband as it can be fielded, with two of the same hull told apart. Two markers
+  // both reading MAIN BATTLE TANK is unreadable on the board, in the debrief and in the
+  // deploy list — and every one of those reads the NAME, not the id.
+  const fieldable = useMemo(() => {
+    const source = run ? fieldableFrom(run) : FORMATIONS.map((formation, index) => ({
+      id: `${formation.id}#${index}`, formationId: formation.id, name: formation.name, wounds: null, refit: null,
+    }));
+    const counts = source.reduce((acc, entry) => {
+      acc[entry.formationId] = (acc[entry.formationId] ?? 0) + 1;
+      return acc;
+    }, {});
+    const seen = {};
+    return source.map((entry) => {
+      if (counts[entry.formationId] < 2) return entry;
+      seen[entry.formationId] = (seen[entry.formationId] ?? 0) + 1;
+      return { ...entry, name: `${entry.name} ${NUMERALS[seen[entry.formationId] - 1] ?? seen[entry.formationId]}` };
+    });
+  }, [run]);
+
+  // Which INSTANCES are already placed. Keyed on the formation, a warband holding two
+  // railjacks could only ever field one of them: placing the first greyed out the second.
+  const used = new Set(Object.values(deployment).map((entry) => entry?.id).filter(Boolean));
   const view = committed && round > 0 ? result.rounds[round - 1] : null;
 
   const commitTo = (id, value) => setCommitments((current) => {
@@ -143,7 +173,11 @@ export default function BattleApp({ onExit }) {
   // the choice, then the next engagement. Every step is a pure function of the run, so a
   // run can be replayed from its seed and the choices made in it.
   const pressOn = () => {
-    const deployedIds = Object.values(planned).map((entry) => entry?.formationId).filter(Boolean);
+    // THE INSTANCE, not the formation. `applyBattle` matches the roster on instance ids —
+    // it has to, or one of two railjacks dying strikes off both — so handing it formation
+    // ids matched nothing: no formation was ever damaged, none was ever lost, and an army
+    // that cannot be hurt makes the repairs in the market unbuyable and the run unloseable.
+    const deployedIds = Object.values(planned).map((entry) => entry?.id).filter(Boolean);
     const after = applyBattle({
       run, result, deployedIds, won: result.winner === "player", disposition: dispositionId,
       commandSpent: budget.spent,
@@ -157,6 +191,11 @@ export default function BattleApp({ onExit }) {
   // Buying does not leave the market — you spend until you are done or out of points, and
   // then move on. A shelf you are thrown off after one purchase is not a market.
   const purchase = (offerId) => setRun(buy({ run, offerId }));
+  // Repairs are bought against a NAMED hull, from the row that hull is already on. A
+  // shelf button that patched "the worst-off formation" was making the decision for you,
+  // and with a dozen hulls in the warband it is a decision worth making: the wreck you
+  // are about to deploy is not always the wreck with the fewest wounds left.
+  const mend = (offerId, targetId) => setRun(buy({ run, offerId, targetId }));
 
   const marchOn = () => {
     setRun(advanceRun(run));
@@ -182,8 +221,11 @@ export default function BattleApp({ onExit }) {
     [slotId]: { ...current[slotId], ...patch },
   }));
 
-  // Declaring a disposition throws away the strategy and every per-slot override with it,
-  // because both were answers to a question that has just changed.
+  // Declaring a disposition throws away the strategy and every per-slot objective override
+  // with it, because both were answers to a question that has just changed. What it keeps
+  // is WHO is standing in each slot: stripping the entry back to its formation dropped the
+  // instance — the id, the name, the damage and the refit — so declaring emptied every slot
+  // on screen and deployed hulls the run does not own.
   const muster = (nextDetachmentId) => {
     const next = detachmentFor(nextDetachmentId);
     setDetachmentId(nextDetachmentId);
@@ -193,18 +235,18 @@ export default function BattleApp({ onExit }) {
     setDispositionId(nextDisposition);
     setStrategyId(plansFor(nextDisposition)[0].id);
     setDeployment((current) => Object.fromEntries(Object.entries(current)
-      .map(([slotId, entry]) => [slotId, { formationId: entry?.formationId ?? null }])));
+      .map(([slotId, entry]) => [slotId, { ...entry, objectiveId: undefined }])));
   };
   const declare = (nextDispositionId) => {
     setDispositionId(nextDispositionId);
     setStrategyId(plansFor(nextDispositionId)[0].id);
     setDeployment((current) => Object.fromEntries(Object.entries(current)
-      .map(([slotId, entry]) => [slotId, { formationId: entry?.formationId ?? null }])));
+      .map(([slotId, entry]) => [slotId, { ...entry, objectiveId: undefined }])));
   };
   const adopt = (nextStrategyId) => {
     setStrategyId(nextStrategyId);
     setDeployment((current) => Object.fromEntries(Object.entries(current)
-      .map(([slotId, entry]) => [slotId, { formationId: entry?.formationId ?? null }])));
+      .map(([slotId, entry]) => [slotId, { ...entry, objectiveId: undefined }])));
   };
 
   // Where every marker sits right now: deployment positions before commit, the round's
@@ -218,6 +260,20 @@ export default function BattleApp({ onExit }) {
       ...player.units.map((unit) => ({ ...unit, side: "player", wounds: unit.wounds, maxWounds: unit.maxWounds })),
       ...enemy.units.map((unit) => ({ ...unit, side: "enemy", wounds: unit.wounds, maxWounds: unit.maxWounds })),
     ];
+  // The shelf, and the two things on it that need a hull named first. Splitting them is
+  // the whole of the change: everything you buy for the warband as a whole stays on the
+  // shelf, and everything you buy FOR a formation is bought on that formation's row.
+  const offers = run ? offersFor(run) : [];
+  const mends = offers.filter((offer) => offer.kind === "service" && MENDS.includes(offer.id));
+  const shelf = offers.filter((offer) => !mends.includes(offer));
+  // The stat line behind each marker, keyed by side and instance. Read from the FORCES
+  // rather than from the round record: the record carries where a unit is and how shot it
+  // is, not what it can do, and the player's numbers have to be read through whatever
+  // refit that particular hull is carrying.
+  const profiles = new Map([
+    ...player.units.map((unit) => [`player:${unit.id}`, unit]),
+    ...enemy.units.map((unit) => [`enemy:${unit.id}`, unit]),
+  ]);
   const scored = view ? view.objectives : null;
   const battleLog = view ? view.log.filter((entry) => entry.phase !== "stratagem") : [];
   // What each formation actually did, measured against what the declared disposition was
@@ -360,16 +416,46 @@ export default function BattleApp({ onExit }) {
             );
           })}
 
-          {markers.map((unit) => (
-            <div
-              key={`${unit.side}-${unit.id}`}
-              className={`battle-unit battle-unit-${unit.side} ${unit.wounds <= 0 ? "destroyed" : ""}`}
-              style={{ left: `${unit.x}%`, top: `${unit.y}%` }}
-            >
-              <b>{unit.name}</b>
-              <i aria-hidden="true"><em style={{ width: `${Math.max(0, 100 * unit.wounds / unit.maxWounds)}%` }} /></i>
-            </div>
-          ))}
+          {markers.map((unit) => {
+            const profile = profiles.get(`${unit.side}:${unit.id}`);
+            const standing = unit.wounds <= 0
+              ? "DESTROYED"
+              : unit.wounds >= unit.maxWounds
+                ? "FULL STRENGTH"
+                : `${Number(unit.wounds.toFixed(1))} OF ${unit.maxWounds} WOUNDS`;
+            // A card 208 wide, hung off a marker standing on the touchline, is a card with
+            // half of it outside a board that clips what it cannot fit. Near an edge it
+            // hangs inwards instead.
+            const edge = unit.x > 76 ? "edge-right" : unit.x < 24 ? "edge-left" : "";
+            const line = profile ? statLineFor(profile) : null;
+            return (
+              <div
+                key={`${unit.side}-${unit.id}`}
+                className={`battle-unit battle-unit-${unit.side} ${unit.wounds <= 0 ? "destroyed" : ""} ${edge}`}
+                style={{ left: `${unit.x}%`, top: `${unit.y}%` }}
+                /* Reachable by keyboard, not only by pointer: a card that only exists under
+                   a mouse is information only some players have. The label carries what the
+                   card shows, so a screen reader gets the profile from the marker itself
+                   and the card can be hidden from it rather than read out twice. */
+                tabIndex={0}
+                aria-label={`${unit.name} — ${standing}${line ? `. ${line}` : ""}`}
+              >
+                <b>{unit.name}</b>
+                <i aria-hidden="true"><em style={{ width: `${Math.max(0, 100 * unit.wounds / unit.maxWounds)}%` }} /></i>
+                {/* WHAT IT CAN DO, not what it is holding. The profile is public in any
+                    wargame — you can read your opponent's army list off the table — and
+                    hiding it only meant guessing whether the thing walking at you outranges
+                    you. What stays hidden is the hand — what they are holding and when they
+                    will spend it — because that is the only uncertainty this game has. */}
+                <span className="battle-unit-card" aria-hidden="true">
+                  <span className="battle-unit-card-name">{unit.name}</span>
+                  {line && <span className="battle-unit-stats">{line}</span>}
+                  <span className="battle-unit-card-state">{standing}</span>
+                  {profile?.note && <span className="battle-unit-card-note">{profile.note}</span>}
+                </span>
+              </div>
+            );
+          })}
           {/* A pairing NAMED on the board, not just drawn. The line between the two hulls is
               close to useless on its own: a pairing only forms when they are within ten
               units of each other, so the two markers are usually on top of one another and
@@ -473,22 +559,45 @@ export default function BattleApp({ onExit }) {
                   <span>THE WARBAND</span>
                   <em>{run.roster.length} FORMATIONS · {run.commandPoints} CP</em>
                 </div>
+                {mends.length > 0 && (
+                  <p className="battle-hint">
+                    Field repair puts wounds back; a rebuild returns a formation to full strength. Buy
+                    either on the row of the formation you want it done to.
+                  </p>
+                )}
                 {run.roster.map((entry) => (
-                  <div className="battle-roster-row" key={entry.formationId}>
+                  <div className="battle-roster-row" key={entry.id}>
                     <b>{entry.name}{entry.refit ? ` · ${refitFor(entry.refit)?.name}` : ""}</b>
                     <em>{Number.isFinite(entry.wounds) ? `${entry.wounds} WOUNDS LEFT` : "FULL STRENGTH"}</em>
-                    <button
-                      type="button"
-                      className="battle-retire"
-                      disabled={fieldableFrom(run).length <= MINIMUM_FORCE}
-                      onClick={() => setRun(retire({ run, formationId: entry.formationId }))}
-                    >
-                      RETIRE
-                    </button>
+                    <span className="battle-roster-acts">
+                      {/* Patch or rebuild THIS hull. Only on the damaged ones, because
+                          buying either for a formation at full strength does nothing and
+                          an offer that does nothing is a trap. */}
+                      {Number.isFinite(entry.wounds) && mends.map((service) => (
+                        <button
+                          type="button"
+                          key={service.id}
+                          className="battle-mend"
+                          disabled={!service.affordable}
+                          aria-label={`${service.name} ${entry.name} for ${service.cost} victory points`}
+                          onClick={() => mend(service.id, entry.id)}
+                        >
+                          {service.short} <span>{service.cost} VP</span>
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="battle-retire"
+                        disabled={fieldableFrom(run).length <= MINIMUM_FORCE}
+                        onClick={() => setRun(retire({ run, id: entry.id }))}
+                      >
+                        RETIRE
+                      </button>
+                    </span>
                   </div>
                 ))}
               </div>
-              {offersFor(run).map((offer) => (
+              {shelf.map((offer) => (
                 <button
                   type="button"
                   className={`battle-offer ${offer.kind} ${offer.affordable ? "" : "unaffordable"}`}
@@ -501,7 +610,7 @@ export default function BattleApp({ onExit }) {
                   <small>{offer.text}</small>
                 </button>
               ))}
-              {offersFor(run).length === 0 && <p className="battle-hint">Nothing left on the shelf.</p>}
+              {shelf.length === 0 && <p className="battle-hint">Nothing left on the shelf.</p>}
               <button type="button" className="battle-commit" onClick={marchOn}>MARCH ON →</button>
             </>
           ) : !committed ? (
@@ -555,18 +664,16 @@ export default function BattleApp({ onExit }) {
                   </div>
                   {/* The stat line has to be readable BEFORE the choice, not after it. A
                       dropdown of names tells you nothing about what you are picking. */}
-                  {fieldableFrom(run).map((entry) => {
+                  {fieldable.map((entry) => {
                     // Through the refit, not around it — a refitted hull that prints its
                     // factory stat line is a lie the player catches by counting shots.
                     const profile = profileWithRefit(entry.formationId, entry.refit);
-                    const placed = used.has(entry.formationId);
+                    const placed = used.has(entry.id);
                     return (
-                      <div className={`battle-warband-row ${placed ? "placed" : ""}`} key={entry.formationId}>
+                      <div className={`battle-warband-row ${placed ? "placed" : ""}`} key={entry.id}>
                         <b>{entry.name}</b>
                         <em>{placed ? "DEPLOYED" : Number.isFinite(entry.wounds) ? `${entry.wounds} WOUNDS` : "FULL"}</em>
-                        <small>
-                          MOVE {profile.move} · RANGE {profile.range} · {profile.shots} SHOTS · {profile.wounds} WOUNDS · CONTROL {profile.control}
-                        </small>
+                        <small>{statLineFor(profile)}</small>
                         {/* On its own line and its own colour: most of a late warband carries
                             a refit now, and run together with the stats it read as more stats. */}
                         {entry.refit && <small className="battle-warband-refit">REFIT · {refitFor(entry.refit)?.name}</small>}
@@ -587,17 +694,34 @@ export default function BattleApp({ onExit }) {
                     <span>FIELD NOTES</span>
                     <em>{(run.discovered ?? []).length} OF {SYNERGY_COUNT} PAIRINGS</em>
                   </div>
-                  {(run.discovered ?? []).map((entry) => (
-                    <div className="battle-note-row" key={entry.id}>
-                      <b>{entry.name}</b>
-                      <em>ENGAGEMENT {entry.battle}</em>
-                      <small>{entry.holder} standing with {entry.partner}. {entry.reveal}</small>
-                    </div>
-                  ))}
+                  {/* Every pairing is listed from the first muster, by name and by the two
+                      keywords it wants. WHAT IT DOES is the part you find out by standing
+                      them together — which keeps the moment of finding one and still gives
+                      the market something to aim at. Six blank lines and a count is not a
+                      secret, it is a wall: there was no way to go looking, and no way to
+                      remember what you had found. */}
+                  {leadsFor(run.discovered ?? []).map((lead) => {
+                    const record = (run.discovered ?? []).find((entry) => entry.id === lead.id);
+                    return (
+                      <div className={`battle-note-row ${record ? "found" : ""}`} key={lead.id}>
+                        <b>{lead.name}</b>
+                        <em>{record ? `ENGAGEMENT ${record.battle}` : "UNRECORDED"}</em>
+                        <small>
+                          {lead.pair[0]} standing with {lead.pair[1]}
+                          {record ? ` — ${record.mechanics}.` : ""}
+                        </small>
+                        {record && (
+                          <small className="battle-note-where">
+                            Found on {record.board}: {record.holder} with {record.partner}.
+                          </small>
+                        )}
+                      </div>
+                    );
+                  })}
                   {(run.discovered ?? []).length === 0 && (
                     <p className="battle-notes-empty">
-                      Nothing recorded yet. Some formations do something together that
-                      neither of them does alone, and no card says which.
+                      Nothing recorded yet. Each of these does something when the two stand
+                      close together, and no card says what.
                     </p>
                   )}
                 </div>
@@ -612,36 +736,56 @@ export default function BattleApp({ onExit }) {
                   <div className="battle-slot" key={slot.id}>
                     <span>{slot.name}</span>
                     <select
-                      value={entry.formationId ?? ""}
-                      onChange={(event) => setSlot(slot.id, { formationId: event.target.value || null })}
+                      value={entry.id ?? ""}
+                      onChange={(event) => {
+                        const picked = fieldable.find((item) => item.id === event.target.value);
+                        setSlot(slot.id, picked
+                          ? { id: picked.id, formationId: picked.formationId, name: picked.name, wounds: picked.wounds, refit: picked.refit }
+                          : { id: null, formationId: null });
+                      }}
                       aria-label={`Formation for ${slot.name}`}
                     >
                       <option value="">— empty —</option>
-                      {(run ? fieldableFrom(run) : FORMATIONS.map((formation) => ({ formationId: formation.id, name: formation.name, wounds: null })))
-                        .map((item) => (
-                          <option
-                            key={item.formationId}
-                            value={item.formationId}
-                            disabled={used.has(item.formationId) && entry.formationId !== item.formationId}
-                          >
-                            {item.name}{Number.isFinite(item.wounds) ? ` · ${item.wounds} WOUNDS LEFT` : ""}
-                          </option>
-                        ))}
+                      {fieldable.map((item) => (
+                        <option
+                          key={item.id}
+                          value={item.id}
+                          disabled={used.has(item.id) && entry.id !== item.id}
+                        >
+                          {item.name}{Number.isFinite(item.wounds) ? ` · ${item.wounds} WOUNDS LEFT` : ""}
+                        </option>
+                      ))}
                     </select>
-                    <small className="battle-assignment">
-                      {(() => {
-                        const index = mission.playerDeployment.indexOf(slot);
-                        const destination = routeDestinationFor(battlePlan, index, mission.objectives, mission.id);
-                        const objective = mission.objectives.find((entry) => entry.id === destination);
-                        return objective ? `THE PLAN SENDS THIS SLOT TO ${objective.name}` : "THIS SLOT HOLDS NO SCORING GROUND";
-                      })()}
-                    </small>
+                    {/* Where the plan sends it, AND whether the disposition you declared
+                        pays for that ground. Under SAFEGUARD only your own half is live and
+                        every safeguard plan sends two or three slots to the flanks — so a
+                        third of the army was walking to markers that score nothing, and the
+                        only place the player found out was the debrief afterwards. Holding
+                        it still denies them the point, which is why the plans do it, but
+                        that is a thing to be told before committing, not after. */}
+                    {(() => {
+                      const index = mission.playerDeployment.indexOf(slot);
+                      const destination = routeDestinationFor(battlePlan, index, mission.objectives, mission.id);
+                      const objective = mission.objectives.find((entry) => entry.id === destination);
+                      if (!objective) return <small className="battle-assignment">THIS SLOT HOLDS NO SCORING GROUND</small>;
+                      const pays = live.has(objective.id);
+                      return (
+                        <>
+                          <small className="battle-assignment">THE PLAN SENDS THIS SLOT TO {objective.name}</small>
+                          {!pays && (
+                            <small className="battle-assignment-unpaid">
+                              {disposition.name} SCORES NOTHING THERE — HOLDING IT ONLY DENIES IT TO THEM
+                            </small>
+                          )}
+                        </>
+                      );
+                    })()}
                     {entry.formationId && (
                       <small className="battle-profile">
                         {(() => {
                           const held = run?.roster.find((item) => item.formationId === entry.formationId);
                           const profile = profileWithRefit(entry.formationId, held?.refit);
-                          return `MOVE ${profile.move} · RANGE ${profile.range} · ${profile.shots} SHOTS · ${profile.wounds} WOUNDS · CONTROL ${profile.control}`;
+                          return statLineFor(profile);
                         })()}
                       </small>
                     )}
@@ -667,6 +811,11 @@ export default function BattleApp({ onExit }) {
                       <em>
                         advances on {mission.objectives.find((objective) => objective.id === enemy.orders[unit.id])?.name ?? "no scoring ground"}
                       </em>
+                      {/* What it can do, beside where it is going. The board says this on
+                          hover, but the deployment is decided here, and comparing five
+                          profiles by pointing at five markers one at a time is not
+                          comparing them. */}
+                      <small>{statLineFor(unit)}</small>
                     </li>
                   ))}
                 </ul>

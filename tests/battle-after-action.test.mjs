@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 
 import { afterActionFor } from "../src/battle/afterAction.js";
 import { deployUnit, resolveBattle } from "../src/battle/battleRules.js";
-import { CIRCUIT_CLASH, buildEnemyForce, buildPlayerForce } from "../src/battle/battleMission.js";
+import { CIRCUIT_CLASH, THE_NARROWS, buildEnemyForce, buildPlayerForce } from "../src/battle/battleMission.js";
+import { liveSitesFor } from "../src/battle/doctrine.js";
 import { plansFor } from "../src/battle/battlePlans.js";
 import { FORMATIONS } from "../src/formationData.js";
 
@@ -146,4 +147,57 @@ test("an empty battle reports nothing rather than crashing", () => {
   assert.deepEqual(afterActionFor({}), { formations: [], measure: "ground", basis: 0 });
   const empty = resolveBattle({});
   assert.deepEqual(afterActionFor({ result: empty, objectives: mission.objectives }).formations, []);
+});
+
+test("ground held that your disposition does not pay for is still work", () => {
+  // Under SAFEGUARD exactly one marker on the board is live, and every safeguard plan sends
+  // two or three of its five slots to the flank markers. Measured against scoring ground
+  // alone, most of a safeguard army came back reading "Held no scoring ground at any
+  // point" — the debrief telling the player half of what they fielded did nothing, in the
+  // run where it was doing the most. HOME-LINE is that disposition's best line BECAUSE of
+  // this work: every marker you stand on is one they are not scoring.
+  const mission = THE_NARROWS;
+  const live = liveSitesFor({ disposition: "safeguard", side: "player", objectives: mission.objectives });
+  assert.equal(live.length, 1, "the fixture no longer has unpaid ground in it");
+  const flank = mission.objectives.find((objective) => !live.some((site) => site.id === objective.id) && objective.y === 50);
+
+  const round = (holder) => ({
+    round: 1,
+    log: [],
+    objectives: mission.objectives.map((objective) => ({
+      objectiveId: objective.id,
+      holder: objective.id === flank.id ? holder : "contested",
+    })),
+    players: [{ id: "breaker", name: "WALKER", x: flank.x, y: flank.y, wounds: 8, maxWounds: 8 }],
+    enemies: [],
+  });
+  const held = afterActionFor({
+    result: { rounds: [round("player"), round("player")] },
+    objectives: mission.objectives,
+    disposition: "safeguard",
+  });
+  const walker = held.formations.find((entry) => entry.name === "WALKER");
+  assert.equal(walker.objectiveRounds, 0, "the flank marker started paying SAFEGUARD");
+  assert.equal(walker.deniedRounds, 2, "holding ground they wanted counted as nothing");
+  assert.match(walker.note, /Denied them ground for 2 rounds/);
+  assert.doesNotMatch(walker.note, /Held no scoring ground at any point/,
+    "a formation that held a marker all battle was reported as having done nothing");
+
+  // Standing on ground the enemy actually holds is not denial.
+  const lost = afterActionFor({
+    result: { rounds: [round("enemy"), round("enemy")] },
+    objectives: mission.objectives,
+    disposition: "safeguard",
+  });
+  assert.equal(lost.formations.find((entry) => entry.name === "WALKER").deniedRounds, 0);
+  assert.match(lost.formations.find((entry) => entry.name === "WALKER").note, /Held no scoring ground at any point/);
+
+  // Under DOMINION every marker pays, so nothing is ever merely denied.
+  const paid = afterActionFor({
+    result: { rounds: [round("player"), round("player")] },
+    objectives: mission.objectives,
+    disposition: "dominion",
+  });
+  assert.equal(paid.formations.find((entry) => entry.name === "WALKER").deniedRounds, 0);
+  assert.equal(paid.formations.find((entry) => entry.name === "WALKER").objectiveRounds, 2);
 });

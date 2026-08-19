@@ -6,6 +6,7 @@ import { BATTLE_PROFILES, battleProfileFor } from "../src/battle/battleProfiles.
 import { deployUnit, resolveBattle } from "../src/battle/battleRules.js";
 import { headlineFor } from "../src/battle/afterAction.js";
 import { FORMATIONS } from "../src/formationData.js";
+import { buy, offersFor, startRun } from "../src/battle/campaign.js";
 
 const profileOf = (formationId) => ({ ...battleProfileFor(formationId), id: formationId });
 const NUMBERS = ["move", "range", "shots", "hit", "wounds", "save", "melee", "control"];
@@ -162,4 +163,30 @@ test("the stat line a screen shows is the stat line that fights", () => {
   assert.deepEqual(profileWithRefit("bastion", null), { ...base, id: "bastion" });
   // A refit belonging to another hull is refused rather than half-applied.
   assert.deepEqual(profileWithRefit("bastion", "harpoon:winch"), { ...base, id: "bastion" });
+});
+
+test("a refit is fitted to one hull, not to every hull of its kind", () => {
+  // A warband may hold two railjacks. Keyed on the formation, buying one set of BASTION
+  // PLATES bolted them to both — one payment, two upgrades — and the market would then
+  // refuse to sell the second set because the warband already "carried" that refit.
+  const base = startRun({ seed: 15 });
+  const hull = "railjack";
+  const refit = refitsFor(hull)[0];
+  const roster = [
+    { id: "railjack#a", formationId: hull, name: "TANK I", wounds: null, refit: null },
+    { id: "railjack#b", formationId: hull, name: "TANK II", wounds: null, refit: null },
+    ...base.roster.filter((entry) => entry.formationId !== hull),
+  ];
+  const run = { ...base, purse: 40, roster, refitShelf: [refit.id] };
+  const fitted = buy({ run, offerId: refit.id });
+  const carrying = fitted.roster.filter((entry) => entry.refit === refit.id);
+  assert.equal(carrying.length, 1, "one payment fitted every hull of that kind");
+
+  // The other one can still be given the same refit, because it is a different hull.
+  const again = buy({ run: { ...fitted, refitShelf: [refit.id] }, offerId: refit.id });
+  assert.equal(again.roster.filter((entry) => entry.refit === refit.id).length, 2);
+  // And once both carry it, it is off the shelf.
+  const full = { ...again, refitShelf: [refit.id] };
+  assert.equal(offersFor(full).some((offer) => offer.id === refit.id), false,
+    "a refit was offered to a warband with nothing left to fit it to");
 });

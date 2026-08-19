@@ -154,7 +154,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Losses are counted from the top of each round, not from the start of the battle. Get this wrong and a wreck pays ERADICATION 4 VP every remaining round, and SAFEGUARD never sees another clean round.
 - **ERADICATION is paid on damage, not on kills.** A five-round battle destroys 0.48 formations on average — measured, not guessed — so a pure body count topped out at 8 VP against an enemy that reliably scores 13 and nobody would ever have declared it.
 - Scoring is razor-sensitive: one victory point per round is decisive, so a x2 to x3 change on a single objective moved a disposition from a 1.3% to a 79.9% win rate. Tune against `npm run analyse:battle` axis D, never by eye. Current: dominion 7.1%, eradication 26.7%, safeguard 25.4%, preferred by 14 / 75 / 37 of the 126 lists.
-- `/tmp/mutate.sh` restores every `.bak` on EXIT, INT and TERM. An interrupted run previously left a mutated source file on disk, and the next sweep measured a deliberately broken build — the SURGE non-stacking fix silently reverted this way and was only caught because the sweep number moved.
+- The mutation script is `scripts/mutants.sh` (149 mutants, 0 surviving). It lived in `/tmp` for most of this project and was re-derived from scratch every session; it is in the repo now. It restores every `.bak` on EXIT, INT and TERM. An interrupted run previously left a mutated source file on disk, and the next sweep measured a deliberately broken build — the SURGE non-stacking fix silently reverted this way and was only caught because the sweep number moved.
 
 ## Strategies are plans with paths (added 18 Aug 2026)
 
@@ -407,3 +407,101 @@ Melee is untouched: two formations in contact are in contact, and a rule letting
 ### The failure condition
 
 `MINIMUM_FORCE` is 4 and a warband starts at 6. Five deployment slots and one spare: a run ends when the army can no longer field four, which costs 8.2% of armies. At 5 it was 26% and one bad first engagement finished a run before the market had opened once, which is not a difficulty setting, it is a coin flip.
+
+## Third playtest round (18 Aug 2026)
+
+- **"If it doesn't say anything it will be really hard to remember what the combo is when it happens and where it happened."** Two problems wearing one coat. FIELD NOTES now lists **every** pairing from the first muster by name and by the two keywords it wants, so there is something to hunt for and the refit market has a target; what it DOES stays hidden until it fires. Six blank lines and a count is not a secret, it is a wall. And a found pairing records the **mechanics and the board**, not only a flavour line — "the screen anchors on the heavy hull" says a pairing happened and nothing about what it was worth.
+- **The mechanics sentence is DERIVED from the effect**, never typed beside it. Written by hand it would be a second copy of every number in `synergies.js`, and ERADICATION's scoring line already showed how that ends: it read "1 VP per 4 wounds" for as long as the rule paid 1 in 3. `SHIELD_SOAK` moved to `battleProfiles.js` for the same reason — LOCKED SHIELDS has to be able to say what it raises the soak *from*.
+- **"Doesn't the walker have scoring ground in the west? The debrief says it didn't hold any."** It held it all battle. The debrief measured objective-rounds against **only the markers the declared disposition scores** — and under SAFEGUARD exactly one marker on the board is live, while every safeguard plan sends two or three of its five slots to the flanks:
+
+```
+safeguard/home-line      west-stack(PAYS NOTHING) | south-yard | south-yard | east-stack(PAYS NOTHING) | east-stack(PAYS NOTHING)
+```
+
+  So most of a safeguard army came back reading *"Held no scoring ground at any point"* — the debrief telling the player that half of what they fielded did nothing, in the run where it was doing the most. **Every marker you stand on is one they are not scoring**, and denying a point is worth what taking one is; HOME-LINE is that disposition's best line *because* of this work. Denial is counted and reported now. Yet another metric measuring the wrong thing — it credited scoring and was blind to denial.
+- **The deploy screen says so before you commit.** A slot walking to ground the declared disposition does not pay for is flagged on the slot itself, as a warning rather than an error, because the plans send formations there on purpose.
+
+Still open, and Jonathan's words: *"the ending is a little lacklustre"*. The last engagement resolves and the run summary states what happened; there is no ending worth the five battles that led to it.
+
+## Two of the same hull (18 Aug 2026)
+
+*"I was thinking you could have multiples of the same unit... I was hoping the further you go in the game the larger the army gets."*
+
+Priced against the alternatives before building anything:
+
+```
+today                     126 lists × 120 orderings =    15,120 battles
+duplicates, 5 slots     1,287 lists × ≤120         =   154,440   (10×)
+12 new hull types, 6 slots  924 × 720              =   665,280   (44×)
+duplicates, 6 slots     3,003 × 720                = 2,162,160  (143×)
+```
+
+Duplicates at five slots is ten times the list-building space for **no new authored content** — no hulls, no routes — and it is the only one of the three that leaves the sweep able to resolve the space rather than sample it. The thin bench was never about the number of slots; it was that there are nine hulls and a warband owned six of them, so the shelf ran dry. A warband now ends a run at **9.52 formations from a starting 6**.
+
+### Instance identity
+
+A unit's `id` **was its formation id**, which made two of the same hull the same unit: they shared an order, walked one route, and every wound landed on whichever the lookup found first. Roster entries carry their own ids now, and everything that keys on identity follows — orders, routes, damage, survivors, retiring, refits.
+
+The bug that took longest to see: `deployUnit` spread the profile **after** writing the id, and `profileWithRefit` carries an `id` of its own — the formation it is a profile *of*. So the instance id was silently overwritten by the formation id, which is precisely the collision the whole change existed to remove. The profile is spread first now.
+
+### At most two
+
+`MAX_COPIES = 2`. Unrestricted, duplicates opened straight onto a degenerate answer: **three RECON TANKS and two RECOVERY VEHICLES won 100% of its deployments**, and ninety-five lists won from every single one of theirs. Three OBJECTIVE hulls each holding at 1.5× control under DUG IN, kept standing by two REPAIR hulls, is not a list. Capped at two it is 882 lists and none of the all-different ones do it. It is also the ordinary rule in the wargames this is built out of, and it reads as one: you can bring a second of something, not an army of it.
+
+DUG IN came down from 1.5× to 1.25× at the same time — it was already the most-formed pairing on the board by a distance, and OBJECTIVE-plus-SUPPORT is exactly the pair a warband holding two haulers assembles without trying.
+
+### The verdict that had to change, and why it is not a dodge
+
+"No list wins from every deployment" failed at 36 of 882 — and **every one of the 36 held a repeat, while none of the 126 all-different lists did**. A list with duplicates has fewer genuinely different deployments (five identical hulls have exactly one), so winning all of them is easier *by construction* rather than by being overpowered. The verdict assumed every list had 120 distinct deployments to be tested against, and duplicates made that false.
+
+It is judged on lists of five different hulls now, and the trade is reported beside it as the design property it is: **stacking a hull buys consistency and spends deployment decision.** Arrangements are deduplicated too — two identical hulls swapped between two slots is one deployment written twice.
+
+### Not done, and why
+
+Six deployment slots is what would make the *board* fuller, and it is the thing that breaks the sweep: 143× the space, and the exhaustive claim dies with it. If it happens it should be a modest escalation — five slots early, six for the last engagements — with the battle axes pinned at five as the measuring instrument and the run axis covering the growth, the same discipline as the control enemy.
+
+## The army that could not be hurt (19 Aug 2026)
+
+*"In the previous games I had to pick repair or full recovery for units... this run I have [not]"* — and, separately, *"won again 4 out of 5 times... I'm good but not that good."*
+
+Both remarks were the same bug. `applyBattle` matches the roster on **instance** ids — it has to, or one of two railjacks dying strikes off both — and the screen was handing it **formation** ids:
+
+```js
+const deployedIds = Object.values(planned).map((entry) => entry?.formationId)  // matched nothing
+```
+
+Nothing matched, so nothing was ever damaged, nothing was ever lost, `DID NOT COME BACK` was always empty, the repairs in the market were never on offer because nothing needed them, and a run could not be lost. An entire economy — attrition, repair, the market's whole reason to exist — sat there looking implemented and doing nothing. **The sweep never saw it**: it drives `campaign.js` directly and passed instance ids all along, which is exactly why every measured number stayed sane while the game the player was actually playing had become unloseable.
+
+Two more instance/formation mismatches came out of the same corner:
+
+- `planned` read each slot's wounds with `roster.find((item) => item.formationId === entry.formationId)`, so two of the same hull both deployed carrying the first one's damage.
+- Declaring a disposition reset each slot to `{ formationId }` — dropping the id, the name, the damage and the refit — which emptied every slot on screen and deployed hulls the run does not own. It keeps the instance and drops only the per-slot objective override now.
+
+**The lesson is not "check your ids".** It is that this project has no test that plays the game the way a player does; every guard either drives the model directly or reads the rendered markup once. Both were green. The guards added are source-level assertions on the wiring between screen and campaign, which is the seam that was unguarded — and a browser pass over an actual engagement, which is what found it.
+
+### What the difficulty actually is
+
+Measured against the enemy the game ships, over the same 1080 policy-and-seed runs the run axis uses:
+
+```
+battles won 0..5:  0:63  1:164  2:255  3:340  4:217  5:41
+four or more: 23.9%      all five: 3.8%
+```
+
+So four of five is a good run — top quarter — and clearing the ladder is rare. The run axis prints a different distribution (5:121) because it fights the **control** enemy on purpose; that is the right instrument for attributing anything to the player's choices and the wrong one for answering "is it too easy". Both are printed now, from the rows that already existed.
+
+The standing imbalance is unchanged and is now printed as a NOTE beside the verdicts: **the enemy's declaration swings the engagement 42.6%** — 75.4% player wins against ERADICATION against 32.8% against DOMINION — which is wider than any choice the player makes. Nothing the player picks moves a run as much as which opponent it drew.
+
+## What a marker says (19 Aug 2026)
+
+*"Should be able to see the enemy units if I hover over them... at least what they can do, as in stats, not their combo."*
+
+Every marker on the board carries its profile now, on hover **and on focus** — a card only a mouse can open is information only some players have. The card shows the stat line, what is left of the hull and the profile note. It shows nothing about the hand or the pairings: the profile is public in any wargame, the army list is on the table, and the only uncertainty this game has is what the enemy is holding. The enemy brief in the rail carries the same line per formation, because the deployment is decided there and comparing five profiles by pointing at five markers one at a time is not comparing them.
+
+The stat line is written **once**, in `statLineFor`. There were four copies of the template by the time this landed and they had already drifted — the card read `1 SHOT` while the deploy list beside it read `1 SHOTS` for the same hull.
+
+## Repairs are bought on the row (19 Aug 2026)
+
+`buy({ run, offerId, targetId })`. Field repair and full rebuild used to go to whichever formation was worst off, which is a sensible default and not a decision. With a dozen hulls in the warband and two of some of them, *which* one you patch before the next engagement is the question the money is asking — the wreck you are about to deploy is often not the wreck with the fewest wounds left.
+
+They are bought from the warband list, on the row of the hull, where the wounds are already written down; only REQUISITION is left on the shelf. Naming a formation that is not damaged, or is not in the warband, **refuses the purchase** rather than quietly doing the work somewhere else and charging for it. Naming nobody still repairs the worst-off hull, which is what the sweep buys — so the measured value of a repair stays the value of the cheapest sensible policy rather than the value of playing it well.

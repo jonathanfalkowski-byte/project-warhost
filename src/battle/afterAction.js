@@ -26,6 +26,26 @@ const heldThisRound = ({ unit, round, sites }) => sites.filter((site) => (
   && round.objectives.find((entry) => entry.objectiveId === site.id)?.holder === "player"
 )).length;
 
+// Ground held that this disposition does not pay for — which is not nothing. Every marker
+// you are standing on is a marker THEY are not scoring, and denying a point is worth what
+// taking one is.
+//
+// Under SAFEGUARD exactly one marker on the board is live, and every safeguard plan sends
+// two or three of its five slots to the flank markers. Measured against scoring ground
+// alone, most of a safeguard army came back reading "Held no scoring ground at any point" —
+// the debrief telling the player that half of what they fielded did nothing, in the run
+// where it was doing the most. HOME-LINE is that disposition's best line BECAUSE of this
+// work.
+const deniedThisRound = ({ unit, round, objectives, sites }) => {
+  const scoring = new Set(sites.map((site) => site.id));
+  return objectives.filter((objective) => (
+    !scoring.has(objective.id)
+    && unit.wounds > 0
+    && distance(unit, objective) <= OBJECTIVE_CONTROL_RANGE
+    && round.objectives.find((entry) => entry.objectiveId === objective.id)?.holder === "player"
+  )).length;
+};
+
 // Which formations are working together, right now, on the board.
 //
 // The combos have been in the rules since the wargame profiles were written — a SHIELD
@@ -134,6 +154,7 @@ export const afterActionFor = ({ result, objectives = [], disposition = "dominio
       dealt: 0,
       taken: 0,
       objectiveRounds: 0,
+      deniedRounds: 0,
       lostInRound: null,
       survived: true,
       maxWounds: unit.maxWounds,
@@ -152,6 +173,7 @@ export const afterActionFor = ({ result, objectives = [], disposition = "dominio
       if (!record) continue;
       record.wounds = unit.wounds;
       record.objectiveRounds += heldThisRound({ unit, round, sites });
+      record.deniedRounds += deniedThisRound({ unit, round, objectives, sites });
       if (unit.wounds <= 0 && record.lostInRound === null) {
         record.lostInRound = index + 1;
         record.survived = false;
@@ -191,8 +213,20 @@ const noteFor = ({ entry, measure }) => {
     if (!entry.survived) return `Dealt ${entry.dealt} before it was destroyed in round ${entry.lostInRound}.`;
     return `Dealt ${entry.dealt} and took ${entry.taken}.`;
   }
-  if (entry.objectiveRounds === 0 && !entry.survived) return `Destroyed in round ${entry.lostInRound} without holding anything.`;
-  if (entry.objectiveRounds === 0) return "Held no scoring ground at any point.";
-  if (!entry.survived) return `Held ground for ${entry.objectiveRounds} round${entry.objectiveRounds === 1 ? "" : "s"} before it was destroyed in round ${entry.lostInRound}.`;
-  return `Held ground for ${entry.objectiveRounds} round${entry.objectiveRounds === 1 ? "" : "s"}.`;
+  const rounds = (count) => `${count} round${count === 1 ? "" : "s"}`;
+  const denial = entry.deniedRounds > 0
+    ? ` Denied them ground for ${rounds(entry.deniedRounds)}, which this disposition does not pay you for.`
+    : "";
+  if (entry.objectiveRounds === 0 && !entry.survived) {
+    return `Destroyed in round ${entry.lostInRound} without holding anything.${denial}`;
+  }
+  if (entry.objectiveRounds === 0) {
+    // A formation that denied ground for the whole battle held plenty; what it did not do
+    // is hold ground THIS disposition scores, and the sentence has to say which.
+    return entry.deniedRounds > 0
+      ? `Held no ground you score.${denial}`
+      : "Held no scoring ground at any point.";
+  }
+  if (!entry.survived) return `Held ground for ${rounds(entry.objectiveRounds)} before it was destroyed in round ${entry.lostInRound}.${denial}`;
+  return `Held ground for ${rounds(entry.objectiveRounds)}.${denial}`;
 };

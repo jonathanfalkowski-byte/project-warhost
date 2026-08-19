@@ -14,7 +14,7 @@
 // strictly the best buy per point.
 
 import { FORMATIONS } from "../formationData.js";
-import { battleProfileFor } from "./battleProfiles.js";
+import { battleProfileFor, statLineFor } from "./battleProfiles.js";
 import { REFITS, REFIT_COST, refitsFor } from "./refits.js";
 
 // What a formation costs to bring into the warband, in victory points.
@@ -40,25 +40,48 @@ export const costOf = (formationId) => UNIT_COSTS[formationId] ?? 5;
 
 // Services cost points too, so the purse is a real choice rather than a shopping list:
 // every point spent patching the army you have is a point not spent widening it.
+// How much a field repair puts back. Named here rather than left as a 4 in the buying
+// code, because the shelf has to be able to say what it sells without keeping a second
+// copy of the number and being wrong about it.
+export const FIELD_REPAIR_WOUNDS = 4;
+
+// `short` is the label on the button beside a damaged formation, where the row already
+// says which hull it is and the long name would only repeat the column above it.
 export const SERVICES = {
   "field-repair": {
-    id: "field-repair", name: "FIELD REPAIR", cost: 2,
-    text: "The worst-off formation in the roster recovers four wounds.",
+    id: "field-repair", name: "FIELD REPAIR", short: `PATCH +${FIELD_REPAIR_WOUNDS}`, cost: 2,
+    text: `A damaged formation of your choosing recovers ${FIELD_REPAIR_WOUNDS} wounds.`,
   },
   rebuild: {
-    id: "rebuild", name: "FULL REBUILD", cost: 4,
-    text: "One formation is returned to full strength.",
+    id: "rebuild", name: "FULL REBUILD", short: "REBUILD", cost: 4,
+    text: "A damaged formation of your choosing is returned to full strength.",
   },
   requisition: {
-    id: "requisition", name: "REQUISITION", cost: 5,
+    id: "requisition", name: "REQUISITION", short: "REQUISITION", cost: 5,
     text: "One more command point, for the rest of the run.",
   },
 };
+
+// The two that need a hull named before they do anything. The market lists them; the
+// warband is where they are bought, one row at a time.
+export const MENDS = ["field-repair", "rebuild"];
 
 // How wide the shelf is. Three offers against a nine-formation roster meant most of what
 // you might want was simply never for sale.
 export const SHELF_UNITS = 5;
 export const SHELF_REFITS = 3;
+
+// AT MOST TWO OF ANY ONE FORMATION. Allowing duplicates at all is what opens list-building
+// up — nine hulls choose five is 126 lists, with repeats it is 1287 — but unrestricted it
+// opens straight onto a degenerate answer: three RECON TANKS and two RECOVERY VEHICLES won
+// 100% of its 120 deployments, because three OBJECTIVE hulls each holding at 1.5× control
+// under DUG IN, kept standing by two REPAIR hulls, is not a list, it is an exploit. Ninety
+// five lists won from every single deployment. Capped at two, that space is 882 lists and
+// none of them do.
+//
+// It is also the ordinary rule in the wargames this is built out of, and it reads as one:
+// you can bring a second of something, not an army of it.
+export const MAX_COPIES = 2;
 
 const shuffleKey = (seed, index) => ((Math.abs(Math.floor(seed)) + 1) * 2654435761 + (index + 1) * 40503) % 100003;
 
@@ -84,10 +107,18 @@ export const shelfRefitsFor = ({ seed = 0, battle = 1, roster = [] } = {}) => ro
 // two or three points, which is why preserving the army bought nothing a run could feel:
 // every disposition ended up lasting the same number of engagements, whatever it did to its
 // own formations. A loss now costs you a battle as well as the points.
+// A HULL YOU ALREADY OWN IS STILL FOR SALE. It used to filter out everything in the
+// warband, so the shelf emptied as the run went on and the market ran out of things to sell
+// you — which is most of why a bench never really formed. Two railjacks is a list-building
+// decision, and it is the one that opens the space up without a single new formation being
+// authored: nine hulls choose-five is 126 lists, nine hulls choose-five WITH REPEATS is
+// 1287. What stays filtered is what died this engagement.
+export const copiesOf = (roster, formationId) => roster.filter((entry) => entry.formationId === formationId).length;
+
 export const shelfUnitsFor = ({ seed = 0, battle = 1, roster = [], lost = [] } = {}) => {
-  const held = new Set([...roster.map((entry) => entry.formationId), ...lost]);
+  const gone = new Set(lost);
   return FORMATIONS
-    .filter((formation) => !held.has(formation.id))
+    .filter((formation) => !gone.has(formation.id) && copiesOf(roster, formation.id) < MAX_COPIES)
     .map((formation, index) => ({ formation, key: shuffleKey(seed * 31 + battle, index) }))
     .sort((left, right) => left.key - right.key || left.formation.id.localeCompare(right.formation.id))
     .slice(0, SHELF_UNITS)
@@ -95,12 +126,16 @@ export const shelfUnitsFor = ({ seed = 0, battle = 1, roster = [], lost = [] } =
 };
 
 export const marketFor = ({ seed = 0, battle = 1, roster = [], purse = 0, shelf = null, refitShelf = null } = {}) => {
-  const held = new Set(roster.map((entry) => entry.formationId));
   const damaged = roster.some((entry) => Number.isFinite(entry.wounds));
   const drawn = shelf ?? shelfUnitsFor({ seed, battle, roster });
+  // Anything bought is taken off the shelf EXPLICITLY, by `buy` removing it from the run's
+  // held shelf. It used to be implicit — the shelf was filtered by what the warband already
+  // owned, which is the same thing only as long as owning one meant you could not buy
+  // another.
   const units = drawn
-    // Anything bought is off the shelf, and nothing new slides in behind it.
-    .filter((id) => !held.has(id))
+    // A hull the warband is already at its limit on comes off the shelf, the same way a
+    // bought one does.
+    .filter((id) => copiesOf(roster, id) < MAX_COPIES)
     .map((id) => FORMATIONS.find((formation) => formation.id === id))
     .filter(Boolean)
     .map((formation) => ({
@@ -111,12 +146,14 @@ export const marketFor = ({ seed = 0, battle = 1, roster = [], purse = 0, shelf 
       text: noteFor(formation.id),
       affordable: costOf(formation.id) <= purse,
     }));
-  const carried = new Set(roster.map((entry) => entry.refit).filter(Boolean));
-  const owned = new Set(roster.map((entry) => entry.formationId));
+  // A refit needs a HULL OF THAT KIND THAT IS NOT ALREADY CARRYING ONE. With two railjacks
+  // in the warband the same refit can be bought twice, once for each; with one railjack that
+  // already has one, it is off the shelf. Asking "does the warband carry this refit
+  // anywhere" was the same question only while a warband could hold one of each hull.
+  const takers = (formationId) => roster.filter((entry) => entry.formationId === formationId && !entry.refit);
   const refits = (refitShelf ?? shelfRefitsFor({ seed, battle, roster }))
     .map((id) => REFITS[id])
-    .filter((refit) => refit && owned.has(refit.formationId) && !carried.has(refit.id)
-      && !roster.find((entry) => entry.formationId === refit.formationId)?.refit)
+    .filter((refit) => refit && takers(refit.formationId).length > 0)
     .map((refit) => ({
       kind: "refit",
       id: refit.id,
@@ -134,9 +171,6 @@ export const marketFor = ({ seed = 0, battle = 1, roster = [], purse = 0, shelf 
 
 // One line on what the money buys, read off the wargame profile so the shelf can never
 // disagree with the board.
-const noteFor = (formationId) => {
-  const profile = battleProfileFor(formationId);
-  return `MOVE ${profile.move} · RANGE ${profile.range} · ${profile.shots} SHOTS · ${profile.wounds} WOUNDS · CONTROL ${profile.control}`;
-};
+const noteFor = (formationId) => statLineFor(battleProfileFor(formationId));
 
 export const canAfford = ({ purse, cost }) => Number.isFinite(purse) && purse >= cost;

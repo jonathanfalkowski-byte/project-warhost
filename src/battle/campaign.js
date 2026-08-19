@@ -25,8 +25,9 @@ import { FORMATIONS } from "../formationData.js";
 import { DETACHMENTS, detachmentFor, drawEnemyHand } from "./stratagems.js";
 import { CIRCUIT_CLASH, THE_NARROWS, armyFor, buildEnemyForce, missionFor } from "./battleMission.js";
 import { plansFor } from "./battlePlans.js";
+import { mechanicsOf, synergyFor } from "./synergies.js";
 import { profileWithRefit } from "./refits.js";
-import { SERVICES, costOf, marketFor, shelfRefitsFor, shelfUnitsFor } from "./market.js";
+import { FIELD_REPAIR_WOUNDS, SERVICES, costOf, marketFor, shelfRefitsFor, shelfUnitsFor } from "./market.js";
 
 export const RUN_LENGTH = 5;
 // Below this you cannot field a force at all and the run is over. Five slots, so the last
@@ -89,7 +90,23 @@ export const startingRoster = ({ seed = 0, size = STARTING_ROSTER } = {}) => FOR
   .map((formation, index) => ({ formation, key: shuffleKey(seed, index) }))
   .sort((left, right) => left.key - right.key || left.formation.id.localeCompare(right.formation.id))
   .slice(0, Math.min(size, FORMATIONS.length))
-  .map(({ formation }) => ({ formationId: formation.id, name: formation.name, wounds: null, refit: null }));
+  .map(({ formation }, index) => rosterEntry(formation.id, formation.name, index));
+
+// A roster entry is an INSTANCE of a formation, not the formation itself. Two railjacks are
+// two entries with two ids and two damage tracks, which is the whole of what makes them two
+// railjacks rather than one counted twice.
+let instanceCounter = 0;
+export const rosterEntry = (formationId, name, seedIndex = null) => {
+  instanceCounter += 1;
+  return {
+    // Deterministic where it can be — a run replays from its seed — and unique regardless.
+    id: `${formationId}#${seedIndex === null ? instanceCounter : seedIndex}`,
+    formationId,
+    name,
+    wounds: null,
+    refit: null,
+  };
+};
 
 export const startRun = ({ detachmentId = "voidbreaker", seed = 0, enemyPolicy = "varied" } = {}) => ({
   seed,
@@ -190,7 +207,20 @@ const withDiscoveries = (run, result) => {
     for (const found of round.synergies?.player ?? []) {
       if (known.has(found.id)) continue;
       known.add(found.id);
-      fresh.push({ id: found.id, name: found.name, reveal: found.reveal, holder: found.holder, partner: found.partner, battle: run.battle });
+      fresh.push({
+        id: found.id,
+        name: found.name,
+        reveal: found.reveal,
+        holder: found.holder,
+        partner: found.partner,
+        battle: run.battle,
+        // WHERE and WHAT. The record used to be a name, two hulls and a flavour line, which
+        // says a pairing happened and not one thing about what it was worth or where to go
+        // looking for it again.
+        board: missionFor(RUN_LADDER[Math.min(run.battle, RUN_LADDER.length) - 1].mission)?.name ?? null,
+        pair: synergyFor(found.id)?.pair ?? [],
+        mechanics: mechanicsOf(synergyFor(found.id)),
+      });
     }
   }
   return [...(run.discovered ?? []), ...fresh];
@@ -201,8 +231,10 @@ export const applyBattle = ({ run, result, deployedIds = [], won, disposition = 
   const roster = [];
   const lost = [];
   for (const entry of run.roster) {
-    if (!deployedIds.includes(entry.formationId)) { roster.push(entry); continue; }
-    const remaining = survivors.get(entry.formationId);
+    // Matched on the INSTANCE. Keyed on the formation, a warband holding two railjacks
+    // struck both off when one died and carried one's damage onto the other.
+    if (!deployedIds.includes(entry.id)) { roster.push(entry); continue; }
+    const remaining = survivors.get(entry.id);
     if (!Number.isFinite(remaining) || remaining <= 0) { lost.push(entry); continue; }
     roster.push({ ...entry, wounds: Number(remaining.toFixed(2)) });
   }
@@ -240,7 +272,7 @@ export const applyBattle = ({ run, result, deployedIds = [], won, disposition = 
       ...record, broke, heldGround, earned: result?.playerScore ?? 0, commandSpent, regained, commanders,
       // What was standing at the end and what did not come back, so the run's ledger can
       // answer "which of mine survived" without anyone having to reconstruct it.
-      survivors: roster.filter((entry) => deployedIds.includes(entry.formationId)).map((entry) => entry.name),
+      survivors: roster.filter((entry) => deployedIds.includes(entry.id)).map((entry) => entry.name),
     }],
     // The shelf is drawn once, here, against the roster as it stands after the battle —
     // so a purchase takes one thing off it rather than re-rolling the other two.
@@ -288,7 +320,8 @@ export const offersFor = (run) => marketFor({
 
 // Buying. Anything you cannot afford is refused rather than silently discounted, and every
 // purchase is a pure function of the run so a run replays from its seed and its choices.
-export const buy = ({ run, offerId }) => {
+// `targetId` names WHICH hull a repair goes to. Everything else ignores it.
+export const buy = ({ run, offerId, targetId = null }) => {
   const offer = offersFor(run).find((entry) => entry.id === offerId);
   if (!offer || offer.cost > run.purse) return run;
   const paid = { ...run, purse: run.purse - offer.cost, spent: run.spent + offer.cost };
@@ -298,17 +331,27 @@ export const buy = ({ run, offerId }) => {
     // already carrying one is never offered another, so it can never be bought. The check
     // lives there rather than being repeated here, where it would be unreachable and
     // therefore untestable.
+    // Fitted to the first hull of that kind that is not already carrying one. Which of two
+    // identical railjacks gets it is not a decision worth asking about — they differ only in
+    // how shot they are — and asking would be a modal dialog nobody wants.
+    const target = paid.roster.find((entry) => entry.formationId === offer.formationId && !entry.refit);
+    if (!target) return run;
     return {
       ...paid,
-      roster: paid.roster.map((entry) => (entry.formationId === offer.formationId
-        ? { ...entry, refit: offer.id } : entry)),
+      roster: paid.roster.map((entry) => (entry === target ? { ...entry, refit: offer.id } : entry)),
     };
   }
 
   if (offer.kind === "unit") {
+    // Taken off the shelf by hand, because owning one no longer means you cannot buy another
+    // and the shelf can therefore no longer be filtered by what the warband holds.
+    const shelf = [...(paid.shelf ?? [])];
+    const at = shelf.indexOf(offer.id);
+    if (at >= 0) shelf.splice(at, 1);
     return {
       ...paid,
-      roster: [...paid.roster, { formationId: offer.id, name: offer.name, wounds: null, refit: null }],
+      shelf,
+      roster: [...paid.roster, rosterEntry(offer.id, offer.name)],
     };
   }
 
@@ -316,20 +359,34 @@ export const buy = ({ run, offerId }) => {
     .filter((entry) => Number.isFinite(entry.wounds))
     .sort((left, right) => left.wounds - right.wounds)[0];
 
+  // WHICH hull gets the work. It used to always be the worst-off one, which is a sensible
+  // default and a poor decision: with two of the same formation in the warband and a dozen
+  // hulls in it, "patch the railjack I am deploying next or rebuild the skimmer I am not"
+  // is the question the money is actually asking. Naming a formation that is not damaged,
+  // or is not in the warband at all, refuses the purchase rather than quietly doing the
+  // work somewhere else and charging for it.
+  const named = targetId === null ? null
+    : paid.roster.find((entry) => entry.id === targetId && Number.isFinite(entry.wounds));
+  if (targetId !== null && !named) return run;
+  // Nobody named one: the worst-off formation, exactly as before. The sweep buys this way,
+  // which is what keeps the measured value of a repair the value of the cheapest sensible
+  // policy rather than the value of playing it well.
+  const target = named ?? worst;
+
   switch (offer.id) {
     case "field-repair": {
-      if (!worst) return paid;
-      const healed = Math.min(worst.wounds + 4, fullStrength(worst));
+      if (!target) return paid;
+      const healed = Math.min(target.wounds + FIELD_REPAIR_WOUNDS, fullStrength(target));
       return {
         ...paid,
-        roster: paid.roster.map((entry) => (entry === worst
+        roster: paid.roster.map((entry) => (entry === target
           ? { ...entry, wounds: healed >= fullStrength(entry) ? null : Number(healed.toFixed(2)) }
           : entry)),
       };
     }
     case "rebuild":
-      if (!worst) return paid;
-      return { ...paid, roster: paid.roster.map((entry) => (entry === worst ? { ...entry, wounds: null } : entry)) };
+      if (!target) return paid;
+      return { ...paid, roster: paid.roster.map((entry) => (entry === target ? { ...entry, wounds: null } : entry)) };
     case "requisition":
       return { ...paid, commandPoints: paid.commandPoints + 1 };
     default:
@@ -337,22 +394,24 @@ export const buy = ({ run, offerId }) => {
   }
 };
 
-export { SERVICES, costOf };
+export { SERVICES, costOf, FIELD_REPAIR_WOUNDS };
 
 // Selling a formation back. The run used to be one army that only ever shrank; a market
 // you can only buy into is a shopping list, not a build. Retiring pays back half of what
 // the formation cost, so churning the warband is possible and lossy rather than free.
 export const RETIRE_REFUND = 0.5;
 
-export const retire = ({ run, formationId }) => {
-  const entry = run.roster.find((item) => item.formationId === formationId);
+// Retiring ONE of them. Keyed on the formation it sold every railjack in the warband at
+// once and paid for a single one.
+export const retire = ({ run, id }) => {
+  const entry = run.roster.find((item) => item.id === id);
   // Never below the minimum force: a warband you cannot field is the end of the run, and
   // ending it by selling your own army is not a decision anyone means to make.
   if (!entry || fieldableFrom(run).length <= MINIMUM_FORCE) return run;
   return {
     ...run,
-    purse: run.purse + Math.floor(costOf(formationId) * RETIRE_REFUND),
-    roster: run.roster.filter((item) => item.formationId !== formationId),
+    purse: run.purse + Math.floor(costOf(entry.formationId) * RETIRE_REFUND),
+    roster: run.roster.filter((item) => item.id !== id),
   };
 };
 

@@ -7,6 +7,8 @@ import {
   SYNERGY_COUNT,
   SYNERGY_RANGE,
   activeSynergies,
+  leadsFor,
+  mechanicsOf,
   packedScaleFor,
   synergiesFor,
   synergyBonusFor,
@@ -331,4 +333,68 @@ test("healing your own army is not damage dealt to theirs", () => {
   const repairs = quiet.rounds.flatMap((round) => round.log).filter((entry) => entry.phase === "repair");
   assert.ok(repairs.length > 0, "nothing was repaired, so the test proves nothing");
   assert.equal(quiet.playerScore, 0, "an army was paid for healing itself");
+});
+
+test("every pairing is a lead from the first muster, and only the effect is hidden", () => {
+  // Six blank lines and a count is not a secret, it is a wall: nothing to hunt for and no
+  // way to remember what had been found. The name and the two keywords are shown from the
+  // start so the market has something to aim at; what it DOES is the part you find out by
+  // standing them together.
+  const cold = leadsFor([]);
+  assert.equal(cold.length, SYNERGY_COUNT, "not every pairing is listed");
+  for (const lead of cold) {
+    assert.equal(lead.found, false);
+    assert.ok(lead.name && lead.pair.length === 2, `${lead.id} is not a usable lead`);
+    assert.equal(lead.effect, undefined, "an unfound pairing gives away its effect");
+    assert.equal(lead.reveal, undefined, "an unfound pairing gives away its reveal");
+  }
+  // Found ones are marked, and nothing else changes about the list.
+  const warm = leadsFor([{ id: "wolf-pair" }]);
+  assert.deepEqual(warm.filter((lead) => lead.found).map((lead) => lead.id), ["wolf-pair"]);
+  assert.deepEqual(warm.map((lead) => lead.id), cold.map((lead) => lead.id), "finding one reordered the list");
+  // Ids are accepted as bare strings too, so a caller cannot get this subtly wrong.
+  assert.deepEqual(leadsFor(["wolf-pair"]).filter((lead) => lead.found).map((lead) => lead.id), ["wolf-pair"]);
+  assert.deepEqual(leadsFor().filter((lead) => lead.found), []);
+});
+
+test("what a pairing does is read off the effect, not written beside it", () => {
+  // The notes recorded a flavour line and nothing else — "the screen anchors on the heavy
+  // hull" says a pairing happened and not one thing about what it was worth. Written by
+  // hand the sentence would be a second copy of every number in the file, and ERADICATION's
+  // scoring line already showed how that ends: it read "1 VP per 4 wounds" for as long as
+  // the rule paid 1 in 3.
+  for (const synergy of synergyList()) {
+    const mechanics = mechanicsOf(synergy);
+    assert.ok(mechanics.length > 5, `${synergy.id} does not say what it does`);
+    for (const value of Object.values(synergy.effect)) {
+      if (typeof value !== "number") continue;
+      // Every number in the effect appears in the sentence, one way or another.
+      const shown = mechanics.includes(String(value))
+        || mechanics.includes(String(Math.round(value * 100)))
+        || mechanics.includes(String(1 + value));
+      assert.ok(shown, `${synergy.id} hides ${value} from its own description: "${mechanics}"`);
+    }
+  }
+  // And it tracks the effect rather than a copy of it.
+  assert.match(mechanicsOf({ effect: { damageScale: 9.5 } }), /9\.5/);
+  assert.match(mechanicsOf({ effect: { repairBonus: 3 } }), /4 instead of 1/);
+  assert.equal(mechanicsOf({ effect: {} }), "");
+  assert.equal(mechanicsOf(null), "");
+});
+
+test("the run writes down what it does and where it happened", () => {
+  const run = startRun({ seed: 4 });
+  const result = battle();
+  const after = applyBattle({
+    run, result, won: true,
+    deployedIds: ["railjack", "hauler", "bastion", "command", "skimmer"],
+  });
+  assert.ok(after.discovered.length > 0, "nothing was found in a battle built to find something");
+  for (const entry of after.discovered) {
+    const synergy = synergyFor(entry.id);
+    assert.deepEqual(entry.pair, synergy.pair, `${entry.id} recorded the wrong keywords`);
+    assert.equal(entry.mechanics, mechanicsOf(synergy), `${entry.id} recorded stale mechanics`);
+    assert.ok(entry.board, `${entry.id} does not say which board it was found on`);
+    assert.ok(entry.holder && entry.partner && entry.battle);
+  }
 });

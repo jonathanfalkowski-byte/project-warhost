@@ -13,6 +13,10 @@
 
 // Board is 100x100 to match the existing field coordinate space.
 export const MELEE_RANGE = 6;
+// The share of a hit a SHIELD formation takes off anything it is screening. Named here
+// rather than sitting as a literal in the damage code, because the pairing that raises it
+// has to be able to say what it raises it FROM without keeping a second copy of the number.
+export const SHIELD_SOAK = 0.28;
 export const OBJECTIVE_CONTROL_RANGE = 12;
 
 export const BATTLE_PROFILES = {
@@ -75,3 +79,14 @@ export const BATTLE_PROFILES = {
 export const battleProfileFor = (formationId) => BATTLE_PROFILES[formationId] ?? {
   move: 10, range: 18, shots: 2, hit: 4, wounds: 8, save: 3, melee: 2, control: 2, keywords: [], note: "",
 };
+
+// THE STAT LINE, written once. It is shown in three places — the deploy list, the shelf,
+// and the card under a marker on the board — and three copies of the same template is how
+// the shelf ends up advertising a profile the board does not have.
+export const statLineFor = (profile) => [
+  `MOVE ${profile.move}`,
+  `RANGE ${profile.range}`,
+  `${profile.shots} SHOT${profile.shots === 1 ? "" : "S"}`,
+  `${profile.wounds} WOUNDS`,
+  `CONTROL ${profile.control}`,
+].join(" \u00b7 ");
