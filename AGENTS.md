@@ -810,3 +810,80 @@ name.
 `scripts/mutants.sh` now runs 172 mutants with none surviving and **32 skipped** — patterns
 that no longer appear exactly once because the code moved out from under them. They are
 printed at the end of every run. That is a real hole and the number should be going down.
+
+## What the screen said it paid (19 Aug 2026)
+
+Three things reported from the first play of the battle model, and all three turned out to
+be one mistake wearing different clothes: **the screen stating a number the declared rule
+does not pay.** None of them was a resolution bug. Every one was the game describing itself
+wrongly, which is the failure the project already has a rule against — *"a screen that
+states the wrong rule is worse than one that states none."*
+
+### A marker pays its holder, not its face value
+
+> "a little misleading that fight considering they are in my home territory"
+
+The enemy had declared ERADICATION, which darkens every marker on the board. It was walking
+into the player's half and standing on their ground, and the round panel was crediting it
+`THE SPAN ENEMY +2` and `NORTH YARD ENEMY +1` for doing so. It scored **nothing** there.
+
+`scoreObjectives` reports raw control and the marker's printed points, because that is all
+a control check can know. What the holder is actually paid is decided by the holder's own
+declaration, and the panel was never asking. The `live` map that does ask existed already —
+it was built for `side: "player"` only, and used to light the board rather than to fill the
+panel.
+
+Both sides are resolved through their own rule now. A marker held by a side that darkened it
+reads `PAYS NOTHING` rather than a number, because the interesting fact on that row is that
+they took ground for free. The same fix corrects the opposite error: SAFEGUARD keeps one
+marker and **doubles** it, so face value was understating it exactly as it overstated the
+dark ones.
+
+Symptom worth remembering: the per-objective rows and the `ROUND N PAID` header disagreed.
+The header used real scoring, the rows did not, and the two were printed four lines apart.
+
+### A shelf does not offer a dominated purchase
+
+> "Patching seems to recover them to full strength as well so i think that is a mistake why
+> would i do a full recovery 4 for when i get it for 2"
+
+Correct, and it is arithmetic rather than taste. FIELD REPAIR costs 2 and heals
+`FIELD_REPAIR_WOUNDS`, completing to full whenever that reaches the cap. FULL REBUILD costs
+4 and always completes. Wound pools run 5 to 14, so against anything down four or less the
+two buy the **identical result** and the rebuild asks twice the points. The shelf shows one
+of each, so buying two patches instead is not available either.
+
+FULL REBUILD is now offered only when some hull is further from full than a patch can carry
+it. Below that it is not a choice the player got wrong, it is a choice that should not have
+been on the shelf. Measured through `profileWithRefit` for the same reason repair is: a
+refit that moves a hull's wounds changes how far from full it actually is.
+
+The prices did not move. The dominated case was removed instead, because the two services
+are meant to be cheap-partial and expensive-complete, and that distinction is real as soon
+as the overlap is gone.
+
+### A wreck says what it was worth
+
+> "Feels like i should have won that fight but didnt"
+
+Lost 9–10 on a DOMINION run, whose rule is `heldPoints` and nothing else. The round 5 banner
+read **"You wrecked AEGIS COHORT."** — an event worth exactly zero victory points under the
+declaration in force. Meanwhile NORTH RELAY had sat `0 v 6` for the whole battle and three of
+the five formations produced almost nothing: `MAIN BATTLE TANK II — held no scoring ground at
+any point`.
+
+The debrief had the real answer. The live feed was celebrating the one thing that could not
+score. A banner reading the same under all three declarations teaches the player that kills
+are progress, and then the scoreboard disagrees with them at the end of five rounds.
+
+Only ERADICATION carries a `wreckBounty`, so the headline states the cost when the declared
+rule does not pay for it. The banner order is unchanged — a formation lost still outranks a
+formation wrecked.
+
+### The freshness guard was watching the wrong thing
+
+`scripts/check-findings-fresh.mjs` compared `docs/balance.md` against `scripts/battle-sweep.mjs`
+alone. Gating the rebuild offer changed what every reward policy buys, so the run axis
+reported different numbers from a byte-identical script — warband 9.91 to 9.93, refits 69.4%
+to 69.8%. The commoner way findings go stale is not the sweep changing, it is the **game**
+changing underneath an unchanged sweep. The guard watches `src/battle` as well now.

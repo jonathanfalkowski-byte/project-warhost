@@ -326,6 +326,18 @@ export default function BattleApp({ onExit }) {
   // choose is the clearest statement of what you are now playing for.
   const live = new Map(liveSitesFor({ disposition: dispositionId, side: "player", objectives: mission.objectives })
     .map((objective) => [objective.id, objective]));
+  // WHAT A MARKER PAYS THE SIDE STANDING ON IT, which is not its face value and is not the
+  // same question for both armies. `scoreObjectives` reports raw control and the marker's
+  // printed points, because that is all a control check knows; what the holder is actually
+  // paid is decided by the holder's OWN declaration. An enemy on ERADICATION darkens every
+  // marker on the board, so it can sit on your ground for five rounds and score nothing for
+  // it — and the round panel was crediting it the face value anyway, which reads as losing
+  // ground you are not losing. Both sides are resolved here, each through its own rule.
+  const paysFor = (disposition, side) => new Map(
+    liveSitesFor({ disposition, side, objectives: mission.objectives })
+      .map((objective) => [objective.id, objective.points ?? 1]));
+  const playerPays = paysFor(dispositionId, "player");
+  const enemyPays = paysFor(army.disposition, "enemy");
 
   return (
     <main className="battle-app">
@@ -1060,6 +1072,7 @@ export default function BattleApp({ onExit }) {
                   round: view,
                   previous: round > 1 ? result.rounds[round - 2] : null,
                   known: alreadyKnown,
+                  disposition: dispositionId,
                 });
                 return headline ? <div className={`battle-headline ${headline.tone}`} aria-live="polite">{headline.text}</div> : null;
               })()}
@@ -1069,13 +1082,23 @@ export default function BattleApp({ onExit }) {
                 <b className="enemy">HELIOCH +{view?.enemyGained ?? 0}</b>
               </div>
               <div className="battle-objective-list">
-                {scored?.map((objective) => (
-                  <div key={objective.objectiveId} className={`battle-objective-row held-${objective.holder}`}>
-                    <b>{objective.name}</b>
-                    <span>{objective.player} v {objective.enemy}</span>
-                    <em>{objective.holder === "contested" ? "CONTESTED" : `${objective.holder.toUpperCase()} +${objective.points}`}</em>
-                  </div>
-                ))}
+                {scored?.map((objective) => {
+                  // Held is not the same as paid. A marker dark under the holder's own
+                  // declaration is worth stating outright rather than printing +0, because
+                  // the interesting thing on that row is that they took ground for nothing.
+                  const pays = objective.holder === "player" ? (playerPays.get(objective.objectiveId) ?? 0)
+                    : objective.holder === "enemy" ? (enemyPays.get(objective.objectiveId) ?? 0)
+                      : 0;
+                  return (
+                    <div key={objective.objectiveId} className={`battle-objective-row held-${objective.holder}`}>
+                      <b>{objective.name}</b>
+                      <span>{objective.player} v {objective.enemy}</span>
+                      <em>{objective.holder === "contested" ? "CONTESTED"
+                        : pays > 0 ? `${objective.holder.toUpperCase()} +${pays}`
+                          : `${objective.holder.toUpperCase()} · PAYS NOTHING`}</em>
+                    </div>
+                  );
+                })}
               </div>
               <ol className="battle-log">
                 {/* Stratagem spends are already called out above the objectives, in the one
