@@ -522,11 +522,11 @@ for (const detachment of Object.values(DETS)) {
       for (const rewardPolicy of ["widen", "patch", "refit", "cheapest", "dearest"]) {
         for (let seed = 0; seed < SEEDS; seed += 1) {
           runRows.push({
-            detachment: detachment.id, disposition: dispositionId, planIndex, rewardPolicy,
+            detachment: detachment.id, disposition: dispositionId, planIndex, rewardPolicy, seed,
             ...playRun({ detachmentId: detachment.id, seed, dispositionId, planIndex, rewardPolicy }),
           });
           variedRows.push({
-            detachment: detachment.id, disposition: dispositionId, planIndex, rewardPolicy,
+            detachment: detachment.id, disposition: dispositionId, planIndex, rewardPolicy, seed,
             ...playRun({ detachmentId: detachment.id, seed, dispositionId, planIndex, rewardPolicy, enemyPolicy: "varied" }),
           });
         }
@@ -952,3 +952,247 @@ for (let seed = 0; seed < 24; seed += 1) {
   }
 }
 console.log(`  ${seenRoads.size === everyRoadOffered.size ? "PASS" : "FAIL"}  every road is reachable (${seenRoads.size} of ${everyRoadOffered.size} offered across 24 runs)`);
+
+// ---- axis K: the skilled run ----
+//
+// Axis I established that deciphering the enemy pays INSIDE ONE BATTLE: six of six enemies
+// reward the best answer by three or more victory points over the median one. Axis E plays
+// whole runs — and never deciphers anything. It declares a plan at muster, fields the
+// healthiest five, and walks that same plan into all five engagements whatever it is sent
+// to fight.
+//
+// So every run-level number in this sweep describes a player who ignores the one skill the
+// game is built around. "2.0% of runs took all five" is not a difficulty reading, it is the
+// clearing rate for a policy nobody plays. Whether the ladder is brutal or trivial for
+// someone who actually counter-picks is, until this axis, simply unmeasured.
+//
+// What the player is allowed to change here, and what they are not:
+//
+//   fixed at muster   the detachment and the disposition — declared before the ladder is
+//                     seen, so choosing them per engagement would be a different game
+//   fixed as policy   the reward rule and the road, so the comparison against axis E moves
+//                     one variable and axis J stays the thing that measures roads
+//   chosen per fight  the plan, which five take the field, and which slot each one walks
+//
+// GREEDY, AND REPORTED AS GREEDY. The joint space of plan x five-of-the-warband x ordering
+// is not tractable five times over for every policy, so the choice resolves in three
+// stages: best plan with the default five, then the best five under that plan, then the
+// best ordering of those. A greedy answer is a LOWER BOUND on skilled play — the real
+// ceiling is at least this high and may be higher, which is the safe direction for a claim
+// that the ladder is survivable.
+//
+// The five are drawn from the healthiest SKILLED_POOL rather than the whole warband. A
+// player benching a scratched hull for a fresh one is playing; a player auditioning a hull
+// that is one hit from a wreck is not, and enumerating them costs the axis its runtime.
+const SKILLED_SEEDS = 6;
+const SKILLED_POOL = 7;
+
+const skilledIdentity = (entry) => `${entry.formationId}:${entry.refit ?? ""}:${entry.wounds ?? ""}`;
+
+// One engagement resolved with a specific plan and a specific ordering. Everything that is
+// not the plan or the ordering is copied from axis E exactly, or the two arms would differ
+// in more than the decision being measured.
+const resolveSkilled = ({ engagement, disposition, detachment, battlePlan, fielded, positions }) => {
+  const deployment = Object.fromEntries(positions.map((slot, index) => [
+    slot.id,
+    fielded[index]
+      ? { id: fielded[index].id, formationId: fielded[index].formationId, name: fielded[index].name, wounds: fielded[index].wounds ?? undefined, refit: fielded[index].refit }
+      : {},
+  ]));
+  const foe = engagement.foe;
+  const built = buildRunForce({ mission: engagement.mission, deployment, formations: FORMATIONS, battlePlan });
+  const outcome = resolveBattle({
+    playerUnits: built.units, enemyUnits: foe.units, objectives: engagement.mission.objectives,
+    playerOrders: built.orders, enemyOrders: foe.orders, playerPaths: built.paths, enemyPaths: foe.paths,
+    playerDisposition: disposition, enemyDisposition: foe.disposition,
+    playerDetachmentRule: detachment.rule,
+    enemyDetachmentRule: detachmentFor(engagement.army.detachment).rule,
+    enemyHand: engagement.enemyHand, rounds: engagement.mission.rounds, missionId: engagement.mission.id,
+  });
+  return { outcome, deployment, margin: outcome.playerScore - outcome.enemyScore };
+};
+
+// Margin rather than won, because a total order is needed to choose between candidates and
+// "won" collapses every losing option onto the same value — including the one that lost by
+// a point and would have been the right thing to learn from.
+const bestOf = (candidates) => candidates.reduce(
+  (best, entry) => (best === null || entry.margin > best.margin ? entry : best), null);
+
+const playSkilledRun = ({ detachmentId, seed, dispositionId, rewardPolicy }) => {
+  let run = C.startRun({ detachmentId, seed, enemyPolicy: "varied" });
+  const faced = [];
+  const detachment = detachmentFor(detachmentId);
+  const disposition = detachment.dispositions.includes(dispositionId) ? dispositionId : detachment.dispositions[0];
+  let considered = 0;
+  while (run.status === "active") {
+    const roads = C.routesFor(run);
+    const road = roads.find((entry) => entry.id === "standing");
+    if (road) run = C.takeRoute(run, road.id);
+    const engagement = C.engagementFor(run);
+    const positions = engagement.mission.playerDeployment.slice(0, engagement.slots);
+    const pool = C.fieldableFrom(run).slice()
+      .sort((left, right) => (right.wounds ?? Infinity) - (left.wounds ?? Infinity))
+      .slice(0, Math.max(positions.length, SKILLED_POOL));
+    const fallback = pool.slice(0, positions.length);
+    const plans = runPlans(disposition);
+
+    // STAGE ONE — which plan, judged on the five that axis E would have fielded anyway.
+    const planPick = bestOf(plans.map((battlePlan) => {
+      considered += 1;
+      return { battlePlan, ...resolveSkilled({ engagement, disposition, detachment, battlePlan, fielded: fallback, positions }) };
+    }));
+    const battlePlan = planPick?.battlePlan ?? plans[0];
+
+    // STAGE TWO — which five, under that plan. This is the counter-pick the warband exists
+    // to make possible: it does not exist at all until there are more than five to choose
+    // between, which is why early engagements resolve one candidate and later ones many.
+    const sets = combinations(pool.map((entry, index) => index), positions.length);
+    const setPick = bestOf(sets.map((indices) => {
+      const fielded = indices.map((index) => pool[index]);
+      considered += 1;
+      return { fielded, ...resolveSkilled({ engagement, disposition, detachment, battlePlan, fielded, positions }) };
+    })) ?? { fielded: fallback };
+
+    // STAGE THREE — which slot each one walks. Deduplicated, because two hulls alike in
+    // formation, refit and damage are the same deployment whichever way round they are
+    // written.
+    const seenOrders = new Set();
+    const orderings = permutations(setPick.fielded).filter((entry) => {
+      const key = entry.map(skilledIdentity).join("+");
+      if (seenOrders.has(key)) return false;
+      seenOrders.add(key);
+      return true;
+    });
+    const orderPick = bestOf(orderings.map((fielded) => {
+      considered += 1;
+      return { fielded, ...resolveSkilled({ engagement, disposition, detachment, battlePlan, fielded, positions }) };
+    })) ?? { fielded: setPick.fielded, outcome: null };
+
+    const fielded = orderPick.fielded;
+    const outcome = orderPick.outcome ?? resolveSkilled({ engagement, disposition, detachment, battlePlan, fielded, positions }).outcome;
+    const foe = engagement.foe;
+    faced.push({ disposition: foe.disposition, plan: foe.plan?.id ?? null });
+    run = C.applyBattle({
+      run, result: outcome, won: outcome.winner === "player", disposition,
+      commandSpent: 0,
+      deployedIds: fielded.map((entry) => entry.id),
+      fielded: positions.map((slot, index) => fielded[index]?.formationId ?? null),
+      planId: battlePlan?.id ?? null,
+    });
+    if (run.status !== "active") break;
+    run = C.repair(run);
+    for (let guard = 0; guard < 8; guard += 1) {
+      const shelf = C.offersFor(run).filter((offer) => offer.affordable);
+      if (shelf.length === 0) break;
+      const units = shelf.filter((offer) => offer.kind === "unit");
+      const services = shelf.filter((offer) => offer.kind === "service");
+      const refits = shelf.filter((offer) => offer.kind === "refit");
+      let pick;
+      if (rewardPolicy === "refit") pick = refits[0] ?? units[0] ?? services[0];
+      else if (rewardPolicy === "widen") pick = units[0] ?? refits[0] ?? services[0];
+      else if (rewardPolicy === "patch") pick = services[0] ?? units[0] ?? refits[0];
+      else if (rewardPolicy === "cheapest") pick = shelf.slice().sort((a, b) => a.cost - b.cost)[0];
+      else pick = shelf.slice().sort((a, b) => b.cost - a.cost)[0];
+      if (!pick) break;
+      const before = run.purse;
+      run = C.buy({ run, offerId: pick.id });
+      if (run.purse === before) break;
+    }
+    run = C.advance(run);
+  }
+  return {
+    ...C.runSummary(run),
+    considered,
+    faced: faced.map((entry, index) => ({ ...entry, won: Boolean(run.history[index]?.won) })),
+  };
+};
+
+const skilledRows = [];
+for (const detachment of Object.values(DETS)) {
+  for (const dispositionId of detachment.dispositions) {
+    for (const rewardPolicy of ["widen", "patch", "refit", "cheapest", "dearest"]) {
+      for (let seed = 0; seed < SKILLED_SEEDS; seed += 1) {
+        skilledRows.push({
+          detachment: detachment.id, disposition: dispositionId, rewardPolicy, seed,
+          ...playSkilledRun({ detachmentId: detachment.id, seed, dispositionId, rewardPolicy }),
+        });
+      }
+    }
+  }
+}
+
+// Axis E's varied arm is the comparison, because it is the same ladder against the same
+// shipping enemy under a fixed policy. Restricted to the seeds this axis actually played,
+// so the two distributions are the same runs decided differently rather than two samples.
+const fixedComparable = variedRows.filter((row) => row.seed < SKILLED_SEEDS);
+const spreadOf = (rows) => [0, 1, 2, 3, 4, 5].map((won) => rows.filter((row) => row.won === won).length);
+const clearedOf = (rows) => (rows.length ? rows.filter((row) => row.won === 5).length / rows.length : 0);
+const brokeOf = (rows) => (rows.length ? rows.filter((row) => row.status === "broken").length / rows.length : 0);
+const wonPerRun = (rows) => (rows.length ? rows.reduce((sum, row) => sum + row.won, 0) / rows.length : 0);
+
+const skilledSpread = spreadOf(skilledRows);
+const fixedSpread = spreadOf(fixedComparable);
+
+console.log(`\nTHE SKILLED RUN — ${skilledRows.length} runs played by choosing the plan, the five and the order at every engagement`);
+console.log("  NOTE: greedy over three stages, not exhaustive. A lower bound on skilled play, not a ceiling.");
+console.log(`  NOTE: ${SKILLED_SEEDS} seeds, five taken from the healthiest ${SKILLED_POOL}, against the SHIPPING enemy.`);
+// THIS IS AN ORACLE, NOT A PLAYER, and the number is worthless read as anything else. To
+// choose, it RESOLVES each candidate and reads the result — so it sees through the one
+// thing the game deliberately hides, which is the enemy's hand. A person picks on intent
+// and inference and cannot know the outcome before committing. So this is the ceiling that
+// perfect foresight reaches, not what anyone plays: the truth for a human sits somewhere
+// between the fixed arm below and this one, and where in that range is the thing only
+// playing it can answer.
+console.log("  NOTE: chooses by resolving each candidate, so it sees the enemy hand. A ceiling, not a player.");
+console.log(`  battles resolved to make the choices: ${skilledRows.reduce((sum, row) => sum + row.considered, 0)}`);
+console.log(`  battles won 0..5   skilled: ${skilledSpread.map((count, won) => `${won}:${count}`).join("  ")}`);
+console.log(`  battles won 0..5   fixed:   ${fixedSpread.map((count, won) => `${won}:${count}`).join("  ")}`);
+console.log(`  battles won per run   skilled ${wonPerRun(skilledRows).toFixed(2)}   fixed ${wonPerRun(fixedComparable).toFixed(2)}`);
+console.log(`  cleared the ladder    skilled ${percent(clearedOf(skilledRows))}   fixed ${percent(clearedOf(fixedComparable))}`);
+console.log(`  armies broken         skilled ${percent(brokeOf(skilledRows))}   fixed ${percent(brokeOf(fixedComparable))}`);
+
+// THE DECLARATION GAP, one level up. Axis G measures it per engagement under a fixed
+// policy. The question this axis can answer and that one cannot is whether a player who
+// counter-picks can close it — if the spread survives being played against, the draw is
+// still deciding runs.
+const facedRateOf = (rows) => {
+  const byFaced = {};
+  for (const row of rows) {
+    for (const entry of row.faced ?? []) {
+      byFaced[entry.disposition] ??= [];
+      byFaced[entry.disposition].push(entry);
+    }
+  }
+  return Object.fromEntries(Object.entries(byFaced)
+    .map(([key, entries]) => [key, entries.filter((entry) => entry.won).length / entries.length]));
+};
+const skilledFaced = facedRateOf(skilledRows);
+const fixedFaced = facedRateOf(fixedComparable);
+const gapOf = (rates) => {
+  const values = Object.values(rates);
+  return values.length ? Math.max(...values) - Math.min(...values) : 0;
+};
+for (const [disposition, rate] of Object.entries(skilledFaced)) {
+  console.log(`  faced ${disposition.padEnd(12)} skilled ${percent(rate)}   fixed ${percent(fixedFaced[disposition] ?? 0)}`);
+}
+const skilledGap = gapOf(skilledFaced);
+const fixedGap = gapOf(fixedFaced);
+console.log(`  declaration gap       skilled ${percent(skilledGap)}   fixed ${percent(fixedGap)}`);
+
+console.log("\nSKILLED RUN VERDICT");
+const skilledWon = wonPerRun(skilledRows);
+const fixedWon = wonPerRun(fixedComparable);
+console.log(`  ${skilledWon > fixedWon ? "PASS" : "FAIL"}  playing well beats playing a fixed plan (${skilledWon.toFixed(2)} battles won against ${fixedWon.toFixed(2)})`);
+const skilledCleared = clearedOf(skilledRows);
+console.log(`  ${skilledCleared > clearedOf(fixedComparable) ? "PASS" : "FAIL"}  and reaches the end of the ladder more often (${percent(skilledCleared)} against ${percent(clearedOf(fixedComparable))})`);
+console.log(`  ${skilledCleared < 0.9 ? "PASS" : "FAIL"}  without making the ladder a formality (${percent(skilledCleared)} cleared it, ceiling 90.0%)`);
+// Counting which outcomes were REACHED says a spread exists while 73% of runs sit on one
+// of them. The honest measure is how much mass the commonest outcome holds.
+const skilledMode = Math.max(...skilledSpread) / (skilledRows.length || 1);
+console.log(`  NOTE  ${skilledSpread.filter((count) => count > 0).length} of 6 outcomes reached, but the commonest holds ${percent(skilledMode)} of runs`);
+// NOT a verdict, because every threshold available here is one I would be choosing to make
+// it pass. README stakes the difficulty design on "the difficulty curve is your own
+// attrition" — and against adaptive play attrition essentially stops happening. That is a
+// design finding, and it belongs in front of a person rather than behind a > 0 test.
+console.log(`  NOTE  attrition barely reaches a skilled run: ${percent(brokeOf(skilledRows))} of armies broke against ${percent(brokeOf(fixedComparable))} under a fixed plan`);
+console.log(`  ${skilledGap <= DECLARATION_GAP_LIMIT ? "PASS" : "FAIL"}  the enemy's declaration does not decide the run against a player who answers it (${percent(skilledGap)}, ceiling ${percent(DECLARATION_GAP_LIMIT)})`);

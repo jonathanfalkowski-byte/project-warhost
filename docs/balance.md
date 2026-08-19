@@ -177,4 +177,26 @@ MAP VERDICT
   PASS  and costs something (1.50 battles won against 2.26)
   PASS  which road you take changes the run (0.76 battles won between the policies)
   PASS  every road is reachable (4 of 4 offered across 24 runs)
+
+THE SKILLED RUN — 180 runs played by choosing the plan, the five and the order at every engagement
+  NOTE: greedy over three stages, not exhaustive. A lower bound on skilled play, not a ceiling.
+  NOTE: 6 seeds, five taken from the healthiest 7, against the SHIPPING enemy.
+  NOTE: chooses by resolving each candidate, so it sees the enemy hand. A ceiling, not a player.
+  battles resolved to make the choices: 243941
+  battles won 0..5   skilled: 0:0  1:2  2:0  3:6  4:40  5:132
+  battles won 0..5   fixed:   0:44  1:121  2:162  3:127  4:68  5:18
+  battles won per run   skilled 4.67   fixed 2.20
+  cleared the ladder    skilled 73.3%   fixed 3.3%
+  armies broken         skilled 1.1%   fixed 14.8%
+  faced eradication  skilled 99.7%   fixed 64.9%
+  faced dominion     skilled 90.1%   fixed 34.4%
+  declaration gap       skilled 9.6%   fixed 30.5%
+
+SKILLED RUN VERDICT
+  PASS  playing well beats playing a fixed plan (4.67 battles won against 2.20)
+  PASS  and reaches the end of the ladder more often (73.3% against 3.3%)
+  PASS  without making the ladder a formality (73.3% cleared it, ceiling 90.0%)
+  NOTE  4 of 6 outcomes reached, but the commonest holds 73.3% of runs
+  NOTE  attrition barely reaches a skilled run: 1.1% of armies broke against 14.8% under a fixed plan
+  PASS  the enemy's declaration does not decide the run against a player who answers it (9.6%, ceiling 30.0%)
 ```
