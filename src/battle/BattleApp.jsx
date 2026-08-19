@@ -16,7 +16,7 @@ import { TERRAIN_KINDS, terrainFor } from "./battleTerrain.js";
 // "MAIN BATTLE TANK 2" reads as a mark number and these are two of the same mark.
 const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 import { resolveBattle } from "./battleRules.js";
-import { DETACHMENTS, detachmentFor, detachmentList, scoutedPool, stratagemFor } from "./stratagems.js";
+import { DETACHMENTS, RESERVE_PREMIUM, detachmentFor, detachmentList, scoutedPool, stratagemFor } from "./stratagems.js";
 import { dispositionFor, dispositionsFor, liveSitesFor } from "./doctrine.js";
 import { afterActionFor, headlineFor, pairingLinksFor, supportLinksFor } from "./afterAction.js";
 import { profileWithRefit, refitFor } from "./refits.js";
@@ -24,7 +24,7 @@ import { SYNERGY_COUNT, leadsFor } from "./synergies.js";
 import { MENDS } from "./market.js";
 import {
   MINIMUM_FORCE, advance as advanceRun, applyBattle, buy, engagementFor, fieldableFrom,
-  offersFor, repair, retire, runSummary, startRun,
+  honourFor, offersFor, repair, retire, runSummary, startRun, takeRoute,
 } from "./campaign.js";
 import { planFor, plansFor, routeDestinationFor, routePointsFor } from "./battlePlans.js";
 
@@ -48,6 +48,10 @@ export default function BattleApp({ onExit }) {
   // Which stratagem is committed to which round: { brace: 3 }. Choosing the round is the
   // decision — "the command seal at the right place and time".
   const [commitments, setCommitments] = useState({});
+  // The card kept back rather than committed, and the one that was actually spent that way.
+  // Held costs a command point more; unspent, it costs nothing at all.
+  const [reserve, setReserve] = useState(null);
+  const [spentLive, setSpentLive] = useState(null);
   // Detachment -> disposition -> strategy. Declared in that order because each one
   // narrows the next: the detachment says what you may declare, the disposition says how
   // you score, and the strategy is one of three authored plans for scoring that way.
@@ -67,6 +71,10 @@ export default function BattleApp({ onExit }) {
   const disposition = dispositionFor(dispositionId);
   const battlePlan = planFor(dispositionId, strategyId);
   const enemyDisposition = dispositionFor(army.disposition);
+  // HOW MANY YOU MAY FIELD. Every road into an engagement offers the same board; one of
+  // them costs you a deployment position, which is the only way a harder road can be
+  // harder while both armies have five. Everything that reads the deployment reads this.
+  const slots = mission.playerDeployment.slice(0, engagement?.slots ?? mission.playerDeployment.length);
 
   useEffect(() => {
     if (!committed || !playing || round >= mission.rounds) return undefined;
@@ -88,8 +96,14 @@ export default function BattleApp({ onExit }) {
   const commandPoints = run ? run.commandPoints : detachment.commandPoints;
   const budget = (() => {
     const chosen = Object.keys(commitments).filter((id) => Number.isFinite(commitments[id]));
-    const spent = chosen.reduce((sum, id) => sum + (stratagemFor(id)?.cost ?? 0), 0);
-    return { spent, remaining: commandPoints - spent };
+    const committedCost = chosen.reduce((sum, id) => sum + (stratagemFor(id)?.cost ?? 0), 0);
+    // A card in reserve is charged at its price plus the premium the moment it is held, so
+    // nobody can hold what they could not afford to spend. Never spent, it is refunded —
+    // `commandSpent` is what actually fired.
+    const heldCost = reserve ? (stratagemFor(reserve)?.cost ?? 0) + RESERVE_PREMIUM : 0;
+    const premium = spentLive ? RESERVE_PREMIUM : 0;
+    const spent = committedCost + premium;
+    return { spent, held: heldCost, remaining: commandPoints - spent - heldCost };
   })();
   // The strategy sets every slot's objective; a slot the player has explicitly changed
   // keeps its override. The plan is the opening position of the argument, not the end of
@@ -97,7 +111,7 @@ export default function BattleApp({ onExit }) {
   // has to stay possible.
   const planned = useMemo(() => {
     const next = {};
-    mission.playerDeployment.forEach((slot, index) => {
+    slots.forEach((slot, index) => {
       const entry = deployment[slot.id];
       if (!entry?.formationId) return;
       // Matched on the INSTANCE. Keyed on the formation, a warband holding two railjacks
@@ -137,7 +151,10 @@ export default function BattleApp({ onExit }) {
     missionId: mission.id,
   }), [player, enemy, playerStratagems, enemyHand, dispositionId, detachment, mission, army]);
 
-  const placed = Object.values(deployment).filter((entry) => entry?.formationId).length;
+  // Counted across the slots this engagement actually offers: a road that costs you a
+  // deployment position must not be satisfied by a formation standing in a position that
+  // is not on the board.
+  const placed = slots.filter((slot) => deployment[slot.id]?.formationId).length;
   // The warband as it can be fielded, with two of the same hull told apart. Two markers
   // both reading MAIN BATTLE TANK is unreadable on the board, in the debrief and in the
   // deploy list — and every one of those reads the NAME, not the id.
@@ -162,6 +179,18 @@ export default function BattleApp({ onExit }) {
   const used = new Set(Object.values(deployment).map((entry) => entry?.id).filter(Boolean));
   const view = committed && round > 0 ? result.rounds[round - 1] : null;
 
+  // SPENDING THE RESERVE, mid-battle, into the round after the one on screen. The battle is
+  // deterministic and the card fires later than anything already watched, so re-resolving
+  // replays the rounds behind you exactly as they were and only the rest of the battle
+  // changes. That is the whole trick that lets an autobattler take a decision in flight.
+  const spendReserve = () => {
+    if (!reserve || round >= mission.rounds) return;
+    const card = reserve;
+    setSpentLive(card);
+    setReserve(null);
+    setCommitments((current) => ({ ...current, [card]: round + 1 }));
+  };
+
   const commitTo = (id, value) => setCommitments((current) => {
     const next = { ...current };
     if (!Number.isFinite(value)) delete next[id];
@@ -184,7 +213,7 @@ export default function BattleApp({ onExit }) {
       // What the enemy will have read by the next engagement: the formation in each slot,
       // and the plan it walked. Ordered by SLOT, because where a hull stood is half of
       // what there is to read.
-      fielded: mission.playerDeployment.map((slot) => planned[slot.id]?.formationId ?? null),
+      fielded: slots.map((slot) => planned[slot.id]?.formationId ?? null),
       planId: strategyId,
     });
     setRun(after.status === "active" ? repair(after) : after);
@@ -206,6 +235,8 @@ export default function BattleApp({ onExit }) {
     setRun(advanceRun(run));
     setDeployment({});
     setCommitments({});
+    setReserve(null);
+    setSpentLive(null);
     setPhase("deploy");
   };
 
@@ -215,6 +246,8 @@ export default function BattleApp({ onExit }) {
     setPhase("deploy");
     setDeployment({});
     setCommitments({});
+    setReserve(null);
+    setSpentLive(null);
     setCommitted(false);
     setRound(0);
     setDispositionId(detachmentFor(detachmentId).dispositions[0]);
@@ -235,6 +268,7 @@ export default function BattleApp({ onExit }) {
     const next = detachmentFor(nextDetachmentId);
     setDetachmentId(nextDetachmentId);
     setCommitments({});
+    setReserve(null);
     // Everything below the detachment is an answer to a question it just changed.
     const nextDisposition = next.dispositions.includes(dispositionId) ? dispositionId : next.dispositions[0];
     setDispositionId(nextDisposition);
@@ -387,7 +421,7 @@ export default function BattleApp({ onExit }) {
 
           {!committed && (
             <svg className="battle-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              {mission.playerDeployment.map((slot, index) => {
+              {slots.map((slot, index) => {
                 // A staffed slot is drawn walking the route the FORCE says it walks — the
                 // same object the battle resolves from, so the drawn plan cannot disagree
                 // with the fought one now that a plan redistributes by army size. An empty
@@ -395,7 +429,7 @@ export default function BattleApp({ onExit }) {
                 const walking = player.units.find((unit) => unit.x === slot.x && unit.y === slot.y);
                 const route = walking && player.paths[walking.id]
                   ? player.paths[walking.id]
-                  : routePointsFor(battlePlan, index, mission.id, false, mission.playerDeployment.length);
+                  : routePointsFor(battlePlan, index, mission.id, false, slots.length);
                 if (route.length === 0) return null;
                 const filled = Boolean(deployment[slot.id]?.formationId);
                 return (
@@ -581,6 +615,12 @@ export default function BattleApp({ onExit }) {
                   <div className="battle-roster-row" key={entry.id}>
                     <b>{entry.name}{entry.refit ? ` · ${refitFor(entry.refit)?.name}` : ""}</b>
                     <em>{Number.isFinite(entry.wounds) ? `${entry.wounds} WOUNDS LEFT` : "FULL STRENGTH"}</em>
+                    {(entry.honours ?? []).length > 0 && (
+                      <small className="battle-honours">
+                        {entry.honours.map((honour) => honourFor(honour.id)?.name ?? honour.id).join(" · ")}
+                        {entry.battles > 0 ? ` · ${entry.battles} ENGAGEMENT${entry.battles === 1 ? "" : "S"}` : ""}
+                      </small>
+                    )}
                     <span className="battle-roster-acts">
                       {/* Patch or rebuild THIS hull. Only on the damaged ones, because
                           buying either for a formation at full strength does nothing and
@@ -634,6 +674,35 @@ export default function BattleApp({ onExit }) {
                   <small>{engagement?.brief}</small>
                   <small className="battle-note">{mission.name} — {mission.brief}</small>
                 </div>
+                {/* WHICH ROAD IN. The run used to be a corridor — five engagements in a
+                    fixed order with a shop between them — and choosing which fight to take
+                    is the half of a roguelite it did not have. A route is not a different
+                    battle, it is a different deal on the same one: how much of their army
+                    turns up, how much they are holding, how many of yours take the field,
+                    and what it pays. Taking one throws the others away. */}
+                {run && engagement?.routes?.length > 1 && (
+                  <div className="battle-roads">
+                    <span>{run.route ? "THE ROAD YOU TOOK" : "CHOOSE YOUR APPROACH"}</span>
+                    {engagement.routes.map((offer) => {
+                      const taken = engagement.route.id === offer.id;
+                      const settled = Boolean(run.route);
+                      return (
+                        <button
+                          type="button"
+                          key={offer.id}
+                          className={`battle-road ${taken && settled ? "taken" : ""} ${settled && !taken ? "given-up" : ""}`}
+                          disabled={settled}
+                          onClick={() => setRun(takeRoute(run, offer.id))}
+                        >
+                          <b>{offer.name}</b>
+                          <em>{offer.pays === 1 ? "PAYS THE RATE" : `PAYS ×${offer.pays}`}</em>
+                          <small>{offer.brief}</small>
+                        </button>
+                      );
+                    })}
+                    {!run.route && <p className="battle-hint">The others are gone once you commit to one.</p>}
+                  </div>
+                )}
                 <label>
                   <span>DETACHMENT — WHAT KIND OF ARMY</span>
                   <select value={detachmentId} onChange={(event) => muster(event.target.value)} disabled={Boolean(run)}>
@@ -686,6 +755,14 @@ export default function BattleApp({ onExit }) {
                         <b>{entry.name}</b>
                         <em>{placed ? "DEPLOYED" : Number.isFinite(entry.wounds) ? `${entry.wounds} WOUNDS` : "FULL"}</em>
                         <small>{statLineFor(profile)}</small>
+                        {/* What it has done, carried under the name. A warband that grows
+                            from six hulls to ten and stays anonymous is a list, not an
+                            army. */}
+                        {(entry.honours ?? []).length > 0 && (
+                          <small className="battle-honours">
+                            {entry.honours.map((honour) => honourFor(honour.id)?.name ?? honour.id).join(" · ")}
+                          </small>
+                        )}
                         {/* On its own line and its own colour: most of a late warband carries
                             a refit now, and run together with the stats it read as more stats. */}
                         {entry.refit && <small className="battle-warband-refit">REFIT · {refitFor(entry.refit)?.name}</small>}
@@ -742,7 +819,7 @@ export default function BattleApp({ onExit }) {
                 The strategy decides where every slot goes. You decide who walks it — that is the
                 whole deployment. Everything resolves once you commit.
               </p>
-              {mission.playerDeployment.map((slot) => {
+              {slots.map((slot) => {
                 const entry = deployment[slot.id] ?? {};
                 return (
                   <div className="battle-slot" key={slot.id}>
@@ -780,11 +857,11 @@ export default function BattleApp({ onExit }) {
                       // route is: what this slot is walking to depends on how many slots
                       // are filled, and the deploy list saying otherwise is the screen
                       // lying about the battle it is about to resolve.
-                      const index = mission.playerDeployment.indexOf(slot);
+                      const index = slots.indexOf(slot);
                       const walking = player.units.find((unit) => unit.x === slot.x && unit.y === slot.y);
                       const destination = walking
                         ? player.orders[walking.id]
-                        : routeDestinationFor(battlePlan, index, mission.objectives, mission.id, false, mission.playerDeployment.length);
+                        : routeDestinationFor(battlePlan, index, mission.objectives, mission.id, false, slots.length);
                       const objective = mission.objectives.find((entry) => entry.id === destination);
                       if (!objective) return <small className="battle-assignment">THIS SLOT HOLDS NO SCORING GROUND</small>;
                       const pays = live.has(objective.id);
@@ -863,11 +940,14 @@ export default function BattleApp({ onExit }) {
               <div className="battle-strat-panel">
                 <h3>
                   {detachment.name}
-                  <em className={budget.remaining < 0 ? "over" : ""}>{budget.remaining} / {detachment.commandPoints} CP</em>
+                  <em className={budget.remaining < 0 ? "over" : ""}>
+                    {budget.remaining} / {detachment.commandPoints} CP{budget.held > 0 ? ` · ${budget.held} HELD` : ""}
+                  </em>
                 </h3>
                 <p className="battle-hint">
                   Commit a stratagem to the round you want it to fire in. That timing is the whole
-                  decision — the same card in a different round is a different battle.
+                  decision — the same card in a different round is a different battle. One card may
+                  be held in reserve instead and spent while you watch, for a command point more.
                 </p>
                 {detachment.pool.map((id) => {
                   const stratagem = stratagemFor(id);
@@ -879,15 +959,30 @@ export default function BattleApp({ onExit }) {
                       <span className="battle-strat-cost">{stratagem.cost} CP</span>
                       <small>{stratagem.text}</small>
                       <select
-                        value={Number.isFinite(chosen) ? String(chosen) : ""}
-                        aria-label={`Round to spend ${stratagem.name}`}
+                        value={Number.isFinite(chosen) ? String(chosen) : reserve === id ? "reserve" : ""}
+                        aria-label={`When to spend ${stratagem.name}`}
                         disabled={unaffordable}
-                        onChange={(event) => commitTo(id, event.target.value ? Number(event.target.value) : null)}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value === "reserve") {
+                            commitTo(id, null);
+                            setReserve(id);
+                            return;
+                          }
+                          if (reserve === id) setReserve(null);
+                          commitTo(id, value ? Number(value) : null);
+                        }}
                       >
-                        <option value="">— hold —</option>
+                        <option value="">— not this battle —</option>
                         {Array.from({ length: mission.rounds }, (unused, index) => index + 1).map((value) => (
                           <option key={value} value={value}>SPEND IN ROUND {value}</option>
                         ))}
+                        {/* One card, kept back to answer them with rather than to predict
+                            them with. It costs a command point more, or holding everything
+                            would always beat committing anything. */}
+                        <option value="reserve" disabled={Boolean(reserve) && reserve !== id}>
+                          HOLD IN RESERVE (+{RESERVE_PREMIUM} CP)
+                        </option>
                       </select>
                     </div>
                   );
@@ -922,6 +1017,25 @@ export default function BattleApp({ onExit }) {
                 ROUND {view?.round ?? 1}
                 <em className="battle-state">{round >= mission.rounds ? "BATTLE OVER" : playing ? "RESOLVING…" : "PAUSED"}</em>
               </h2>
+              {/* THE ONE DECISION LEFT IN FLIGHT. Everything else was committed before the
+                  first round; this is the card you kept back to answer them with. It fires
+                  in the round AFTER the one on screen, which is why the battle can be
+                  re-resolved without rewriting anything already watched. */}
+              {reserve && round < mission.rounds && (
+                <div className="battle-reserve">
+                  <span>HELD IN RESERVE</span>
+                  <b>{stratagemFor(reserve)?.name}</b>
+                  <small>{stratagemFor(reserve)?.text}</small>
+                  <button type="button" className="battle-spend-now" onClick={spendReserve}>
+                    SPEND IT INTO ROUND {round + 1}
+                  </button>
+                </div>
+              )}
+              {spentLive && (
+                <p className="battle-hint">
+                  {stratagemFor(spentLive)?.name} was spent from reserve, at {RESERVE_PREMIUM} command point over the committed price.
+                </p>
+              )}
               {view?.spends?.length > 0 && (
                 <div className="battle-spends" aria-live="polite">
                   {view.spends.map((spend) => (

@@ -4,6 +4,7 @@ import test from "node:test";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { createServer } from "vite";
+import { RESERVE_PREMIUM } from "../src/battle/stratagems.js";
 
 // One Vite server, one render, shared by every test in this file. Starting a second Vite
 // server anywhere else in the suite makes esbuild cancel a build mid-run, so tests that
@@ -185,7 +186,36 @@ test("damage comes home to the formation that took it", () => {
   // And what was fielded goes home with it, because the next enemy is built by replaying
   // this engagement. Passing nothing leaves the enemy permanently blind and the whole
   // counter-play layer silently off.
-  assert.match(pressOn, /fielded: mission\.playerDeployment\.map\(\(slot\) => planned\[slot\.id\]\?\.formationId/,
+  assert.match(pressOn, /fielded: slots\.map\(\(slot\) => planned\[slot\.id\]\?\.formationId/,
     "the engagement is not recorded, so the enemy never has anything to read");
   assert.match(pressOn, /planId: strategyId/, "the enemy cannot replay the plan the player walked");
+});
+
+test("the deploy screen fields what the road allows, not what the board has room for", () => {
+  // FORCED MARCH costs a deployment position — the only way a harder road can be harder
+  // while both armies have five. If the screen keeps offering five, the road is a free 45%.
+  const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
+  assert.match(source, /const slots = mission\.playerDeployment\.slice\(0, engagement\?\.slots/,
+    "the deploy screen does not read how many positions this engagement allows");
+  // And everything else reads THAT rather than the board: the only line allowed to mention
+  // the board's own positions is the one that narrows them.
+  const elsewhere = source.split("\n").filter((line) => line.includes("mission.playerDeployment") && !line.includes("engagement?.slots"));
+  assert.deepEqual(elsewhere, [], `${elsewhere.length} line(s) still read the board's positions instead of the road's`);
+  assert.match(source, /const placed = slots\.filter/, "a formation in a position the road removed still counts as deployed");
+});
+
+test("one card can be held back, and holding it costs something", () => {
+  // The battle plays itself, and every decision was made before the first round. One card
+  // may be kept in reserve and spent into the round after the one on screen — the battle is
+  // deterministic and the card fires later than anything already watched, so re-resolving
+  // replays what was watched and changes only the rest.
+  const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
+  assert.match(source, /const spendReserve = \(\) => \{/, "there is no way to spend a card in flight");
+  assert.match(source, /\[card\]: round \+ 1/, "the reserve fires into a round that has already been watched");
+  assert.match(source, /HOLD IN RESERVE/, "the deploy screen never offers to hold one back");
+  // Without a premium, holding everything and deciding later strictly dominates committing
+  // anything, and the timing decision the sweep measures as the largest lever in a battle
+  // quietly stops existing.
+  assert.match(source, /RESERVE_PREMIUM/, "holding a card back costs the same as committing it");
+  assert.ok(RESERVE_PREMIUM >= 1, `a card can be held for ${RESERVE_PREMIUM} command points`);
 });

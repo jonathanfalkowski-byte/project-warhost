@@ -413,22 +413,31 @@ const { plansFor: runPlans } = await import("../src/battle/battlePlans.js");
 const { detachmentFor } = await import("../src/battle/stratagems.js");
 const { buildPlayerForce: buildRunForce } = await import("../src/battle/battleMission.js");
 
-const playRun = ({ detachmentId, seed, dispositionId, planIndex, rewardPolicy, enemyPolicy = "control" }) => {
+const playRun = ({ detachmentId, seed, dispositionId, planIndex, rewardPolicy, enemyPolicy = "control", routePolicy = "standing" }) => {
   let run = C.startRun({ detachmentId, seed, enemyPolicy });
   // What this run was actually made to fight, engagement by engagement.
   const faced = [];
   const detachment = detachmentFor(detachmentId);
   const disposition = detachment.dispositions.includes(dispositionId) ? dispositionId : detachment.dispositions[0];
   while (run.status === "active") {
+    // WHICH ROAD. "standing" is the engagement as it was before the map existed, so every
+    // other axis measures what it always measured; the map axis below is what compares them.
+    const roads = C.routesFor(run);
+    const road = routePolicy === "standing" ? roads.find((entry) => entry.id === "standing")
+      : routePolicy === "rich" ? roads.slice().sort((left, right) => right.pays - left.pays)[0]
+        : roads.slice().sort((left, right) => left.pays - right.pays)[0];
+    if (road) run = C.takeRoute(run, road.id);
     const engagement = C.engagementFor(run);
     const battlePlan = runPlans(disposition)[planIndex % 3];
     // The healthiest five take the field, which is the obvious policy and therefore the
     // right one to measure against — a run that is only survivable by clever benching is
     // not survivable.
+    // How many may take the field is the road's, not the board's.
+    const positions = engagement.mission.playerDeployment.slice(0, engagement.slots);
     const fielded = C.fieldableFrom(run).slice()
       .sort((left, right) => (right.wounds ?? Infinity) - (left.wounds ?? Infinity))
-      .slice(0, engagement.mission.playerDeployment.length);
-    const deployment = Object.fromEntries(engagement.mission.playerDeployment.map((slot, index) => [
+      .slice(0, positions.length);
+    const deployment = Object.fromEntries(positions.map((slot, index) => [
       slot.id,
       fielded[index]
         ? { id: fielded[index].id, formationId: fielded[index].formationId, name: fielded[index].name, wounds: fielded[index].wounds ?? undefined, refit: fielded[index].refit }
@@ -457,7 +466,7 @@ const playRun = ({ detachmentId, seed, dispositionId, planIndex, rewardPolicy, e
       // What the enemy reads before the next engagement. The control arm never reads it —
       // `engagementFor` refuses on a control run — but the run has to record it either way
       // or the two arms would differ in more than the enemy.
-      fielded: engagement.mission.playerDeployment.map((slot) => deployment[slot.id]?.formationId ?? null),
+      fielded: positions.map((slot) => deployment[slot.id]?.formationId ?? null),
       planId: battlePlan?.id ?? null,
     });
     if (run.status !== "active") break;
@@ -888,3 +897,58 @@ const answerable = headroom.filter((entry) => entry.winning > 0).length;
 console.log(`  ${answerable === headroom.length ? "PASS" : "FAIL"}  every enemy has an answer (${answerable} of ${headroom.length} can be beaten)`);
 const paying = headroom.filter((entry) => entry.best - entry.median >= 3).length;
 console.log(`  ${paying === headroom.length ? "PASS" : "FAIL"}  reading the enemy pays (${paying} of ${headroom.length} reward the best answer by 3+ VP over the median)`);
+
+// ---- axis J: the map ----
+//
+// A run was a corridor: five engagements in a fixed order with a shop between them. Every
+// engagement offers two or three ROADS now — the same battle on different terms — and the
+// question is whether choosing between them is a decision or a formality. Three policies,
+// each played to the end of the ladder: always take the standing battle, always take the
+// best-paying road, always take the cheapest one.
+const mapRows = [];
+for (const detachment of Object.values(DETS)) {
+  for (const dispositionId of detachment.dispositions) {
+    for (const routePolicy of ["standing", "rich", "safe"]) {
+      for (let seed = 0; seed < SEEDS; seed += 1) {
+        mapRows.push({
+          routePolicy,
+          ...playRun({ detachmentId: detachment.id, seed, dispositionId, planIndex: 0, rewardPolicy: "patch", enemyPolicy: "varied", routePolicy }),
+        });
+      }
+    }
+  }
+}
+const byRoad = ["standing", "rich", "safe"].map((policy) => {
+  const rows = mapRows.filter((row) => row.routePolicy === policy);
+  return {
+    policy,
+    won: rows.reduce((sum, row) => sum + row.won, 0) / rows.length,
+    earned: rows.reduce((sum, row) => sum + row.earned, 0) / rows.length,
+    warband: rows.reduce((sum, row) => sum + row.rosterSize, 0) / rows.length,
+    broken: rows.filter((row) => row.status === "broken").length / rows.length,
+  };
+});
+
+console.log(`\nTHE MAP — ${mapRows.length} runs, three ways of choosing which road to take into every engagement`);
+for (const entry of byRoad) {
+  console.log(`  ${entry.policy.padEnd(10)} battles won ${entry.won.toFixed(2)}   victory points ${entry.earned.toFixed(1).padStart(5)}   warband ${entry.warband.toFixed(2)}   armies broken ${percent(entry.broken)}`);
+}
+
+console.log("\nMAP VERDICT");
+const richer = byRoad.find((entry) => entry.policy === "rich");
+const safer = byRoad.find((entry) => entry.policy === "safe");
+const straight = byRoad.find((entry) => entry.policy === "standing");
+console.log(`  ${richer.earned > straight.earned ? "PASS" : "FAIL"}  the hard road pays for itself (${richer.earned.toFixed(1)} against ${straight.earned.toFixed(1)} victory points)`);
+console.log(`  ${richer.won < safer.won ? "PASS" : "FAIL"}  and costs something (${richer.won.toFixed(2)} battles won against ${safer.won.toFixed(2)})`);
+const spreadOfRoads = Math.max(...byRoad.map((entry) => entry.won)) - Math.min(...byRoad.map((entry) => entry.won));
+console.log(`  ${spreadOfRoads > 0.1 ? "PASS" : "FAIL"}  which road you take changes the run (${spreadOfRoads.toFixed(2)} battles won between the policies)`);
+const everyRoadOffered = new Set(Object.values(C.ROUTES).map((route) => route.id));
+const seenRoads = new Set();
+for (let seed = 0; seed < 24; seed += 1) {
+  let probe = C.startRun({ seed });
+  for (let battle = 0; battle < C.RUN_LADDER.length; battle += 1) {
+    for (const road of C.routesFor(probe)) seenRoads.add(road.id);
+    probe = C.advance(probe);
+  }
+}
+console.log(`  ${seenRoads.size === everyRoadOffered.size ? "PASS" : "FAIL"}  every road is reachable (${seenRoads.size} of ${everyRoadOffered.size} offered across 24 runs)`);

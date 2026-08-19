@@ -867,7 +867,7 @@ mutate "the screen never says the enemy studied them" src/battle/BattleApp.jsx \
       '                      {" "}' \
       "tests/battle-counterplay.test.mjs"
 mutate "the screen stops passing what was fielded to the run" src/battle/BattleApp.jsx \
-      '      fielded: mission.playerDeployment.map((slot) => planned[slot.id]?.formationId ?? null),' \
+      '      fielded: slots.map((slot) => planned[slot.id]?.formationId ?? null),' \
       '      fielded: null,' \
       "tests/app-render.test.mjs"
 
@@ -908,6 +908,66 @@ mutate "safeguard's own ground is worth what everyone else's is" src/battle/doct
       '      .map((objective) => ({ ...objective, points: objective.points * DISPOSITIONS.safeguard.homeMultiplier })),' \
       '      .map((objective) => ({ ...objective })),' \
       "tests/battle-doctrine-layers.test.mjs"
+
+echo "=== the map ==="
+mutate "every engagement offers the same road" src/battle/campaign.js \
+      '  return [ROUTES.standing, ...ordered].slice(0, Math.max(2, Math.min(ROUTES_OFFERED, others.length + 1)));' \
+      '  return [ROUTES.standing];' \
+      "tests/battle-map.test.mjs"
+mutate "the road can be changed after it is taken" src/battle/campaign.js \
+      '  if (run.route) return run;' \
+      '  if (false) return run;' \
+      "tests/battle-map.test.mjs"
+mutate "a road nobody offered can be taken" src/battle/campaign.js \
+      '  if (!routesFor(run).some((route) => route.id === routeId)) return run;' \
+      '  if (false) return run;' \
+      "tests/battle-map.test.mjs"
+mutate "the road does not change how much of their army turns up" src/battle/campaign.js \
+      '    (rung.enemyCount ?? mission.enemyDeployment.length) - (run.attrition ?? 0) + route.strengthStep,' \
+      '    (rung.enemyCount ?? mission.enemyDeployment.length) - (run.attrition ?? 0),' \
+      "tests/battle-map.test.mjs"
+mutate "the road does not change what they are holding" src/battle/campaign.js \
+      '    enemyHand: drawEnemyHand({ detachment, seed, size: Math.max(0, rung.handSize + route.handStep) }),' \
+      '    enemyHand: drawEnemyHand({ detachment, seed, size: rung.handSize }),' \
+      "tests/battle-map.test.mjs"
+mutate "the road does not cost a deployment position" src/battle/campaign.js \
+      '    slots: Math.max(3, mission.playerDeployment.length + (route.slotStep ?? 0)),' \
+      '    slots: mission.playerDeployment.length,' \
+      "tests/battle-map.test.mjs"
+mutate "a road pays the going rate whatever it advertises" src/battle/campaign.js \
+      '  const earned = Math.round(scored * route.pays);' \
+      '  const earned = scored;' \
+      "tests/battle-map.test.mjs"
+mutate "marching on keeps the road you took last time" src/battle/campaign.js \
+      '{ ...run, battle: run.battle + 1, route: null }' \
+      '{ ...run, battle: run.battle + 1 }' \
+      "tests/battle-map.test.mjs"
+mutate "the deploy screen ignores the position the road cost you" src/battle/BattleApp.jsx \
+      '  const slots = mission.playerDeployment.slice(0, engagement?.slots ?? mission.playerDeployment.length);' \
+      '  const slots = mission.playerDeployment;' \
+      "tests/app-render.test.mjs"
+
+echo "=== the reserve, and what a formation is called ==="
+mutate "holding a card back costs nothing" src/battle/stratagems.js \
+      'export const RESERVE_PREMIUM = 1;' \
+      'export const RESERVE_PREMIUM = 0;' \
+      "tests/app-render.test.mjs"
+mutate "an honour can be collected more than once" src/battle/campaign.js \
+      '  const already = new Set((held ?? []).map((honour) => honour.id));' \
+      '  const already = new Set();' \
+      "tests/battle-campaign.test.mjs"
+mutate "the hammer is whoever fired first rather than whoever hit hardest" src/battle/campaign.js \
+      '  const best = [...dealt.entries()].sort((left, right) => right[1] - left[1]);' \
+      '  const best = [...dealt.entries()];' \
+      "tests/battle-campaign.test.mjs"
+mutate "a formation that took nothing is marked as scarred" src/battle/campaign.js \
+      '  if (!already.has("scarred") && remaining > 0 && remaining <= maxWounds * 0.25) earned.push("scarred");' \
+      '  if (!already.has("scarred") && remaining > 0) earned.push("scarred");' \
+      "tests/battle-campaign.test.mjs"
+mutate "engagements fought are not counted" src/battle/campaign.js \
+      '    const battles = (entry.battles ?? 0) + 1;' \
+      '    const battles = 0;' \
+      "tests/battle-campaign.test.mjs"
 
 echo
 echo "killed $pass mutants, $fail survived, $skipped skipped"

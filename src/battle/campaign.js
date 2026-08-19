@@ -83,6 +83,68 @@ export const RUN_LADDER = [
 
 const shuffleKey = (seed, index) => ((Math.abs(Math.floor(seed)) + 1) * 2654435761 + (index + 1) * 40503) % 100003;
 
+// THE MAP. A run used to be a corridor: five engagements in a fixed order, and the only
+// thing between them was a shop. That is the half of a roguelite this game did not have —
+// the genre runs on choosing which fight to take, and Warhost's equivalent was a straight
+// line. Every engagement now offers two or three ROUTES to it, and taking one throws the
+// others away.
+//
+// A route is not a different battle, it is a different DEAL on the same one: how much of
+// their army turns up, how much they are holding, and what the engagement pays. So the
+// choice is legible without needing new content — you are reading the same three numbers
+// you already understand, and betting on your own list against them.
+export const ROUTES = {
+  skirmish: {
+    id: "skirmish", name: "SKIRMISH", strengthStep: -1, handStep: 0, slotStep: 0, pays: 0.75,
+    brief: "A screening force, caught out of position. Fewer of them, and it pays less.",
+  },
+  standing: {
+    id: "standing", name: "STANDING BATTLE", strengthStep: 0, handStep: 0, slotStep: 0, pays: 1,
+    brief: "The engagement as it stands. Everything they have, and the going rate.",
+  },
+  ambush: {
+    id: "ambush", name: "WALK INTO IT", strengthStep: 0, handStep: 1, slotStep: 0, pays: 1.4,
+    brief: "They chose the ground and they are holding an extra card for it. Pays half again.",
+  },
+  // The cost is on YOUR side of the board. "More of them" is not expressible while both
+  // armies have five deployment positions — a route that adds a sixth enemy does nothing
+  // whenever they are already at five, which is most of the time, and a free 35% is not a
+  // decision. Fielding one fewer is a real price, and it is one the lanes can now pay:
+  // four formations walk the whole plan at four fifths strength rather than three of its
+  // five routes.
+  march: {
+    id: "march", name: "FORCED MARCH", strengthStep: 0, handStep: 0, slotStep: -1, pays: 1.45,
+    brief: "Arrive first, and arrive short. You field one formation fewer, for half again.",
+  },
+};
+
+export const routeFor = (id) => ROUTES[id] ?? ROUTES.standing;
+
+// How many routes an engagement offers. Two is a choice; three is a choice with a hedge in
+// it, which is what makes the map worth reading rather than worth flipping a coin over.
+export const ROUTES_OFFERED = 3;
+
+// Which routes this engagement offers. Deterministic from the run's seed and the battle
+// number, so a run replays. STANDING BATTLE is always one of them — a map where every road
+// is a gamble is not offering a choice, it is charging a toll.
+export const routesFor = (run) => {
+  const others = Object.values(ROUTES).filter((route) => route.id !== "standing");
+  const key = shuffleKey(run.seed, run.battle * 7 + 3);
+  const ordered = others
+    .map((route, index) => ({ route, order: shuffleKey(key, index) }))
+    .sort((left, right) => left.order - right.order || left.route.id.localeCompare(right.route.id))
+    .map((entry) => entry.route);
+  return [ROUTES.standing, ...ordered].slice(0, Math.max(2, Math.min(ROUTES_OFFERED, others.length + 1)));
+};
+
+// Taking one. The others are gone: a choice you can revisit after seeing the enemy is not a
+// choice, it is a preview.
+export const takeRoute = (run, routeId) => {
+  if (run.route) return run;
+  if (!routesFor(run).some((route) => route.id === routeId)) return run;
+  return { ...run, route: routeId };
+};
+
 // The formations a run starts with, drawn from the roster by seed. Ranked rather than
 // repeatedly drawn, for the same reason the enemy's hand is: a stride-based walk can land
 // on the same index forever.
@@ -105,6 +167,9 @@ export const rosterEntry = (formationId, name, seedIndex = null) => {
     name,
     wounds: null,
     refit: null,
+    // What it has done and what it is called for having done it.
+    battles: 0,
+    honours: [],
   };
 };
 
@@ -112,6 +177,10 @@ export const startRun = ({ detachmentId = "voidbreaker", seed = 0, enemyPolicy =
   seed,
   detachmentId,
   battle: 1,
+  // Which road into this engagement was taken. Null until the player picks one, and the
+  // engagement reads as the first offer until they do — the sweep's policies and a player
+  // who has not chosen yet both get the standing battle.
+  route: null,
   commandPoints: detachmentFor(detachmentId).commandPoints,
   roster: startingRoster({ seed }),
   // What the last battle earned that outlives it. Every disposition gets one of these, or
@@ -147,6 +216,8 @@ export const startRun = ({ detachmentId = "voidbreaker", seed = 0, enemyPolicy =
 // same cards in the same order and a replay is a replay.
 export const engagementFor = (run) => {
   const rung = RUN_LADDER[Math.min(run.battle, RUN_LADDER.length) - 1];
+  const offers = routesFor(run);
+  const route = run.route ? routeFor(run.route) : offers[0];
   const mission = missionFor(rung.mission);
   const doctrine = armyFor(rung.mission);
   const detachment = detachmentFor(doctrine.detachment);
@@ -154,7 +225,10 @@ export const engagementFor = (run) => {
   // ERADICATION's run-level payoff: what you destroyed does not come back next time. It
   // never drops the enemy below three, so breaking their army buys a real advantage
   // without ever emptying the board.
-  const strength = Math.max(3, (rung.enemyCount ?? mission.enemyDeployment.length) - (run.attrition ?? 0));
+  const strength = Math.max(3, Math.min(
+    mission.enemyDeployment.length,
+    (rung.enemyCount ?? mission.enemyDeployment.length) - (run.attrition ?? 0) + route.strengthStep,
+  ));
   // WHAT THE ENEMY DECLARES, drawn from the same seed as its hand.
   //
   // It used to be DOMINION, always, on both boards, in every run. The player has three
@@ -200,8 +274,44 @@ export const engagementFor = (run) => {
       ? buildEnemyForce(mission, doctrine, { disposition, planId, strength, seed })
         .units.map((unit) => unit.id.replace(/^enemy-/, ""))
       : null,
-    enemyHand: drawEnemyHand({ detachment, seed, size: rung.handSize }),
+    enemyHand: drawEnemyHand({ detachment, seed, size: Math.max(0, rung.handSize + route.handStep) }),
+    // The road taken, and the ones still on offer. Both, because the screen has to show
+    // what was given up as well as what was chosen.
+    route,
+    routes: offers,
+    pays: route.pays,
+    // How many of your own formations take the field. A route that costs you a deployment
+    // slot is the only way, at five positions a side, for a harder road to be harder.
+    slots: Math.max(3, mission.playerDeployment.length + (route.slotStep ?? 0)),
   };
+};
+
+// WHAT A FORMATION BECOMES. A warband grew from six hulls to ten across a run and stayed
+// anonymous — the roster got bigger and never became anything, which is the cheapest
+// available attachment in a game about an army you keep. A formation that comes home from
+// something notable carries it for the rest of the run.
+//
+// Read off the battle rather than declared: each of these is a fact about what the hull did
+// on the board, so none of them can be awarded for something that did not happen.
+export const HONOURS = {
+  unbroken: { id: "unbroken", name: "UNBROKEN", text: "Fought an engagement and took nothing." },
+  scarred: { id: "scarred", name: "SCARRED", text: "Came home from under a quarter of its wounds." },
+  hammer: { id: "hammer", name: "THE HAMMER", text: "Dealt more damage than anything else in the warband." },
+  veteran: { id: "veteran", name: "VETERAN", text: "Came home from three engagements." },
+};
+
+export const honourFor = (id) => HONOURS[id] ?? null;
+
+// Which honours a formation earned in this engagement. Only ever awarded once each — a
+// title you can collect four times is a counter, not a name.
+const honoursEarned = ({ entry, remaining, maxWounds, battles, topDamage, held }) => {
+  const already = new Set((held ?? []).map((honour) => honour.id));
+  const earned = [];
+  if (!already.has("unbroken") && remaining >= maxWounds) earned.push("unbroken");
+  if (!already.has("scarred") && remaining > 0 && remaining <= maxWounds * 0.25) earned.push("scarred");
+  if (!already.has("hammer") && topDamage) earned.push("hammer");
+  if (!already.has("veteran") && battles >= 3) earned.push("veteran");
+  return earned;
 };
 
 export const fieldableFrom = (run) => run.roster.filter((entry) => entry.wounds === null || entry.wounds > 0);
@@ -248,6 +358,17 @@ export const applyBattle = ({
   fielded = null, planId = null,
 }) => {
   const survivors = new Map((result?.rounds?.at(-1)?.players ?? []).map((unit) => [unit.id, unit.wounds]));
+  // Who hit hardest, by name, because that is what the round log records. Ties go to
+  // nobody: two formations that dealt exactly the same are not "the hammer".
+  const dealt = new Map();
+  for (const round of result?.rounds ?? []) {
+    for (const line of round.log ?? []) {
+      if (line.side !== "player" || line.phase === "repair" || line.phase === "stratagem") continue;
+      dealt.set(line.actor, (dealt.get(line.actor) ?? 0) + line.amount);
+    }
+  }
+  const best = [...dealt.entries()].sort((left, right) => right[1] - left[1]);
+  const hammer = best.length > 0 && (best.length === 1 || best[0][1] > best[1][1]) && best[0][1] > 0 ? best[0][0] : null;
   const roster = [];
   const lost = [];
   for (const entry of run.roster) {
@@ -256,8 +377,27 @@ export const applyBattle = ({
     if (!deployedIds.includes(entry.id)) { roster.push(entry); continue; }
     const remaining = survivors.get(entry.id);
     if (!Number.isFinite(remaining) || remaining <= 0) { lost.push(entry); continue; }
-    roster.push({ ...entry, wounds: Number(remaining.toFixed(2)) });
+    const battles = (entry.battles ?? 0) + 1;
+    const earned = honoursEarned({
+      entry,
+      remaining,
+      maxWounds: fullStrength(entry),
+      battles,
+      topDamage: hammer !== null && hammer === entry.name,
+      held: entry.honours,
+    });
+    roster.push({
+      ...entry,
+      wounds: Number(remaining.toFixed(2)),
+      battles,
+      honours: [...(entry.honours ?? []), ...earned.map((id) => ({ id, battle: run.battle }))],
+    });
   }
+  // What the engagement paid, through the road that was taken. A harder road is only a
+  // decision if it is worth more, and the multiplier is the whole of that decision.
+  const route = routeFor(run.route ?? routesFor(run)[0].id);
+  const scored = result?.playerScore ?? 0;
+  const earned = Math.round(scored * route.pays);
   const record = {
     battle: run.battle,
     won: Boolean(won),
@@ -282,14 +422,15 @@ export const applyBattle = ({
     // the same way. Now they are a run resource: what you spend is gone, what you do not
     // spend carries, and REQUISITION in the market is the only way to get one back.
     commandPoints: Math.max(0, run.commandPoints - Math.max(0, commandSpent)) + regained,
-    // Income is what you SCORED, not the margin. A battle you lost still paid for what you
-    // took while you were losing it, which is the same reason a lost battle does not end
-    // the run: it has to cost you something without ending everything.
-    purse: run.purse + (result?.playerScore ?? 0),
+    // Income is what you SCORED, not the margin — times what the road you took pays. A
+    // battle you lost still paid for what you took while you were losing it, which is the
+    // same reason a lost battle does not end the run: it has to cost you something without
+    // ending everything.
+    purse: run.purse + earned,
     attrition: disposition === "eradication" ? Math.min(2, (run.attrition ?? 0) + broke) : 0,
     supply: disposition === "dominion" ? heldGround : 0,
     history: [...run.history, {
-      ...record, broke, heldGround, earned: result?.playerScore ?? 0, commandSpent, regained, commanders,
+      ...record, broke, heldGround, earned, scored, route: route.id, commandSpent, regained, commanders,
       // What was standing at the end and what did not come back, so the run's ledger can
       // answer "which of mine survived" without anyone having to reconstruct it.
       survivors: roster.filter((entry) => deployedIds.includes(entry.id)).map((entry) => entry.name),
@@ -439,7 +580,8 @@ export const retire = ({ run, id }) => {
   };
 };
 
-export const advance = (run) => (run.status === "active" ? { ...run, battle: run.battle + 1 } : run);
+// Marching on clears the road, because the next engagement offers its own.
+export const advance = (run) => (run.status === "active" ? { ...run, battle: run.battle + 1, route: null } : run);
 
 // A run is not pass or fail. It ends either because the ladder is finished or because the
 // army is gone, and what it is worth is how many of the five you actually took.

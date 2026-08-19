@@ -14,6 +14,7 @@ import {
   COMMAND_REGEN_CAP,
   buy,
   FIELD_REPAIR_WOUNDS,
+  HONOURS,
   engagementFor,
   fieldableFrom,
   offersFor,
@@ -799,4 +800,52 @@ test("deploying two of a hull puts two formations on the board", () => {
     { x: moved[1].x, y: moved[1].y },
     "two of the same hull ended the battle standing on the same spot",
   );
+});
+
+test("a formation is named for what it did", () => {
+  // A warband grew from six hulls to ten across a run and stayed anonymous. An honour is
+  // read off the battle rather than declared, so none of them can be awarded for something
+  // that did not happen — and each is awarded once, because a title you can collect four
+  // times is a counter and not a name.
+  const base = startRun({ seed: 12 });
+  const entry = base.roster[0];
+  const other = base.roster[1];
+  const maxWounds = battleProfileFor(entry.formationId).wounds;
+  // The weaker shot is fired FIRST, so "the hammer" cannot be satisfied by whoever appears
+  // at the top of the log.
+  const battleWith = (wounds, actor) => ({
+    playerScore: 5,
+    enemyScore: 1,
+    rounds: [{
+      players: [{ id: entry.id, wounds, maxWounds }, { id: other.id, wounds: 4, maxWounds: 8 }],
+      log: [
+        { side: "player", phase: "shoot", actor: actor === entry.name ? other.name : entry.name, target: "THEM", amount: 3 },
+        { side: "player", phase: "shoot", actor, target: "THEM", amount: 9 },
+        { side: "enemy", phase: "shoot", actor: "THEIRS", target: "OURS", amount: 40 },
+      ],
+    }],
+  });
+  const deployedIds = [entry.id, other.id];
+
+  const untouched = applyBattle({ run: base, result: battleWith(maxWounds, other.name), deployedIds, won: true, disposition: "dominion" });
+  assert.deepEqual(untouched.roster[0].honours.map((honour) => honour.id), ["unbroken"]);
+  assert.equal(untouched.roster[0].battles, 1);
+  // The hammer is the one that actually dealt the most, and it is the other formation here.
+  assert.ok(untouched.roster[1].honours.some((honour) => honour.id === "hammer"));
+
+  const mauled = applyBattle({ run: base, result: battleWith(1, entry.name), deployedIds, won: true, disposition: "dominion" });
+  assert.deepEqual(mauled.roster[0].honours.map((honour) => honour.id).sort(), ["hammer", "scarred"]);
+
+  // Never twice. Three engagements in and it is a VETERAN, and still only one SCARRED.
+  let run = base;
+  for (let battle = 0; battle < 3; battle += 1) {
+    run = applyBattle({ run, result: battleWith(1, entry.name), deployedIds, won: true, disposition: "dominion" });
+    run = { ...run, battle: run.battle + 1, status: "active" };
+  }
+  const ids = run.roster[0].honours.map((honour) => honour.id);
+  assert.equal(run.roster[0].battles, 3);
+  assert.equal(ids.filter((id) => id === "scarred").length, 1, "an honour was awarded twice");
+  assert.ok(ids.includes("veteran"), "three engagements did not make a veteran");
+  // And every honour it holds is one the game can name.
+  for (const honour of run.roster[0].honours) assert.ok(HONOURS[honour.id], `${honour.id} is not an honour`);
 });

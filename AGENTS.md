@@ -742,3 +742,71 @@ them. A guard that has stopped being checked reports the same as a guard that pa
 is the single most recurring failure in this project. The summary line counts skips now and
 prints every one of them at the end, so the number cannot hide again. They still need
 re-pointing at the code as it stands.
+
+## The map, the reserve, and what a formation is called (19 Aug 2026)
+
+Three changes to the run, in the order they matter. The battle was in good shape and the
+campaign around it was a straight line with a shop on it.
+
+### The map
+
+A run was a corridor: five engagements in a fixed order, and the only thing between them was
+a market. Choosing which fight to take is the half of a roguelite this game did not have.
+
+Every engagement offers **three roads to it** — the same battle on different terms, so the
+choice needs no new content and is read off three numbers the player already understands:
+
+```
+SKIRMISH        one fewer of them                      pays x0.75
+STANDING BATTLE the engagement as it stands            pays the rate
+WALK INTO IT    they hold one more card                pays x1.4
+FORCED MARCH    you field one formation fewer          pays x1.45
+```
+
+STANDING BATTLE is always on offer — a map where every road is a gamble is not offering a
+choice, it is charging a toll — and taking one throws the others away.
+
+**The cost has to be on the player's side of the board.** The first version of FORCED MARCH
+was PRESS THE LINE: one MORE of them, for 35% more. It does nothing whenever the enemy is
+already at five deployment positions, which is most of the time, so it was a free 35%.
+Fielding one fewer is a real price, and it is one the lanes can now pay: four formations
+walk the whole plan at four-fifths strength rather than three of its five routes.
+
+Axis J measures it, three policies played to the end of the ladder:
+
+```
+standing   battles won 1.97   victory points 51.0
+rich       battles won 1.50   victory points 65.1
+safe       battles won 2.26   victory points 46.5
+```
+
+The hard road pays for itself and costs something; which road you take moves a run by 0.76
+battles won. Every other axis plays "standing", which is the ladder exactly as it was, so
+nothing else in the sweep changed meaning.
+
+### The reserve
+
+Everything was committed before the first round, and then the player watched for five. One
+card may now be **held back and spent into the round after the one on screen**. The battle is
+deterministic and the card fires later than anything already watched, so re-resolving replays
+what was watched and changes only what is left — which is the whole trick that lets an
+autobattler take a decision in flight.
+
+`RESERVE_PREMIUM = 1`. Without a price, holding everything and deciding later strictly
+dominates committing anything, and the timing decision — measured as the largest single lever
+in a battle — quietly stops existing. Held, it is charged at cost plus the premium so nobody
+can hold what they could not afford to spend; never spent, it is refunded.
+
+### What a formation is called
+
+A warband grew from six hulls to ten and stayed anonymous. Four honours, each read off the
+battle rather than declared, each awarded once: **UNBROKEN** (took nothing), **SCARRED**
+(came home under a quarter), **THE HAMMER** (dealt more than anything else in the warband),
+**VETERAN** (came home from three). A title you can collect four times is a counter, not a
+name.
+
+### Housekeeping
+
+`scripts/mutants.sh` now runs 172 mutants with none surviving and **32 skipped** — patterns
+that no longer appear exactly once because the code moved out from under them. They are
+printed at the end of every run. That is a real hole and the number should be going down.

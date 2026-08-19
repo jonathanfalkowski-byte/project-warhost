@@ -85,6 +85,30 @@
 .battle-slot select { padding: 5px; border: 1px solid #45585f; background: #101a1d; color: #e6efec; font-family: "Barlow Condensed"; font-size: 13px; }
 .battle-profile { color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 10.5px; letter-spacing: .06em; }
 .battle-note { color: #93a8a2; font-size: 11px; line-height: 1.35; }
+/* What a formation has done, under its name. */
+.battle-honours { color: #d8b775; font-family: "Barlow Condensed"; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; }
+
+/* The map. Three roads into the same engagement, one of which is the standing battle. */
+.battle-roads { display: grid; gap: 5px; padding: 8px; border: 1px solid #4a3f6a; background: rgba(26,20,38,.85); }
+.battle-roads > span { color: #b9a8e6; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.battle-road { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; padding: 7px 8px; border: 1px solid #5b4d84; background: rgba(18,14,28,.9); text-align: left; font: inherit; cursor: pointer; }
+.battle-road b { color: #d7c9ff; font-family: "Barlow Condensed"; font-size: 13px; letter-spacing: .08em; }
+.battle-road em { justify-self: end; color: #e8c98a; font-family: "Barlow Condensed"; font-size: 11px; font-style: normal; letter-spacing: .06em; }
+.battle-road small { grid-column: 1 / -1; color: #b2a6cc; font-size: 11px; line-height: 1.35; }
+.battle-road:hover:not(:disabled) { border-color: #8f7ed0; background: rgba(34,26,52,.95); }
+.battle-road.taken { border-color: #b4762f; background: rgba(42,26,12,.9); }
+.battle-road.taken b { color: #edc478; }
+.battle-road.given-up { border-color: #2e2840; }
+.battle-road.given-up b { color: #8b81a4; }
+.battle-road.given-up em, .battle-road.given-up small { color: #8b81a4; }
+
+/* The card you kept back, and the button that spends it while the battle is still running. */
+.battle-reserve { display: grid; gap: 3px; padding: 9px; border: 1px solid #b4762f; background: rgba(42,26,12,.9); }
+.battle-reserve > span { color: #edc478; font-family: "Barlow Condensed"; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.battle-reserve b { color: #ffd89a; font-family: "Barlow Condensed"; font-size: 14px; letter-spacing: .08em; }
+.battle-reserve small { color: #dcc29a; font-size: 11px; line-height: 1.35; }
+.battle-spend-now { margin-top: 4px; padding: 7px; border: 1px solid #edc478; background: #3a2410; color: #ffe6b8; font-family: "Barlow Condensed"; font-size: 13px; font-weight: 700; letter-spacing: .1em; cursor: pointer; }
+.battle-spend-now:hover { background: #4a2e12; }
 
 .battle-enemy-brief { padding: 9px; border-left: 3px solid #b1553c; background: rgba(34,16,12,.8); display: grid; gap: 4px; }
 .battle-enemy-brief > span { color: #f28a5c; font-family: "Barlow Condensed"; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
@@ -403,3 +427,4 @@
 .battle-roster-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; border-top: 1px solid #1b262a; }
 .battle-roster-row b { flex: 1 1 140px; min-width: 0; }
 .battle-roster-row em { white-space: nowrap; }
+.battle-roster-row .battle-honours { flex-basis: 100%; }

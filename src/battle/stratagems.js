@@ -21,6 +21,17 @@ export const TRIGGERS = Object.freeze({
 
 // Effects are deliberately few and blunt. A stratagem the player cannot predict the
 // consequence of is noise, not a decision.
+// HOLDING ONE BACK. Committing a card to a round before the battle is the decision this
+// game is built on — the same card in a different round is a different battle — and it is
+// also the reason the player is a spectator for five rounds. One card may be kept in
+// reserve and spent while watching, into the round after the one on screen.
+//
+// It costs a command point more than committing it. Without that price, holding everything
+// and deciding later strictly dominates committing anything, and the timing decision — the
+// one the sweep measures as the largest single lever in a battle — quietly stops existing.
+// With it, the reserve is what you buy when you would rather answer them than predict them.
+export const RESERVE_PREMIUM = 1;
+
 export const STRATAGEMS = {
   overwatch: {
     id: "overwatch", name: "OVERWATCH", cost: 1, trigger: "beforeMove",
