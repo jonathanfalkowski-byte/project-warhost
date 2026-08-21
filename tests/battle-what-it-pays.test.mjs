@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { headlineFor, roundPanelFor } from "../src/battle/afterAction.js";
-import { CIRCUIT_CLASH } from "../src/battle/battleMission.js";
+import { CIRCUIT_CLASH, THE_NARROWS } from "../src/battle/battleMission.js";
+import { deployUnit, resolveBattle } from "../src/battle/battleRules.js";
 import { liveSitesFor } from "../src/battle/doctrine.js";
 import { FIELD_REPAIR_WOUNDS, marketFor } from "../src/battle/market.js";
 import { profileWithRefit } from "../src/battle/refits.js";
@@ -252,4 +253,131 @@ test("the panel carries the control numbers through untouched", () => {
 test("no round is an empty panel rather than a crash", () => {
   assert.deepEqual(roundPanelFor({ objectives: OBJECTIVES }), []);
   assert.deepEqual(roundPanelFor(), []);
+});
+
+// THE TWO FIGHTS THAT REPORTED THIS, pinned with the numbers off the screen rather than with
+// synthetic rounds. Everything above tests the rule; these test the cases that were actually
+// played and actually complained about, so a regression has to survive being recognisable.
+
+const rowsFrom = (mission, control) => ({
+  objectives: mission.objectives.map((objective) => {
+    const [player, enemy] = control[objective.id];
+    return {
+      objectiveId: objective.id,
+      name: objective.name,
+      player,
+      enemy,
+      holder: player > enemy ? "player" : enemy > player ? "enemy" : "contested",
+      points: objective.points,
+    };
+  }),
+});
+
+const paidTo = (rows, side) => rows
+  .filter((row) => row.holder === side)
+  .reduce((sum, row) => sum + row.paid, 0);
+
+test("fight one: an ERADICATION enemy in the player's half is paid nothing for standing there", () => {
+  // THE NARROWS, round 5, WARHOST DOMINION 13 v HELIOCH ERADICATION 5. The panel read
+  // "THE SPAN ENEMY +2" and "NORTH YARD ENEMY +1" while the header said HELIOCH +2, and the
+  // rows and the header were disagreeing four lines apart on the same screen.
+  const round = rowsFrom(THE_NARROWS, {
+    "south-yard": [7, 5],
+    "west-stack": [2, 0],
+    "the-span": [4, 16.5],
+    "east-stack": [4, 0],
+    "north-yard": [0, 4],
+  });
+  const rows = roundPanelFor({
+    round, objectives: THE_NARROWS.objectives,
+    playerDisposition: "dominion", enemyDisposition: "eradication",
+  });
+
+  // The two rows that were wrong, and they were the two the player was looking at.
+  for (const id of ["the-span", "north-yard"]) {
+    const row = rows.find((entry) => entry.objectiveId === id);
+    assert.equal(row.holder, "enemy");
+    assert.equal(row.paid, 0, `${id} pays an ERADICATION army nothing`);
+    assert.equal(row.dark, true);
+  }
+
+  // And the reconciliation that failed on screen: the player's rows have to add up to the
+  // WARHOST +3 the header printed, and the enemy's to nothing, because everything HELIOCH
+  // scored that round it scored by doing damage rather than by holding ground.
+  assert.equal(paidTo(rows, "player"), 3, "SOUTH YARD, WEST STACK and EAST STACK at 1 VP each");
+  assert.equal(paidTo(rows, "enemy"), 0, "no ground scores for ERADICATION, however much of it they are standing on");
+});
+
+test("fight two: two DOMINION armies are both paid face value, and the panel was right", () => {
+  // BREAK THE CIRCUIT, round 5, 9-10. Worth pinning precisely because the panel was NOT the
+  // bug here - both armies had declared DOMINION, so face value was the correct answer and
+  // the rows already reconciled with the header. The defect in this fight was the banner.
+  // A fix that "corrects" this panel would be breaking it.
+  const round = rowsFrom(CIRCUIT_CLASH, {
+    "south-relay": [2, 0],
+    "west-works": [2, 0],
+    reactor: [3, 0],
+    "east-gantry": [2, 4],
+    "north-relay": [0, 6],
+  });
+  const rows = roundPanelFor({
+    round, objectives: CIRCUIT_CLASH.objectives,
+    playerDisposition: "dominion", enemyDisposition: "dominion",
+  });
+
+  assert.equal(paidTo(rows, "player"), 4, "SOUTH RELAY 1 + WEST WORKS 1 + REACTOR SPINE 2");
+  assert.equal(paidTo(rows, "enemy"), 2, "EAST GANTRY 1 + NORTH RELAY 1");
+  assert.ok(rows.every((row) => row.dark === false), "nothing is dark when both armies light the board");
+});
+
+test("fight two: and the banner that was the actual defect", () => {
+  // "You wrecked AEGIS COHORT." on a DOMINION run, which scores heldPoints and pays a wreck
+  // nothing. Announced while NORTH RELAY had sat 0 v 6 for the whole battle.
+  const headline = headlineFor({
+    round: {
+      players: [{ id: "p1", name: "RECON TANK", wounds: 4 }],
+      enemies: [{ id: "e1", name: "AEGIS COHORT", wounds: 0 }],
+      synergies: { player: [] }, log: [], spends: [],
+    },
+    previous: {
+      players: [{ id: "p1", name: "RECON TANK", wounds: 4 }],
+      enemies: [{ id: "e1", name: "AEGIS COHORT", wounds: 2 }],
+    },
+    disposition: "dominion",
+  });
+  assert.match(headline.text, /AEGIS COHORT/);
+  assert.match(headline.text, /DOMINION pays nothing for it/);
+});
+
+test("fight one, second line: a patch reports what it put back, not what it tried", () => {
+  // Also off that screen: "SALVAGE TENDER patches GAFF HOOK for 2". The heal has always been
+  // capped at the hull's maximum, but the log recorded the INTENT, so a formation close to
+  // full printed the whole attempt having been given the remainder. Same defect as the round
+  // panel crediting a darkened marker - a number on screen that is not what happened.
+  // Half a wound of room, because wounds are fractional here and one patch is worth a whole
+  // one, so the intent and the outcome cannot be confused for each other.
+  const medic = deployUnit({ formationId: "hauler", name: "SALVAGE TENDER", position: { x: 50, y: 90 }, id: "h#1" });
+  const patient = {
+    ...deployUnit({ formationId: "harpoon", name: "GAFF HOOK", position: { x: 52, y: 90 }, id: "g#1" }),
+    wounds: 5.5,
+  };
+  assert.ok(medic.keywords.includes("REPAIR"), "the SALVAGE TENDER is the hull that patches");
+  assert.equal(patient.maxWounds, 6, "half a wound below its cap");
+
+  const out = resolveBattle({
+    playerUnits: [medic, patient],
+    // Far enough up the board that nothing is in range and the repair phase is the only
+    // thing in the log.
+    enemyUnits: [deployUnit({ formationId: "skimmer", name: "FAR", position: { x: 50, y: 5 }, id: "e#1" })],
+    objectives: [], rounds: 1, playerOrders: {}, enemyOrders: {},
+  });
+
+  const patches = out.rounds.flatMap((round) => round.log).filter((entry) => entry.phase === "repair");
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0].actor, "SALVAGE TENDER");
+  assert.equal(patches[0].target, "GAFF HOOK");
+  assert.equal(patches[0].amount, 0.5, "half a wound was restored, so half a wound is what it says");
+
+  const healed = out.rounds.at(-1).players.find((unit) => unit.id === "g#1");
+  assert.equal(healed.wounds, 6, "and it stops at the cap rather than overshooting it");
 });

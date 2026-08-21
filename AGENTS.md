@@ -1029,3 +1029,45 @@ Both were written the same day as the code, by someone who had just read it, and
 That is what the sweep is for, and it is worth more than the count it prints.
 
 **185 killed, 0 survived, 32 skipped.**
+
+## The two fights, pinned (21 Aug 2026)
+
+The fights that reported all of this are regression tests now, written with the numbers off
+the screen rather than with synthetic rounds, so a regression has to survive being
+recognisable.
+
+**Fight one — THE NARROWS, round 5, WARHOST DOMINION 13 v HELIOCH ERADICATION 5.** THE SPAN
+at `4 v 16.5` and NORTH YARD at `0 v 4` read `PAYS NOTHING` now. The assertion that matters
+is the reconciliation that was visibly broken on screen: the player's rows sum to exactly the
+`WARHOST +3` the header printed, and the enemy's to nothing, because everything HELIOCH
+scored that round it scored by doing damage rather than by holding ground.
+
+**Fight two — BREAK THE CIRCUIT, round 5, 9-10, both DOMINION.** Pinned precisely BECAUSE the
+panel was already right there. Both armies lit the board, so face value was the correct
+answer and the rows always reconciled with the header (1+1+2 = 4, 1+1 = 2). A later change
+that "corrects" this panel would be breaking it. The defect in that fight was the banner, and
+it is asserted separately.
+
+### A fourth instance of the same defect, off the same screenshot
+
+*"Patching seems to recover them to full strength as well"* was read as the market, and the
+FULL REBUILD overlap was what got fixed. But the same screen carried `SALVAGE TENDER patches
+GAFF HOOK for 2`, and that line was lying. The heal has always been capped at the hull's
+maximum — the LOG recorded the intent, so a formation close to full printed the whole attempt
+having been given the remainder.
+
+Wounds are fractional, so the test gives GAFF HOOK half a wound of room: one patch is worth a
+whole one, and the intent and the outcome cannot be confused for each other. It logs `0.5`
+and lands on exactly 6.
+
+### What four of four says
+
+Every defect reported from play has been the same thing: **the screen stating a number that
+is not the number that happened.** A panel crediting a darkened marker, a shelf offering a
+purchase that buys nothing extra, a banner celebrating an event worth zero, a log reporting
+an attempt as an outcome.
+
+Not one was a resolution bug, which is exactly why none of them was visible to 187 mutants
+and forty-odd balance verdicts pointed at the engine. The sweep resolves battles; it never
+reads a word the game says. Two fights found four defects the whole apparatus could not see,
+and that ratio is the argument for playing it.

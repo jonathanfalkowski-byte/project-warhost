@@ -1049,6 +1049,8 @@ echo "=== the round panel ==="
 # The layer all three reported defects lived in, and the one the harness could not reach
 # until roundPanelFor came out of BattleApp. These decide whether the panel tests are guards
 # or just seven more things that happen to pass.
+mutate "a patch reports what it tried rather than what it put back" src/battle/battleRules.js       'const amount = Number((healed - patient.wounds).toFixed(2));'       'const amount = intended;'       "tests/battle-what-it-pays.test.mjs"
+mutate "a patch overshoots the hull's maximum" src/battle/battleRules.js       'const healed = Math.min(patient.maxWounds, patient.wounds + intended);'       'const healed = patient.wounds + intended;'       "tests/battle-what-it-pays.test.mjs"
 mutate "the panel reads the enemy's ground through the player's declaration" src/battle/afterAction.js \
       'const enemyPays = paysFor(enemyDisposition, "enemy");' \
       'const enemyPays = paysFor(playerDisposition, "enemy");' \
