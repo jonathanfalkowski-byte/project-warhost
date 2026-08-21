@@ -968,6 +968,14 @@ day.
 rebuild fix moved out from under it. Every skip is a guard the repo believes it has and does
 not, and they are printed at the end of every run. The number should keep going down.
 
-`BattleApp.jsx` has no mutants at all, and the objective-panel fix lives there. Its tests
-cover `liveSitesFor` — the data — not the wiring that reads it. Nothing in the suite renders
-a resolved battle panel, so that fix is guarded at the source and unguarded at the surface.
+`BattleApp.jsx` carries **12 mutants and every one of them runs**. None of them touches the
+objective-panel row or the disposition the wreck banner is handed, which is the code that
+changed. Its tests cover `liveSitesFor` — the data — not the wiring that reads it, and the
+render in `app-render.test.mjs` is the screen before anything has been chosen, never a
+resolved battle. So those two fixes are guarded at the source and unguarded at the surface.
+
+That sentence originally read "no mutants at all", which was wrong and was written into this
+file before anyone counted. The count is 12, all live, and every one of the 32 skips is in an
+engine file: campaign 11, battleRules 8, battleMission 5, market 3, doctrine 2, battlePlans 2,
+battleTerrain 1. A claim about coverage is worth exactly as much as the count behind it, which
+is the same lesson as the 172 above and it was made twice in one day.
