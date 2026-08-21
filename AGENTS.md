@@ -807,9 +807,13 @@ name.
 
 ### Housekeeping
 
-`scripts/mutants.sh` now runs 172 mutants with none surviving and **32 skipped** — patterns
-that no longer appear exactly once because the code moved out from under them. They are
-printed at the end of every run. That is a real hole and the number should be going down.
+`scripts/mutants.sh` runs **178 mutants with none surviving and 32 skipped** — patterns that
+no longer appear exactly once because the code moved out from under them. They are printed
+at the end of every run. That is a real hole and the number should be going down.
+
+The figure this paragraph used to carry (172, none, 32) was not measured on this machine and
+could not have been: the harness was silently mutating nothing and scoring every mutant as a
+survivor. See *The sweep that could not fail*.
 
 ## What the screen said it paid (19 Aug 2026)
 
@@ -887,3 +891,83 @@ alone. Gating the rebuild offer changed what every reward policy buys, so the ru
 reported different numbers from a byte-identical script — warband 9.91 to 9.93, refits 69.4%
 to 69.8%. The commoner way findings go stale is not the sweep changing, it is the **game**
 changing underneath an unchanged sweep. The guard watches `src/battle` as well now.
+
+## The sweep that could not fail (19 Aug 2026)
+
+`scripts/mutants.sh` was reporting **`killed 0 mutants, 204 survived`** on this machine, and
+had been for some time. Not one mutant had run. Three defects, each hidden by the one above
+it, and the middle one is the only one worth remembering.
+
+### The stub that exits 0
+
+`mutate` called `python3`. On Windows that usually resolves to the Microsoft Store **App
+Execution Alias**, which prints `Python was not found` and **exits 0**. Real Python is on
+this machine as `python`.
+
+Because the stub exits zero, nothing failed. The file was never edited, `node --test` then
+ran against pristine source, passed, and the mutant was recorded as having SURVIVED. Every
+one of them, every run.
+
+The interpreter is now resolved once at startup by making a candidate **print a token only a
+real interpreter can print**. Asking for `--version` is not enough — the stub answers that
+too, which is exactly how it passed for a live dependency. If none of `python3`, `python`,
+`py` can do it, the script refuses to start rather than producing numbers.
+
+### The failure that scored itself as a result
+
+This is the one that matters, and it would have outlived the fix above.
+
+`mutate` treated exit code 3 as "pattern moved, skip this one" and **everything else as
+success**. Any other failure — no interpreter, unwritable file, a crash inside the edit —
+fell straight through to the test run, which then measured the *intact* build, passed, and
+blamed the guard for passing.
+
+A measurement tool is allowed to crash. It is not allowed to report the opposite of the
+truth in the tool's own vocabulary. Status 3 skips, 0 proceeds, anything else aborts the
+whole sweep loudly. And after a successful edit the file is `cmp`'d against its backup,
+because a write that silently no-ops leaves the sweep measuring the original code while
+reporting on a mutant — the same failure wearing a different hat.
+
+### The crash that fix found within one run
+
+With the abort in place the very next sweep stopped on a `UnicodeDecodeError`: Python on
+Windows opens text in the locale encoding, cp1252 here, and these sources are full of
+em-dashes. Every mutant touching a file carrying one had been dying on the read — and under
+the old handling, being recorded as a survivor.
+
+`open()` now names `encoding="utf-8"` on both ends, with `newline=""` so line endings
+round-trip untouched; `.gitattributes` pins `eol=lf` and a sweep must not be the thing that
+rewrites it.
+
+### What it actually measures
+
+**178 killed, 0 survived, 32 skipped.** The guards were sound the whole time. Nothing was
+wrong with the tests; the thing that checks them had stopped being able to tell.
+
+The 172/none/32 figure this section used to carry cannot have been measured here. It was
+either taken before the em-dashes went in or on the machine the `_stage<letter>` tarballs
+come from, and it was carried forward as a fact about this repo for long enough that nobody
+re-derived it. A number in a document outlives the run that produced it.
+
+### Eight passing tests are not eight guards
+
+The three fixes in *What the screen said it paid* shipped with eight new tests, all passing,
+none mutated. Six mutants were written for them and **one survived**: the rebuild gate reads
+`profileWithRefit`, and every case in the file used an unrefitted hull, so
+`battleProfileFor` returned the identical number and swapping one for the other changed
+nothing a test could see. `bastion:wall` moves a BASTION from 14 wounds to 18, and the case
+that uses it kills the mutant.
+
+One of the three things that gate does was unguarded while the file reported full coverage
+of it. That is the argument for this script existing, made against the code written the same
+day.
+
+### Still unmeasured
+
+**32 skipped**, down one — the `market.js` service filter, whose pattern this session's own
+rebuild fix moved out from under it. Every skip is a guard the repo believes it has and does
+not, and they are printed at the end of every run. The number should keep going down.
+
+`BattleApp.jsx` has no mutants at all, and the objective-panel fix lives there. Its tests
+cover `liveSitesFor` — the data — not the wiring that reads it. Nothing in the suite renders
+a resolved battle panel, so that fix is guarded at the source and unguarded at the surface.

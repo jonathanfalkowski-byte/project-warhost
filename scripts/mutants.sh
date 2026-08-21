@@ -8,6 +8,27 @@
 cd "$(dirname "$0")/.." || exit 1
 pass=0; fail=0; skipped=0; skips=""
 
+# WHICH PYTHON ACTUALLY RUNS, proven rather than assumed. On Windows `python3` is usually
+# the Microsoft Store App Execution Alias: it prints "Python was not found" and EXITS 0.
+# That is the worst shape a dependency can fail in here. The mutation silently does nothing,
+# the tests then pass against untouched source, and every mutant is reported SURVIVED. This
+# script ran exactly that way and printed "killed 0 mutants, 204 survived" - the precise
+# inverse of the truth, with nothing in the output admitting it had not run.
+# The interpreter therefore has to PRINT something only a real one can print. Asking for
+# --version is not enough, because the stub answers that too.
+PY_BIN=""
+for candidate in python3 python py; do
+  if command -v "$candidate" >/dev/null 2>&1      && [ "$("$candidate" -c 'print("mutants-ok")' 2>/dev/null)" = "mutants-ok" ]; then
+    PY_BIN="$candidate"; break
+  fi
+done
+if [ -z "$PY_BIN" ]; then
+  echo "no working python (tried python3, python, py) - refusing to run, because a sweep" >&2
+  echo "that cannot mutate reports every mutant as survived and every guard as broken." >&2
+  exit 1
+fi
+echo "python: $PY_BIN - $("$PY_BIN" --version 2>&1)"
+
 # An interrupted run used to leave a mutated source file on disk — a killed script skips
 # its restore, and the next sweep then measures a deliberately broken build. Restore every
 # outstanding backup on any exit, including SIGINT and SIGTERM.
@@ -22,19 +43,43 @@ trap restore_all EXIT INT TERM
 mutate () {
   local label="$1" file="$2" from="$3" to="$4" tests="$5"
   cp "$file" "$file.bak"
-  python3 - "$file" "$from" "$to" <<'PY'
+  "$PY_BIN" - "$file" "$from" "$to" <<'PY'
 import sys
+# EXPLICIT UTF-8, BOTH WAYS. Python on Windows opens text in the locale encoding, which is
+# cp1252 here, and these sources are full of em-dashes - so the read died on any file
+# carrying one. Under the old error handling that crash fell straight past the skip check,
+# the tests ran against unmutated source, and the mutant was recorded as a survivor.
+# newline="" on both ends so line endings round-trip untouched; .gitattributes pins eol=lf
+# and a sweep must not be the thing that rewrites it.
 path, frm, to = sys.argv[1], sys.argv[2], sys.argv[3]
-s = open(path).read()
+s = open(path, encoding="utf-8", newline="").read()
 if s.count(frm) != 1:
     print(f"SKIP-PATTERN({s.count(frm)})"); sys.exit(3)
-open(path, "w").write(s.replace(frm, to))
+open(path, "w", encoding="utf-8", newline="").write(s.replace(frm, to))
 PY
-  if [ $? -eq 3 ]; then
+  local status=$?
+  # 3 is the ONE failure this script may shrug at: the pattern moved, and that is reported
+  # at the end as an unguarded mutant. Any other status means the mutation did not happen
+  # for a reason nobody chose, and running the tests now would measure the intact build and
+  # then blame the guard for passing.
+  if [ "$status" -eq 3 ]; then
     mv "$file.bak" "$file"
     echo "?? $label — pattern not unique"
     skipped=$((skipped+1)); skips="$skips\n    $label"
     return
+  fi
+  if [ "$status" -ne 0 ]; then
+    mv "$file.bak" "$file"
+    echo "xx ABORT: $label - mutation failed with status $status" >&2
+    exit 1
+  fi
+  # And the file has to be different now. A write that no-ops leaves the sweep measuring
+  # the original code while reporting on a mutant, which is the same failure wearing a
+  # different hat. One cmp, against the whole premise of the tool.
+  if cmp -s "$file" "$file.bak"; then
+    mv "$file.bak" "$file"
+    echo "xx ABORT: $label - mutation left the file byte-identical" >&2
+    exit 1
   fi
   if node --test $tests >/dev/null 2>&1; then
     echo "!! SURVIVED: $label — the guard does not catch this"; fail=$((fail+1))
@@ -405,7 +450,7 @@ mutate "the shelf offers formations the warband already holds" src/battle/market
       '    .filter(() => true)' \
       "tests/battle-campaign.test.mjs"
 mutate "the shelf offers repairs to an army with nothing to repair" src/battle/market.js \
-      '    .filter((service) => (service.id === "requisition" ? true : damaged))' \
+      '    .filter((service) => (service.id === "requisition" ? true : service.id === "rebuild" ? beyondPatch : damaged))' \
       '    .filter(() => true)' \
       "tests/battle-campaign.test.mjs"
 mutate "every formation costs the same" src/battle/market.js \
@@ -968,6 +1013,36 @@ mutate "engagements fought are not counted" src/battle/campaign.js \
       '    const battles = (entry.battles ?? 0) + 1;' \
       '    const battles = 0;' \
       "tests/battle-campaign.test.mjs"
+
+echo "=== what the rule actually pays ==="
+# The three fixes reported from play on 19 Aug 2026. Eight tests were written for them and
+# all eight passed, which by this script's own standard proves nothing at all: a test that
+# passes against a broken implementation is not a guard. These are the mutants that decide
+# whether those tests earn the name.
+mutate "the shelf goes back to offering a rebuild a patch would finish" src/battle/market.js \
+      '    && profileWithRefit(entry.formationId, entry.refit).wounds - entry.wounds > FIELD_REPAIR_WOUNDS);' \
+      '    && profileWithRefit(entry.formationId, entry.refit).wounds - entry.wounds > 0);' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "the rebuild gate is off by one at the boundary" src/battle/market.js \
+      '    && profileWithRefit(entry.formationId, entry.refit).wounds - entry.wounds > FIELD_REPAIR_WOUNDS);' \
+      '    && profileWithRefit(entry.formationId, entry.refit).wounds - entry.wounds >= FIELD_REPAIR_WOUNDS);' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "the rebuild gate reads the base profile instead of the refitted one" src/battle/market.js \
+      '    && profileWithRefit(entry.formationId, entry.refit).wounds - entry.wounds > FIELD_REPAIR_WOUNDS);' \
+      '    && battleProfileFor(entry.formationId).wounds - entry.wounds > FIELD_REPAIR_WOUNDS);' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "a wreck is announced the same way whatever was declared" src/battle/afterAction.js \
+      '      text: !rule || rule.wreckBounty' \
+      '      text: true' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "the wreck banner reads the wrong half of the rule" src/battle/afterAction.js \
+      '      text: !rule || rule.wreckBounty' \
+      '      text: !rule || !rule.wreckBounty' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "losing a formation stops outranking wrecking one" src/battle/afterAction.js \
+      '  if (lostThisRound.length > 0) {' \
+      '  if (false) {' \
+      "tests/battle-what-it-pays.test.mjs"
 
 echo
 echo "killed $pass mutants, $fail survived, $skipped skipped"

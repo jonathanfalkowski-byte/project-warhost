@@ -57,6 +57,32 @@ test("a rebuild is offered once it does something a patch cannot", () => {
   }
 });
 
+test("the rebuild gate measures distance from full THROUGH the refit", () => {
+  // The first version of this file tested an unrefitted hull only, so profileWithRefit and
+  // battleProfileFor returned the same number and swapping one for the other changed
+  // nothing a test could see. The mutant that makes that swap SURVIVED, which is the whole
+  // argument for running them: eight passing tests said the gate was guarded and one of the
+  // three things it does was not.
+  // bastion:wall takes a BASTION from 14 wounds to 18. At 13 it is one down on the profile
+  // it was printed with and five down on the profile it is actually carrying.
+  const withWall = (wounds) => marketFor({
+    roster: [{ id: "bastion#1", formationId: "bastion", name: "BASTION", wounds, refit: "bastion:wall" }],
+    purse: 20, seed: 0, battle: 1,
+  }).filter((offer) => offer.kind === "service").map((offer) => offer.id);
+
+  const reinforced = profileWithRefit("bastion", "bastion:wall").wounds;
+  assert.ok(reinforced > BASTION_FULL, "the wall refit has to move the cap or this proves nothing");
+
+  assert.ok(
+    withWall(reinforced - (FIELD_REPAIR_WOUNDS + 1)).includes("rebuild"),
+    "past what a patch finishes on the REFITTED cap, even though the base profile says otherwise",
+  );
+  assert.ok(
+    !withWall(reinforced - 1).includes("rebuild"),
+    "and a scratch is still a scratch",
+  );
+});
+
 test("an undamaged warband is offered neither mend", () => {
   const services = marketFor({
     roster: [{ id: "bastion#1", formationId: "bastion", name: "BASTION", wounds: null }],
