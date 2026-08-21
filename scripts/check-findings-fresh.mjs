@@ -6,52 +6,107 @@
 // entire review was written on it. That is the whole failure mode: the doc is the only
 // place a retired number still exists, and it reads exactly like a live one.
 //
-// So: if the sweep changed more recently than the findings did, the findings are stale.
-// Compared by COMMIT TIME rather than file mtime, because a clone has no useful mtimes —
-// every file arrives at checkout time. Needs full history; a shallow clone is not an error,
-// it is just a check that cannot run, and it says so rather than failing.
+// THIS USED TO COMPARE COMMIT TIMES, and that was wrong in a way that took a day to show.
+// It watched scripts/battle-sweep.mjs and src/battle, and failed when either was newer than
+// the findings. But a change under src/battle that does not move the sweep's OUTPUT — moving
+// display logic into a pure function, say — makes that check fail forever: regenerating
+// produces a byte-identical file, so there is nothing to commit, so the findings' commit
+// time never advances, so it fails again. A false positive with no way out is worse than
+// the staleness it was written to catch.
+//
+// So it asks the real question instead. Run the sweep, render the document it implies, and
+// compare. No timestamps, no proxies: either the file says what the sweep says or it does
+// not. The sweep is deterministic and byte-identical across runs, which is what makes this
+// possible at all.
+//
+// It checks the verdicts from the same run, because it has them in hand and a second run
+// would cost another hundred seconds to learn something already on screen.
 
 import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-// EVERY INPUT, not just the sweep. The first version of this watched scripts/battle-sweep.mjs
-// alone, which misses the commoner way the findings go stale: the sweep is unchanged and the
-// GAME changed underneath it. Gating the FULL REBUILD offer moved what every reward policy
-// buys, so the run axis reported different numbers from an identical script.
-const INPUTS = ["scripts/battle-sweep.mjs", "src/battle"];
-const FINDINGS = "docs/balance.md";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SWEEP = path.join(ROOT, "scripts", "battle-sweep.mjs");
+const FINDINGS = path.join(ROOT, "docs", "balance.md");
+const FINDINGS_LABEL = "docs/balance.md";
 
-const lastCommitTime = (path) => {
-  try {
-    const out = execFileSync("git", ["log", "-1", "--format=%ct", "--", path], { encoding: "utf8" }).trim();
-    return out ? Number(out) : null;
-  } catch {
-    return null;
-  }
-};
+// The document is a pure function of the sweep, written in ONE place so the file and the
+// check can never disagree about its shape. The npm preamble the old file carried is gone:
+// two lines describing how the output was obtained are not findings, and they made the
+// document depend on which command produced it rather than on what it measured.
+const documentFor = (sweep) => `# Balance findings
 
-const stamps = INPUTS.map((path) => ({ path, at: lastCommitTime(path) }));
-const findings = lastCommitTime(FINDINGS);
-const newest = stamps.filter((entry) => entry.at !== null)
-  .reduce((best, entry) => (best === null || entry.at > best.at ? entry : best), null);
+Regenerate with \`npm run check:findings -- --write\`.
 
-if (newest === null || findings === null) {
-  console.log(`findings freshness: SKIPPED — no commit history for ${newest === null ? INPUTS.join(" or ") : FINDINGS}`);
-  process.exit(0);
-}
+\`\`\`
+${sweep.replace(/\s*$/, "")}
+\`\`\`
+`;
 
-const sweep = newest.at;
+const runSweep = () => execFileSync(process.execPath, [SWEEP], {
+  cwd: ROOT,
+  encoding: "utf8",
+  shell: false,
+  // The sweep prints every axis in full; the default buffer is not enough for it.
+  maxBuffer: 64 * 1024 * 1024,
+});
 
-if (sweep > findings) {
-  console.error(`findings freshness: STALE`);
-  console.error(`  ${newest.path} last changed ${new Date(sweep * 1000).toISOString()}`);
-  console.error(`  ${FINDINGS} last changed ${new Date(findings * 1000).toISOString()}`);
-  console.error(``);
-  console.error(`  A sweep input changed after the findings were written, so docs/balance.md is`);
-  console.error(`  reporting numbers the current sweep no longer produces. Regenerate it:`);
-  console.error(``);
-  console.error(`      npm run analyse > /tmp/sweep.txt`);
-  console.error(`      then rewrite docs/balance.md around that output`);
+const write = process.argv.includes("--write");
+
+let sweep;
+try {
+  sweep = runSweep();
+} catch (error) {
+  console.error("findings freshness: the sweep did not complete, so nothing can be checked");
+  console.error(String(error?.stderr || error?.message || error).slice(0, 2000));
   process.exit(1);
 }
 
-console.log(`findings freshness: OK — ${FINDINGS} is at or ahead of ${newest.path}`);
+const expected = documentFor(sweep);
+
+if (write) {
+  writeFileSync(FINDINGS, expected, { encoding: "utf8" });
+  console.log(`findings: wrote ${FINDINGS_LABEL} from the current sweep`);
+  process.exit(0);
+}
+
+let actual;
+try {
+  actual = readFileSync(FINDINGS, { encoding: "utf8" });
+} catch {
+  console.error(`findings freshness: ${FINDINGS_LABEL} is missing. Write it with:`);
+  console.error("      npm run check:findings -- --write");
+  process.exit(1);
+}
+
+if (actual !== expected) {
+  const actualLines = actual.split("\n");
+  const expectedLines = expected.split("\n");
+  const at = expectedLines.findIndex((line, index) => line !== actualLines[index]);
+  console.error("findings freshness: STALE");
+  console.error(`  ${FINDINGS_LABEL} does not match what the sweep currently prints.`);
+  if (at >= 0) {
+    console.error(`  first difference at line ${at + 1}:`);
+    console.error(`    committed: ${JSON.stringify(actualLines[at] ?? "(end of file)")}`);
+    console.error(`    swept:     ${JSON.stringify(expectedLines[at] ?? "(end of file)")}`);
+  } else {
+    console.error(`  the files differ in length: committed ${actualLines.length} lines, swept ${expectedLines.length}`);
+  }
+  console.error("");
+  console.error("  Regenerate it:");
+  console.error("      npm run check:findings -- --write");
+  process.exit(1);
+}
+
+// Same run, second question. A FAIL is a balance claim that has stopped being true, and it
+// should stop a merge exactly like a failing test.
+const failures = sweep.split("\n").filter((line) => /^\s+FAIL/.test(line));
+if (failures.length > 0) {
+  console.error(`findings: the sweep reported ${failures.length} FAIL verdict(s)`);
+  for (const line of failures) console.error(line);
+  process.exit(1);
+}
+
+console.log(`findings: ${FINDINGS_LABEL} matches the current sweep, and no verdict FAILs`);

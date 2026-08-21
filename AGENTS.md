@@ -884,13 +884,30 @@ Only ERADICATION carries a `wreckBounty`, so the headline states the cost when t
 rule does not pay for it. The banner order is unchanged — a formation lost still outranks a
 formation wrecked.
 
-### The freshness guard was watching the wrong thing
+### The freshness guard was watching the wrong thing, twice
 
 `scripts/check-findings-fresh.mjs` compared `docs/balance.md` against `scripts/battle-sweep.mjs`
 alone. Gating the rebuild offer changed what every reward policy buys, so the run axis
 reported different numbers from a byte-identical script — warband 9.91 to 9.93, refits 69.4%
 to 69.8%. The commoner way findings go stale is not the sweep changing, it is the **game**
-changing underneath an unchanged sweep. The guard watches `src/battle` as well now.
+changing underneath an unchanged sweep. The guard was widened to watch `src/battle` too.
+
+**Then that broke as well, and worse.** Moving the round panel's derivation into a pure
+function changed `src/battle` without moving a single number, so the guard failed — and
+regenerating produced a byte-identical file, so there was nothing to commit, so the findings'
+commit time never advanced, so it failed again. A false positive with no way out is worse
+than the staleness it was written to catch.
+
+It asks the real question now: run the sweep, render the document it implies, compare. No
+timestamps, no proxies — either the file says what the sweep says or it does not. That is
+only possible because the sweep is deterministic and byte-identical across runs, which is
+the same property the whole exhaustive method rests on. `--write` regenerates.
+
+It reads the verdicts from that same run, so CI stopped sweeping twice: one hundred seconds
+back, and the two checks can no longer disagree about which sweep they are describing. The
+npm preamble came out of `docs/balance.md` at the same time — two lines describing how the
+output was obtained are not findings, and they made the document depend on which command
+produced it rather than on what it measured.
 
 ## The sweep that could not fail (19 Aug 2026)
 

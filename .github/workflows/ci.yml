@@ -17,10 +17,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # A shallow clone is enough now. The findings check reads no git history - it runs the
+      # sweep and compares its output against the committed file.
       - uses: actions/checkout@v5
-        with:
-          # The findings-freshness guard compares commit times, so it needs real history.
-          fetch-depth: 0
 
       - uses: actions/setup-node@v5
         with:
@@ -29,7 +28,11 @@ jobs:
 
       - run: npm ci
 
-      - name: findings are not stale
+      # Runs the sweep once and asks two things of it: that docs/balance.md says what it
+      # currently prints, and that no verdict FAILs. It used to compare commit times, which
+      # failed forever on any src/battle change that did not move the numbers - regenerating
+      # produced no diff, so nothing could be committed to satisfy it.
+      - name: findings match the sweep, and no verdict fails
         run: npm run check:findings
 
       - name: game tests
@@ -46,19 +49,3 @@ jobs:
       - name: sites worker tests
         run: npm run test:sites
 
-      # The sweep prints verdicts, not numbers to interpret. A FAIL is a balance claim that
-      # has stopped being true, and it should stop a merge exactly like a failing test.
-      - name: balance sweep reports no FAIL
-        run: |
-          if ! npm run analyse > sweep.txt 2>&1; then
-            cat sweep.txt
-            echo "::error::the balance sweep did not complete"
-            exit 1
-          fi
-          cat sweep.txt
-          if grep -qE '^[[:space:]]+FAIL' sweep.txt; then
-            echo "::error::the balance sweep reported a FAIL"
-            grep -E '^[[:space:]]+FAIL' sweep.txt
-            exit 1
-          fi
-          echo "no FAIL verdicts"

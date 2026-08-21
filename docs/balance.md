@@ -1,12 +1,8 @@
 # Balance findings
 
-Regenerate with `npm run analyse`.
+Regenerate with `npm run check:findings -- --write`.
 
 ```
-
-> project-warhost@0.0.0 analyse
-> node scripts/battle-sweep.mjs
-
 BATTLE SWEEP — BREAK THE CIRCUIT vs IRON PROCESSION
 5 battle rounds, 5 objectives
 
