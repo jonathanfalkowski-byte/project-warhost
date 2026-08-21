@@ -1044,6 +1044,40 @@ mutate "losing a formation stops outranking wrecking one" src/battle/afterAction
       '  if (false) {' \
       "tests/battle-what-it-pays.test.mjs"
 
+
+echo "=== the round panel ==="
+# The layer all three reported defects lived in, and the one the harness could not reach
+# until roundPanelFor came out of BattleApp. These decide whether the panel tests are guards
+# or just seven more things that happen to pass.
+mutate "the panel reads the enemy's ground through the player's declaration" src/battle/afterAction.js \
+      'const enemyPays = paysFor(enemyDisposition, "enemy");' \
+      'const enemyPays = paysFor(playerDisposition, "enemy");' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "the panel reads the player's ground through the enemy's declaration" src/battle/afterAction.js \
+      'const playerPays = paysFor(playerDisposition, "player");' \
+      'const playerPays = paysFor(enemyDisposition, "player");' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "the panel asks which markers are live for the wrong side" src/battle/afterAction.js \
+      'liveSitesFor({ disposition, side, objectives })' \
+      'liveSitesFor({ disposition, side: "player", objectives })' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "a marker held for nothing stops being called out" src/battle/afterAction.js \
+      'dark: entry.holder !== "contested" && paid === 0 };' \
+      'dark: false };' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "a contested marker is reported as held for nothing" src/battle/afterAction.js \
+      'dark: entry.holder !== "contested" && paid === 0 };' \
+      'dark: paid === 0 };' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "the dark test is inverted, so paying markers are the ones called out" src/battle/afterAction.js \
+      'dark: entry.holder !== "contested" && paid === 0 };' \
+      'dark: entry.holder !== "contested" && paid > 0 };' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "an unlit marker falls through as undefined rather than nothing" src/battle/afterAction.js \
+      ': entry.holder === "enemy" ? (enemyPays.get(entry.objectiveId) ?? 0)' \
+      ': entry.holder === "enemy" ? enemyPays.get(entry.objectiveId)' \
+      "tests/battle-what-it-pays.test.mjs"
+
 echo
 echo "killed $pass mutants, $fail survived, $skipped skipped"
 # A SKIPPED MUTANT IS AN UNGUARDED ONE. The pattern it edits no longer appears exactly once

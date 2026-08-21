@@ -968,14 +968,47 @@ day.
 rebuild fix moved out from under it. Every skip is a guard the repo believes it has and does
 not, and they are printed at the end of every run. The number should keep going down.
 
-`BattleApp.jsx` carries **12 mutants and every one of them runs**. None of them touches the
+`BattleApp.jsx` carries **12 mutants and every one of them runs**. None of them touched the
 objective-panel row or the disposition the wreck banner is handed, which is the code that
-changed. Its tests cover `liveSitesFor` — the data — not the wiring that reads it, and the
-render in `app-render.test.mjs` is the screen before anything has been chosen, never a
-resolved battle. So those two fixes are guarded at the source and unguarded at the surface.
+changed — and nothing could, because that logic sat inside the component.
+
+**Logic in `BattleApp` is not under-tested, it is unreachable.** The component is hook-driven
+with no props, so `renderToString` can only ever produce the screen before anything has been
+chosen; a resolved battle is not a state the suite can get to, and there is no testing
+library here to drive one. Anything load-bearing has to be a pure function outside it. So the
+round panel's derivation moved to `roundPanelFor` in `afterAction.js`, beside the other
+screen-facing pure functions, and the JSX now reads `row.paid` and `row.dark` and computes
+nothing. Same strings render; the difference is that eight tests and seven mutants can now
+reach it.
 
 That sentence originally read "no mutants at all", which was wrong and was written into this
 file before anyone counted. The count is 12, all live, and every one of the 32 skips is in an
 engine file: campaign 11, battleRules 8, battleMission 5, market 3, doctrine 2, battlePlans 2,
 battleTerrain 1. A claim about coverage is worth exactly as much as the count behind it, which
 is the same lesson as the 172 above and it was made twice in one day.
+
+## What a passing test is worth, twice in one day (19 Aug 2026)
+
+Mutation testing found a hole in freshly written tests **twice**, and both holes were the
+same shape: *a test that exercises the code without varying the thing the code branches on.*
+
+The rebuild gate reads `profileWithRefit`, and every case used an unrefitted hull — so
+`battleProfileFor` returned the identical number and the swap was invisible. Killed with
+`bastion:wall`, which moves a BASTION from 14 wounds to 18.
+
+The round panel asks `liveSitesFor` for a given `side`, and **`side` only changes the answer
+for SAFEGUARD**: DOMINION lights every marker for both armies, ERADICATION darkens every
+marker for both. Every SAFEGUARD case tested the PLAYER side, which is exactly where
+hardcoding `side: "player"` is indistinguishable from the truth. Seven tests, and the mutant
+walked through all of them.
+
+The bug it stood for is not cosmetic. SAFEGUARD keeps `south-relay` for the player and
+`north-relay` for the enemy, because each army's own half is the one it deploys in. An enemy
+declaring SAFEGUARD would have been paid for the PLAYER's half — the reverse of the truth, on
+the one disposition where which ground you hold is the entire decision. Killed by the case
+where the enemy declares it: paid at the top of the board, paid nothing at the bottom.
+
+Both were written the same day as the code, by someone who had just read it, and both passed.
+That is what the sweep is for, and it is worth more than the count it prints.
+
+**185 killed, 0 survived, 32 skipped.**

@@ -18,7 +18,7 @@ const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 import { resolveBattle } from "./battleRules.js";
 import { DETACHMENTS, RESERVE_PREMIUM, detachmentFor, detachmentList, scoutedPool, stratagemFor } from "./stratagems.js";
 import { dispositionFor, dispositionsFor, liveSitesFor } from "./doctrine.js";
-import { afterActionFor, headlineFor, pairingLinksFor, supportLinksFor } from "./afterAction.js";
+import { afterActionFor, headlineFor, pairingLinksFor, roundPanelFor, supportLinksFor } from "./afterAction.js";
 import { profileWithRefit, refitFor } from "./refits.js";
 import { SYNERGY_COUNT, leadsFor } from "./synergies.js";
 import { MENDS } from "./market.js";
@@ -333,11 +333,15 @@ export default function BattleApp({ onExit }) {
   // marker on the board, so it can sit on your ground for five rounds and score nothing for
   // it — and the round panel was crediting it the face value anyway, which reads as losing
   // ground you are not losing. Both sides are resolved here, each through its own rule.
-  const paysFor = (disposition, side) => new Map(
-    liveSitesFor({ disposition, side, objectives: mission.objectives })
-      .map((objective) => [objective.id, objective.points ?? 1]));
-  const playerPays = paysFor(dispositionId, "player");
-  const enemyPays = paysFor(army.disposition, "enemy");
+  // Rows for the round panel, already told what each marker paid the side holding it. The
+  // derivation lives in afterAction.js so it can be tested and mutated; nothing computed
+  // inside this component can be reached by either.
+  const panelRows = roundPanelFor({
+    round: view,
+    objectives: mission.objectives,
+    playerDisposition: dispositionId,
+    enemyDisposition: army.disposition,
+  });
 
   return (
     <main className="battle-app">
@@ -1082,23 +1086,15 @@ export default function BattleApp({ onExit }) {
                 <b className="enemy">HELIOCH +{view?.enemyGained ?? 0}</b>
               </div>
               <div className="battle-objective-list">
-                {scored?.map((objective) => {
-                  // Held is not the same as paid. A marker dark under the holder's own
-                  // declaration is worth stating outright rather than printing +0, because
-                  // the interesting thing on that row is that they took ground for nothing.
-                  const pays = objective.holder === "player" ? (playerPays.get(objective.objectiveId) ?? 0)
-                    : objective.holder === "enemy" ? (enemyPays.get(objective.objectiveId) ?? 0)
-                      : 0;
-                  return (
-                    <div key={objective.objectiveId} className={`battle-objective-row held-${objective.holder}`}>
-                      <b>{objective.name}</b>
-                      <span>{objective.player} v {objective.enemy}</span>
-                      <em>{objective.holder === "contested" ? "CONTESTED"
-                        : pays > 0 ? `${objective.holder.toUpperCase()} +${pays}`
-                          : `${objective.holder.toUpperCase()} · PAYS NOTHING`}</em>
-                    </div>
-                  );
-                })}
+                {panelRows.map((objective) => (
+                  <div key={objective.objectiveId} className={`battle-objective-row held-${objective.holder}`}>
+                    <b>{objective.name}</b>
+                    <span>{objective.player} v {objective.enemy}</span>
+                    <em>{objective.holder === "contested" ? "CONTESTED"
+                      : objective.dark ? `${objective.holder.toUpperCase()} · PAYS NOTHING`
+                        : `${objective.holder.toUpperCase()} +${objective.paid}`}</em>
+                  </div>
+                ))}
               </div>
               <ol className="battle-log">
                 {/* Stratagem spends are already called out above the objectives, in the one
