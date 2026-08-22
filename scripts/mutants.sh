@@ -938,10 +938,21 @@ mutate "a part-strength enemy takes a slice out of the middle of its doctrine" s
       '    const route = plan ? routePointsFor(plan, index, mission.id, true, size) : [];' \
       '    const route = plan ? routePointsFor(plan, slotIndex, mission.id, true, size) : [];' \
       "tests/battle-lanes.test.mjs"
-mutate "a part-strength warband takes a slice out of the middle of its plan" src/battle/battleMission.js \
-      '    const route = battlePlan ? routePointsFor(battlePlan, index, mission.id, false, size) : [];' \
-      '    const route = battlePlan ? routePointsFor(battlePlan, slotIndex, mission.id, false, size) : [];' \
-      "tests/battle-lanes.test.mjs"
+# REMOVED: "a part-strength warband takes a slice out of the middle of its plan" swapped
+# `index` for `slotIndex` in the route lookup. That was a real mutation while `index` was
+# the filled-index, and it had been SKIPPED for a while because the code moved out from
+# under its pattern. Making a lane belong to a position defines `const index = slotIndex`,
+# so the swap now substitutes an identical value: it edits the file, passes the cmp guard,
+# and changes no behaviour, so nothing can ever kill it.
+#
+# A mutant that cannot fail is worse than no mutant, because it counts. It is also the one
+# failure this harness still cannot detect for itself - the cmp check proves the text
+# changed, and nothing proves the MEANING did. Worth remembering while working the skip
+# list: some of those 32 will be tautologies waiting to be noticed rather than coverage
+# waiting to be restored.
+#
+# The claim it was making is made properly by "a lane is shared out among whoever turned
+# up", which replaces the index with the filled count and dies.
 
 
 echo "=== what a declaration pays ==="
@@ -1049,6 +1060,12 @@ echo "=== the round panel ==="
 # The layer all three reported defects lived in, and the one the harness could not reach
 # until roundPanelFor came out of BattleApp. These decide whether the panel tests are guards
 # or just seven more things that happen to pass.
+echo "=== a lane belongs to a position ==="
+# Reported from play: staffing the centre slot moved the formations already deployed. The
+# lanes were shared out among whoever had turned up, so filling a third slot re-resolved the
+# plan for the two already in it.
+mutate "a lane is shared out among whoever turned up, so staffing moves the others" src/battle/battleMission.js       'const index = slotIndex;'       'const index = units.length;'       "tests/battle-lanes.test.mjs"
+mutate "the lane basis ignores the road, so a position it costs is free" src/battle/battleMission.js       'const size = positions ?? mission.playerDeployment.length;'       'const size = mission.playerDeployment.length;'       "tests/battle-lanes.test.mjs"
 mutate "a patch reports what it tried rather than what it put back" src/battle/battleRules.js       'const amount = Number((healed - patient.wounds).toFixed(2));'       'const amount = intended;'       "tests/battle-what-it-pays.test.mjs"
 mutate "a patch overshoots the hull's maximum" src/battle/battleRules.js       'const healed = Math.min(patient.maxWounds, patient.wounds + intended);'       'const healed = patient.wounds + intended;'       "tests/battle-what-it-pays.test.mjs"
 mutate "the panel reads the enemy's ground through the player's declaration" src/battle/afterAction.js \

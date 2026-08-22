@@ -70,30 +70,30 @@ DOCTRINE VERDICT
 RUNS — 1080 runs (12 seeds x every detachment, disposition, plan and spending rule)
   NOTE: exhaustive over policies, sampled over seeds. Every other axis above resolves its space in full.
   NOTE: fought against the CONTROL enemy, so what changes is only what the player chose.
-  battles won 0..5: 0:268  1:200  2:159  3:250  4:82  5:121
-  armies broken before the ladder ended: 48 (4.4%)
-  dominion     won 1.72 of 4.91 fought   win rate 34.9%
-  safeguard    won 2.66 of 5.00 fought   win rate 53.1%
-  eradication  won 2.20 of 4.83 fought   win rate 44.7%
-  victory points earned per run: 56.1   spent: 44.9
+  battles won 0..5: 0:268  1:197  2:163  3:248  4:83  5:121
+  armies broken before the ladder ended: 54 (5.0%)
+  dominion     won 1.73 of 4.90 fought   win rate 35.0%
+  safeguard    won 2.64 of 4.99 fought   win rate 52.9%
+  eradication  won 2.21 of 4.81 fought   win rate 44.8%
+  victory points earned per run: 56.1   spent: 44.8
   warband size at the end: 9.93 (started 6)
   formations carrying a refit at the end: 3.75
   widen        won 2.11 of 5.00 fought   win rate 42.2%
-  patch        won 2.37 of 4.75 fought   win rate 49.4%
-  refit        won 1.89 of 4.85 fought   win rate 37.8%
-  cheapest     won 1.75 of 4.89 fought   win rate 35.2%
+  patch        won 2.38 of 4.70 fought   win rate 49.7%
+  refit        won 1.88 of 4.84 fought   win rate 37.7%
+  cheapest     won 1.76 of 4.88 fought   win rate 35.4%
   dearest      won 2.07 of 5.00 fought   win rate 41.4%
 
 RUN VERDICT
   PASS  a run is a spread rather than pass-or-fail (6 of 6 outcomes reached)
-  PASS  both endings happen (4.4% of armies break)
-  PASS  which disposition you run matters, without deciding it (18.2% apart on win rate)
+  PASS  both endings happen (5.0% of armies break)
+  PASS  which disposition you run matters, without deciding it (17.9% apart on win rate)
   PASS  how long an army lasts depends on how it fights (dominion 0.42, safeguard 0.34, eradication 0.50 lost per engagement)
-  PASS  the reward you take changes the run (14.2% apart on win rate)
-  PASS  formations get refitted rather than only replaced (69.8% of runs ended carrying at least one)
-  PASS  what you score turns into an army, wider or deeper (13.68 formations-plus-refits from 6, 88.5% of runs ended ahead)
+  PASS  the reward you take changes the run (14.3% apart on win rate)
+  PASS  formations get refitted rather than only replaced (69.7% of runs ended carrying at least one)
+  PASS  what you score turns into an army, wider or deeper (13.68 formations-plus-refits from 6, 88.9% of runs ended ahead)
   PASS  the purse is spent rather than hoarded (0.0% of runs left 7+ points unspent at the last shelf)
-  PASS  preserving the army pays across a run (SAFEGUARD lasts 5.00 battles v 4.88 for the rest)
+  PASS  preserving the army pays across a run (SAFEGUARD lasts 4.99 battles v 4.86 for the rest)
 
 PAIRINGS — 52920 list-and-deployment pairs, each resolved with the layer and without it
   deployments that formed at least one pairing: 26164 of 52920
@@ -113,21 +113,21 @@ PAIRING VERDICT
   PASS  a pairing is something you have to build for (26756 formed none)
 
 THE ENEMY — the same 1080 policies against the control enemy and against the one the game ships
-  battles won per run: control 2.04   varied 1.95
-  runs the enemy changed: 792 of 1080
-  faced eradication   2556 engagements   player won 54.3%
-  faced dominion      2564 engagements   player won 27.9%
-  battles won 0..5 against the shipping enemy: 0:150  1:250  2:335  3:218  4:105  5:22
-  runs that took four or more: 11.8%   all five: 2.0%
+  battles won per run: control 2.04   varied 1.96
+  runs the enemy changed: 793 of 1080
+  faced eradication   2562 engagements   player won 54.5%
+  faced dominion      2572 engagements   player won 28.0%
+  battles won 0..5 against the shipping enemy: 0:144  1:250  2:339  3:222  4:103  5:22
+  runs that took four or more: 11.6%   all five: 2.0%
 
 ENEMY VERDICT
-  PASS  which enemy you drew changes the run (792 of 1080 ran differently)
+  PASS  which enemy you drew changes the run (793 of 1080 ran differently)
   PASS  the enemy declares more than one way to win (eradication, dominion)
-  PASS  no enemy declaration is a free win (best is 54.3%)
-  PASS  no enemy declaration is an unloseable wall (worst is 27.9%)
+  PASS  no enemy declaration is a free win (best is 54.5%)
+  PASS  no enemy declaration is an unloseable wall (worst is 28.0%)
   PASS  clearing the ladder is a result rather than the default (2.0% of runs took all five)
-  PASS  and it is reachable (11.8% took four or more)
-  PASS  the enemy's declaration does not decide the engagement on its own (26.4% between its best and worst, ceiling 30.0%)
+  PASS  and it is reachable (11.6% took four or more)
+  PASS  the enemy's declaration does not decide the engagement on its own (26.5% between its best and worst, ceiling 30.0%)
 
 THE GROUND — 5292 list-and-plan pairs, each fought on the Circuit and on a flat plain
   results the ground changed: 4686   outcomes it flipped: 918
@@ -164,14 +164,14 @@ SOLVABILITY VERDICT
   PASS  reading the enemy pays (6 of 6 reward the best answer by 3+ VP over the median)
 
 THE MAP — 216 runs, three ways of choosing which road to take into every engagement
-  standing   battles won 1.97   victory points  51.0   warband 3.99   armies broken 56.9%
-  rich       battles won 1.50   victory points  65.1   warband 4.35   armies broken 41.7%
-  safe       battles won 2.26   victory points  46.5   warband 4.56   armies broken 37.5%
+  standing   battles won 1.97   victory points  51.1   warband 3.99   armies broken 56.9%
+  rich       battles won 1.50   victory points  65.1   warband 4.33   armies broken 41.7%
+  safe       battles won 2.29   victory points  46.4   warband 4.54   armies broken 37.5%
 
 MAP VERDICT
-  PASS  the hard road pays for itself (65.1 against 51.0 victory points)
-  PASS  and costs something (1.50 battles won against 2.26)
-  PASS  which road you take changes the run (0.76 battles won between the policies)
+  PASS  the hard road pays for itself (65.1 against 51.1 victory points)
+  PASS  and costs something (1.50 battles won against 2.29)
+  PASS  which road you take changes the run (0.79 battles won between the policies)
   PASS  every road is reachable (4 of 4 offered across 24 runs)
 
 THE SKILLED RUN — 180 runs played by choosing the plan, the five and the order at every engagement
@@ -180,19 +180,19 @@ THE SKILLED RUN — 180 runs played by choosing the plan, the five and the order
   NOTE: chooses by resolving each candidate, so it sees the enemy hand. A ceiling, not a player.
   battles resolved to make the choices: 243941
   battles won 0..5   skilled: 0:0  1:2  2:0  3:6  4:40  5:132
-  battles won 0..5   fixed:   0:44  1:121  2:163  3:126  4:68  5:18
-  battles won per run   skilled 4.67   fixed 2.20
+  battles won 0..5   fixed:   0:39  1:121  2:167  3:127  4:68  5:18
+  battles won per run   skilled 4.67   fixed 2.22
   cleared the ladder    skilled 73.3%   fixed 3.3%
-  armies broken         skilled 1.1%   fixed 14.8%
-  faced eradication  skilled 99.7%   fixed 64.9%
+  armies broken         skilled 1.1%   fixed 14.1%
+  faced eradication  skilled 99.7%   fixed 65.4%
   faced dominion     skilled 90.1%   fixed 34.3%
-  declaration gap       skilled 9.6%   fixed 30.6%
+  declaration gap       skilled 9.6%   fixed 31.1%
 
 SKILLED RUN VERDICT
-  PASS  playing well beats playing a fixed plan (4.67 battles won against 2.20)
+  PASS  playing well beats playing a fixed plan (4.67 battles won against 2.22)
   PASS  and reaches the end of the ladder more often (73.3% against 3.3%)
   PASS  without making the ladder a formality (73.3% cleared it, ceiling 90.0%)
   NOTE  4 of 6 outcomes reached, but the commonest holds 73.3% of runs
-  NOTE  attrition barely reaches a skilled run: 1.1% of armies broke against 14.8% under a fixed plan
+  NOTE  attrition barely reaches a skilled run: 1.1% of armies broke against 14.1% under a fixed plan
   PASS  the enemy's declaration does not decide the run against a player who answers it (9.6%, ceiling 30.0%)
 ```

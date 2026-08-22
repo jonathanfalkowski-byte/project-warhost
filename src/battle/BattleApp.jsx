@@ -128,8 +128,10 @@ export default function BattleApp({ onExit }) {
     return next;
   }, [deployment, mission, run]);
   const player = useMemo(
-    () => buildPlayerForce({ mission, deployment: planned, formations: FORMATIONS, battlePlan }),
-    [planned, battlePlan, mission],
+    // `slots.length` rather than the board's positions, so a road that costs one is a lane
+    // the plan loses rather than a lane it quietly redistributes.
+    () => buildPlayerForce({ mission, deployment: planned, formations: FORMATIONS, battlePlan, positions: slots.length }),
+    [planned, battlePlan, mission, slots.length],
   );
   const result = useMemo(() => resolveBattle({
     playerUnits: player.units,

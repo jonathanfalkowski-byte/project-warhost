@@ -179,23 +179,40 @@ export const buildEnemyForce = (mission = CIRCUIT_CLASH, army = armyFor(mission.
 };
 
 export const buildPlayerForce = ({
-  mission = CIRCUIT_CLASH, deployment = {}, formations = [], battlePlan = null,
+  mission = CIRCUIT_CLASH, deployment = {}, formations = [], battlePlan = null, positions = null,
 } = {}) => {
   const byId = new Map(formations.map((formation) => [formation.id, formation]));
   const units = [];
   const orders = {};
   const paths = {};
-  // How many are actually walking this plan, and which of them each one is — counted across
-  // the ARMY west to east rather than across the deployment slots, because a plan is lanes
-  // now and the lanes are shared out among whoever turned up.
-  const filled = mission.playerDeployment.filter((slot) => deployment[slot.id]?.formationId && byId.get(deployment[slot.id].formationId));
-  const size = filled.length;
+  // A LANE BELONGS TO A DEPLOYMENT POSITION, not to whoever happens to have turned up.
+  //
+  // The lanes used to be shared out among the FILLED slots, so filling a third slot
+  // re-resolved the plan for the two already in it. Reported from play on 21 Aug 2026:
+  // slotting the MAIN BATTLE TANK into the centre moved it off the REACTOR SPINE and onto
+  // EAST GANTRY, because SPEAR's shares are 1:3:1 and three formations divide them
+  // differently from five. AGENTS.md forbids exactly that — "staffing a formation never
+  // moves, bends, or replaces authored route geometry" — and it is the worse rule to break,
+  // because the plan was rearranging itself underneath a decision being made about it.
+  //
+  // So the lane is the position's, west to east across the board. Leaving a slot empty means
+  // that lane goes unwalked; it does not redistribute the others.
+  //
+  // The ENEMY still shares its lanes out by army size, and that is not an inconsistency: a
+  // part-strength Helioch force fills the first N of its positions contiguously, so giving
+  // it board-based lanes would bunch the whole army into the western flank. Its positions
+  // are handed out by count. The player's are chosen by position.
+  // HOW MANY POSITIONS THIS ENGAGEMENT ALLOWS, which is the road's answer and not the
+  // board's: FORCED MARCH costs a deployment position, and a lane basis read off the board
+  // would hand that cost straight back. Callers that know the road pass it; the default is
+  // the whole board, for the tests and tools that fight on an unmodified one.
+  const size = positions ?? mission.playerDeployment.length;
   mission.playerDeployment.forEach((slot, slotIndex) => {
     const entry = deployment[slot.id];
     if (!entry?.formationId) return;
     const formation = byId.get(entry.formationId);
     if (!formation) return;
-    const index = filled.indexOf(slot);
+    const index = slotIndex;
     // Keyed on the INSTANCE, so a warband holding two of the same hull deploys two units
     // with two orders and two routes rather than one unit counted twice.
     const id = entry.id ?? formation.id;

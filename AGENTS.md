@@ -1071,3 +1071,71 @@ Not one was a resolution bug, which is exactly why none of them was visible to 1
 and forty-odd balance verdicts pointed at the engine. The sweep resolves battles; it never
 reads a word the game says. Two fights found four defects the whole apparatus could not see,
 and that ratio is the argument for playing it.
+
+## A lane belongs to a position (21 Aug 2026)
+
+Reported from play, on SPEAR: *"when i slotted the main battle tank into the middle slot the
+plan changed... Is that supposed to happen?"*
+
+It was. The lanes were shared out among the FILLED slots, so filling a third re-resolved the
+plan for the two already in it. SPEAR's shares are **1 : 3 : 1**, and three formations divide
+them differently from five:
+
+```
+size 3 -> south-relay, reactor, east-gantry
+size 5 -> south-relay, reactor, reactor, reactor, east-gantry
+```
+
+So staffing the centre moved it off the two-point REACTOR SPINE and onto EAST GANTRY. That
+is the rule this file already had, broken by the lanes change that came after it: *staffing a
+formation never moves, bends, or replaces authored route geometry.* It is the worse of the
+two rules to break, because the plan was rearranging itself underneath a decision being made
+about it.
+
+Worse, the deploy panel was showing **two plans at once**: filled slots read the resolved
+orders at the current turnout, empty slots read the plan at full size. `CENTRE → EAST GANTRY`
+next to `EAST CENTRE → REACTOR SPINE` is not a plan, it is two plans spliced.
+
+### A lane is the position's
+
+`size` is how many positions the engagement allows and `index` is the slot's own place on the
+board, west to east. An empty slot is a lane nobody walks; it does not hand its share to
+everyone else. SPEAR now reads as the column its own text describes at every turnout.
+
+### The road still costs a position
+
+The first version of the fix read the lane basis off the BOARD, and
+`tests/app-render.test.mjs` caught it: *"FORCED MARCH costs a deployment position — the only
+way a harder road can be harder while both armies have five. If the screen keeps offering
+five, the road is a free 45%."* Board-based lanes hand that cost straight back.
+
+So the basis is the road's allowance, threaded through `buildPlayerForce` as an explicit
+`positions` argument. Four positions is a genuine four-lane plan — `south-relay, reactor,
+reactor, east-gantry` — a different shape, so the road buys something.
+
+### The enemy is deliberately not this rule
+
+`buildEnemyForce` fills a part-strength army into its first N positions CONTIGUOUSLY, so
+board-based lanes would bunch the whole Helioch force into one flank. Its positions are handed
+out by count; the player's are chosen by position. Different situations, different rule, and
+both are written down so neither gets "fixed" into the other.
+
+### A mutant that could not fail
+
+Fixing this un-skipped `"a part-strength warband takes a slice out of the middle of its
+plan"`, which had been sitting in the skip list because the code had moved. It ran for the
+first time in a while — and survived. It swaps `index` for `slotIndex` in the route lookup,
+and `index` is now DEFINED as `slotIndex`, so it edits the file, passes the `cmp` guard, and
+changes nothing.
+
+Removed. A mutant that cannot fail is worse than no mutant, because it counts. It is also the
+one failure the harness still cannot catch for itself: `cmp` proves the text changed, and
+nothing proves the meaning did. Some of the remaining **32 skips** will be this rather than
+lost coverage, and they should be read that way when the list is worked.
+
+### Cost
+
+Every run where fewer formations were fielded than there are positions resolves differently.
+Armies broken across the run axis moved 4.4% to 5.0%, dispositions by under a fifth of a
+point, no verdict changed state. Skilled attrition is unchanged at **1.1%**, so the open
+question about the difficulty curve is exactly where it was.
