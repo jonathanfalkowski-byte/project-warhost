@@ -18,7 +18,7 @@ const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 import { resolveBattle } from "./battleRules.js";
 import { DETACHMENTS, RESERVE_PREMIUM, detachmentFor, detachmentList, scoutedPool, stratagemFor } from "./stratagems.js";
 import { dispositionFor, dispositionsFor, liveSitesFor } from "./doctrine.js";
-import { afterActionFor, headlineFor, pairingLinksFor, roundPanelFor, supportLinksFor } from "./afterAction.js";
+import { afterActionFor, headlineFor, pairingLinksFor, roundPanelFor, sightlinesFrom, supportLinksFor } from "./afterAction.js";
 import { profileWithRefit, refitFor } from "./refits.js";
 import { SYNERGY_COUNT, leadsFor } from "./synergies.js";
 import { MENDS } from "./market.js";
@@ -45,6 +45,10 @@ export default function BattleApp({ onExit }) {
   // can pause to read a round or step back through it, but doing nothing must still show
   // the whole battle.
   const [playing, setPlaying] = useState(true);
+  // WHICH MARKER IS BEING LOOKED AT, so its sightlines can be drawn and nobody else's. Every
+  // formation's lines at once is twenty-five lines over a board with five markers on it,
+  // which is not a decision aid, it is a cobweb.
+  const [sighting, setSighting] = useState(null);
   // Which stratagem is committed to which round: { brace: 3 }. Choosing the round is the
   // decision — "the command seal at the right place and time".
   const [commitments, setCommitments] = useState({});
@@ -335,6 +339,20 @@ export default function BattleApp({ onExit }) {
   // marker on the board, so it can sit on your ground for five rounds and score nothing for
   // it — and the round panel was crediting it the face value anyway, which reads as losing
   // ground you are not losing. Both sides are resolved here, each through its own rule.
+  // The lines for whichever marker is being looked at, before commitment. Enemy positions
+  // are public in this game - you are told its detachment, its disposition and where every
+  // formation is going - so drawing what your own guns can reach reveals nothing that was
+  // being kept back. The hand stays hidden, as it always did.
+  const sighted = !committed && sighting
+    ? player.units.find((unit) => unit.id === sighting) ?? null
+    : null;
+  const sightlines = sighted
+    ? sightlinesFrom({ from: sighted, targets: enemy.units, missionId: mission.id, range: sighted.range })
+    : [];
+  const sightSummary = sightlines.length
+    ? `${sightlines.filter((line) => line.status === "clear").length} OF ${sightlines.length}`
+    : null;
+
   // Rows for the round panel, already told what each marker paid the side holding it. The
   // derivation lives in afterAction.js so it can be tested and mutated; nothing computed
   // inside this component can be reached by either.
@@ -458,6 +476,17 @@ export default function BattleApp({ onExit }) {
                   />
                 );
               })}
+
+              {/* WHAT THE GUN CAN SEE FROM THERE. Drawn in the same overlay as the routes and
+                  read off the same sightBlocked the battle resolves with, so the picture and
+                  the fight cannot disagree. */}
+              {sighted && sightlines.map((line) => (
+                <line
+                  key={`sight-${line.id}`}
+                  className={`battle-sightline battle-sightline-${line.status}`}
+                  x1={sighted.x} y1={sighted.y} x2={line.x} y2={line.y}
+                />
+              ))}
             </svg>
           )}
 
@@ -492,6 +521,10 @@ export default function BattleApp({ onExit }) {
             // hangs inwards instead.
             const edge = unit.x > 76 ? "edge-right" : unit.x < 24 ? "edge-left" : "";
             const line = profile ? statLineFor(profile) : null;
+            // Only your own formations, only while the plan is still being made, and only
+            // while standing: a wreck has no line of sight to draw.
+            const sightable = !committed && unit.side === "player" && unit.wounds > 0;
+            const looking = sighting === unit.id;
             return (
               <div
                 key={`${unit.side}-${unit.id}`}
@@ -502,7 +535,16 @@ export default function BattleApp({ onExit }) {
                    card shows, so a screen reader gets the profile from the marker itself
                    and the card can be hidden from it rather than read out twice. */
                 tabIndex={0}
-                aria-label={`${unit.name} — ${standing}${line ? `. ${line}` : ""}`}
+                /* Pointer AND keyboard, for the same reason the card is reachable both ways:
+                   a sightline that only exists under a mouse is a rule only some players get
+                   to see. Enemy markers do not offer it - what the Helioch can see is its
+                   business, and the one thing this game hides is the hand. */
+                onMouseEnter={sightable ? () => setSighting(unit.id) : undefined}
+                onMouseLeave={sightable ? () => setSighting(null) : undefined}
+                onFocus={sightable ? () => setSighting(unit.id) : undefined}
+                onBlur={sightable ? () => setSighting(null) : undefined}
+                aria-label={`${unit.name} — ${standing}${line ? `. ${line}` : ""}${
+                  sightable && looking && sightSummary ? `. Sees ${sightSummary} enemy formations from here` : ""}`}
               >
                 <b>{unit.name}</b>
                 <i aria-hidden="true"><em style={{ width: `${Math.max(0, 100 * unit.wounds / unit.maxWounds)}%` }} /></i>
@@ -515,6 +557,9 @@ export default function BattleApp({ onExit }) {
                   <span className="battle-unit-card-name">{unit.name}</span>
                   {line && <span className="battle-unit-stats">{line}</span>}
                   <span className="battle-unit-card-state">{standing}</span>
+                  {sightable && looking && sightSummary && (
+                    <span className="battle-unit-card-sight">SEES {sightSummary} FROM HERE</span>
+                  )}
                   {profile?.note && <span className="battle-unit-card-note">{profile.note}</span>}
                 </span>
               </div>

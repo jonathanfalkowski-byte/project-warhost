@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { headlineFor, roundPanelFor } from "../src/battle/afterAction.js";
+import { headlineFor, roundPanelFor, sightlinesFrom } from "../src/battle/afterAction.js";
 import { CIRCUIT_CLASH, THE_NARROWS } from "../src/battle/battleMission.js";
 import { deployUnit, resolveBattle } from "../src/battle/battleRules.js";
 import { liveSitesFor } from "../src/battle/doctrine.js";
+import { terrainFor } from "../src/battle/battleTerrain.js";
 import { FIELD_REPAIR_WOUNDS, marketFor } from "../src/battle/market.js";
 import { profileWithRefit } from "../src/battle/refits.js";
 
@@ -380,4 +381,79 @@ test("fight one, second line: a patch reports what it put back, not what it trie
 
   const healed = out.rounds.at(-1).players.find((unit) => unit.id === "g#1");
   assert.equal(healed.wounds, 6, "and it stops at the cap rather than overshooting it");
+});
+
+// WHAT A GUN CAN REACH. The rules have always consulted sightBlocked when picking a target;
+// the screen never did, so "this gun has no lane" was learned in round three rather than
+// while placing it. These test the derivation the deploy screen now draws.
+
+// A real blocking feature off the board rather than an invented one, so the test cannot pass
+// against geometry the game does not have.
+const STACK = terrainFor(CIRCUIT_CLASH.id).find((feature) => feature.kind === "blocking");
+// Directly south of it, firing directly north through it.
+const SHOOTER = { id: "gun", name: "SIEGE GUN CARRIAGE", x: STACK.x, y: STACK.y + 22, range: 60 };
+const behind = { id: "behind", name: "BEHIND THE STACK", x: STACK.x, y: STACK.y - 22, wounds: 5 };
+const open = { id: "open", name: "IN THE OPEN", x: STACK.x + 34, y: STACK.y - 10, wounds: 5 };
+
+test("a shot through blocking ground is reported blocked, not clear", () => {
+  const [line] = sightlinesFrom({
+    from: SHOOTER, targets: [behind], missionId: CIRCUIT_CLASH.id, range: SHOOTER.range,
+  });
+  assert.equal(line.blocked, true);
+  assert.equal(line.status, "blocked");
+  assert.ok(line.distance <= SHOOTER.range, "and it is a shot that could otherwise have reached");
+});
+
+test("a shot with nothing in the way is clear", () => {
+  const [line] = sightlinesFrom({
+    from: SHOOTER, targets: [open], missionId: CIRCUIT_CLASH.id, range: SHOOTER.range,
+  });
+  assert.equal(line.blocked, false);
+  assert.equal(line.status, "clear");
+});
+
+test("out of range beats blocked, because blocking is academic on a shot that cannot arrive", () => {
+  // The same target and the same stack, on a hull that cannot reach it. Reporting BLOCKED
+  // there would send the player to move a wall that was never the problem.
+  const [line] = sightlinesFrom({
+    from: SHOOTER, targets: [behind], missionId: CIRCUIT_CLASH.id, range: 5,
+  });
+  assert.equal(line.blocked, true, "the stack is still in the way");
+  assert.equal(line.status, "far", "but the range is what the player has to fix");
+});
+
+test("with no range given, reach is not judged at all", () => {
+  const [line] = sightlinesFrom({ from: SHOOTER, targets: [open], missionId: CIRCUIT_CLASH.id });
+  assert.equal(line.status, "clear", "a caller that did not say how far it shoots is not told it is short");
+});
+
+test("a wreck is not something to draw a line to", () => {
+  const lines = sightlinesFrom({
+    from: SHOOTER,
+    targets: [open, { id: "dead", name: "A WRECK", x: STACK.x + 5, y: STACK.y - 5, wounds: 0 }],
+    missionId: CIRCUIT_CLASH.id,
+    range: SHOOTER.range,
+  });
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].id, "open");
+});
+
+test("without a mission there is no ground, so nothing is blocked by it", () => {
+  // The board is what carries the terrain. Asked without one, the honest answer is that
+  // nothing is known to be in the way - not that everything is.
+  const [line] = sightlinesFrom({ from: SHOOTER, targets: [behind], range: SHOOTER.range });
+  assert.equal(line.blocked, false);
+  assert.equal(line.status, "clear");
+});
+
+test("no shooter is no lines, rather than a crash", () => {
+  assert.deepEqual(sightlinesFrom({ targets: [open], missionId: CIRCUIT_CLASH.id }), []);
+  assert.deepEqual(sightlinesFrom(), []);
+});
+
+test("the line carries where to draw it to", () => {
+  const [line] = sightlinesFrom({ from: SHOOTER, targets: [open], missionId: CIRCUIT_CLASH.id });
+  assert.equal(line.x, open.x);
+  assert.equal(line.y, open.y);
+  assert.equal(line.name, "IN THE OPEN");
 });

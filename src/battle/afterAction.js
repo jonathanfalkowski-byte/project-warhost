@@ -13,6 +13,7 @@
 
 import { OBJECTIVE_CONTROL_RANGE } from "./battleProfiles.js";
 import { COMMAND_RANGE, SHIELD_RANGE } from "./battleRules.js";
+import { sightBlocked } from "./battleTerrain.js";
 import { dispositionFor, liveSitesFor } from "./doctrine.js";
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -160,6 +161,40 @@ export const headlineFor = ({ round, previous, known = [], disposition = null } 
 // AND from the mutation harness. The three defects reported from play were all in this
 // layer, and all three were invisible to a suite pointed entirely at the engine. A pure
 // function is the difference between logic that can be guarded and logic that cannot.
+// WHAT THIS FORMATION CAN ACTUALLY SHOOT, from where it is standing.
+//
+// The rules have always known. `sightBlocked` is consulted when a unit picks a target and
+// again when FOCUS FIRE picks one for the army, so a gun with a stack in front of it holds
+// fire every round of every battle. None of that reached the screen, which meant "this gun
+// has no lane" was something you found out in round three rather than while placing it.
+//
+// Three states rather than two, because the reasons are different and so are the fixes. A
+// shot that cannot reach is a range problem; a shot that reaches and is cut is a placement
+// problem, and it is the one worth drawing. Out of range wins the tie: blocking is academic
+// on a shot that was never going to arrive.
+export const SIGHT_STATES = Object.freeze(["clear", "blocked", "far"]);
+
+export const sightlinesFrom = ({ from, targets = [], missionId = null, range = null } = {}) => {
+  if (!from) return [];
+  return targets
+    // A wreck is not a target. `wounds` is absent on a bare position, and absent is alive.
+    .filter((target) => target && (target.wounds === undefined || target.wounds > 0))
+    .map((target) => {
+      const distance = Math.hypot(target.x - from.x, target.y - from.y);
+      const blocked = Boolean(missionId) && sightBlocked(from, target, missionId);
+      const far = range !== null && distance > range;
+      return {
+        id: target.id,
+        name: target.name,
+        x: target.x,
+        y: target.y,
+        distance,
+        blocked,
+        status: far ? "far" : blocked ? "blocked" : "clear",
+      };
+    });
+};
+
 export const roundPanelFor = ({
   round, objectives = [], playerDisposition = "dominion", enemyDisposition = "dominion",
 } = {}) => {

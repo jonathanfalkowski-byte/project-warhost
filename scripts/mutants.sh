@@ -1060,6 +1060,33 @@ echo "=== the round panel ==="
 # The layer all three reported defects lived in, and the one the harness could not reach
 # until roundPanelFor came out of BattleApp. These decide whether the panel tests are guards
 # or just seven more things that happen to pass.
+echo "=== what a gun can reach ==="
+# The rules always consulted sightBlocked; the screen never did. These decide whether the
+# derivation the deploy screen draws is guarded, or eight more things that happen to pass.
+mutate "a blocked lane is drawn as a clear one" src/battle/afterAction.js \
+      'const blocked = Boolean(missionId) && sightBlocked(from, target, missionId);' \
+      'const blocked = false;' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "the sightline test is inverted, so open ground reads as blocked" src/battle/afterAction.js \
+      'const blocked = Boolean(missionId) && sightBlocked(from, target, missionId);' \
+      'const blocked = Boolean(missionId) && !sightBlocked(from, target, missionId);' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "reach stops being judged, so a shot that cannot arrive reads clear" src/battle/afterAction.js \
+      'const far = range !== null && distance > range;' \
+      'const far = false;' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "a caller that named no range is told its shots are short" src/battle/afterAction.js \
+      'const far = range !== null && distance > range;' \
+      'const far = distance > range;' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "blocked outranks out-of-range, so the player is sent to move the wrong thing" src/battle/afterAction.js \
+      'status: far ? "far" : blocked ? "blocked" : "clear",' \
+      'status: blocked ? "blocked" : far ? "far" : "clear",' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "a wreck is still drawn a line" src/battle/afterAction.js \
+      '.filter((target) => target && (target.wounds === undefined || target.wounds > 0))' \
+      '.filter((target) => Boolean(target))' \
+      "tests/battle-what-it-pays.test.mjs"
 echo "=== a lane belongs to a position ==="
 # Reported from play: staffing the centre slot moved the formations already deployed. The
 # lanes were shared out among whoever had turned up, so filling a third slot re-resolved the

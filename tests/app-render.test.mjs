@@ -115,7 +115,16 @@ test("the screen fights on the ground it draws", () => {
   // there is no way to see that from the outside — the board would look exactly right and
   // every shot would be wrong.
   const source = readFileSync(new URL("../src/battle/BattleApp.jsx", import.meta.url), "utf8");
-  assert.match(source, /missionId:\s*mission\.id/, "the app resolves its battles on a flat plain");
+
+  // THE RESOLVE CALL SPECIFICALLY, not the string anywhere in the file. This asserted
+  // `/missionId:\s*mission\.id/` against the whole source, and the moment a second, entirely
+  // innocent caller wanted the mission id - the sightline derivation - deleting it from the
+  // battle resolution stopped failing anything. The mutant that blanks it survived, which is
+  // how the hole was found. A grep over a file is a guard on the file, not on the call.
+  const resolve = source.slice(source.indexOf("resolveBattle({"));
+  const call = resolve.slice(0, resolve.indexOf("})"));
+  assert.ok(call.length > 0, "resolveBattle is not called from the screen at all");
+  assert.match(call, /missionId:\s*mission\.id/, "the app resolves its battles on a flat plain");
   assert.match(source, /terrainFor\(mission\.id\)/, "the app draws terrain from somewhere other than the mission");
 });
 

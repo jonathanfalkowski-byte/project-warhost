@@ -71,6 +71,19 @@
 /* Off a touchline marker, inwards: the board clips what it cannot fit. */
 .battle-unit.edge-left .battle-unit-card { left: 0; transform: none; }
 .battle-unit.edge-right .battle-unit-card { left: auto; right: 0; transform: none; }
+/* WHAT A GUN CAN REACH FROM WHERE IT IS STANDING. Three states because the fixes differ: a
+   clear lane is worth confirming, a cut one is a placement problem and the reason this is
+   drawn at all, and out of range is a range problem the player can solve by walking. Drawn
+   under the markers so it never sits on top of a name. */
+.battle-sightline { vector-effect: non-scaling-stroke; fill: none; }
+.battle-sightline-clear { stroke: #6fc8ea; stroke-width: 1; stroke-dasharray: 5 3; }
+.battle-sightline-blocked { stroke: #c8654c; stroke-width: 1.2; stroke-dasharray: 2 4; }
+/* Recessive by COLOUR, not by opacity. accessibility.test.mjs exempts strokes from that rule
+   and this could have joined the exemption; a flat dim slate needs no exemption at all, and
+   a rule nobody had to be excused from is the better rule. */
+.battle-sightline-far { stroke: #40575f; stroke-width: .8; stroke-dasharray: 1 5; }
+.battle-unit-card-sight { color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+
 .battle-unit-card-name { color: #e6efec; font-family: "Barlow Condensed"; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; }
 .battle-unit-stats { color: #8fdcf6; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .05em; }
 .battle-unit-card-state { color: #9fd6c6; font-family: "Barlow Condensed"; font-size: 11px; letter-spacing: .05em; }
