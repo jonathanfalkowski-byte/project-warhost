@@ -807,9 +807,13 @@ name.
 
 ### Housekeeping
 
-`scripts/mutants.sh` now runs 172 mutants with none surviving and **32 skipped** — patterns
-that no longer appear exactly once because the code moved out from under them. They are
-printed at the end of every run. That is a real hole and the number should be going down.
+`scripts/mutants.sh` runs **178 mutants with none surviving and 32 skipped** — patterns that
+no longer appear exactly once because the code moved out from under them. They are printed
+at the end of every run. That is a real hole and the number should be going down.
+
+The figure this paragraph used to carry (172, none, 32) was not measured on this machine and
+could not have been: the harness was silently mutating nothing and scoring every mutant as a
+survivor. See *The sweep that could not fail*.
 
 ## What the screen said it paid (19 Aug 2026)
 
@@ -880,10 +884,190 @@ Only ERADICATION carries a `wreckBounty`, so the headline states the cost when t
 rule does not pay for it. The banner order is unchanged — a formation lost still outranks a
 formation wrecked.
 
-### The freshness guard was watching the wrong thing
+### The freshness guard was watching the wrong thing, twice
 
 `scripts/check-findings-fresh.mjs` compared `docs/balance.md` against `scripts/battle-sweep.mjs`
 alone. Gating the rebuild offer changed what every reward policy buys, so the run axis
 reported different numbers from a byte-identical script — warband 9.91 to 9.93, refits 69.4%
 to 69.8%. The commoner way findings go stale is not the sweep changing, it is the **game**
-changing underneath an unchanged sweep. The guard watches `src/battle` as well now.
+changing underneath an unchanged sweep. The guard was widened to watch `src/battle` too.
+
+**Then that broke as well, and worse.** Moving the round panel's derivation into a pure
+function changed `src/battle` without moving a single number, so the guard failed — and
+regenerating produced a byte-identical file, so there was nothing to commit, so the findings'
+commit time never advanced, so it failed again. A false positive with no way out is worse
+than the staleness it was written to catch.
+
+It asks the real question now: run the sweep, render the document it implies, compare. No
+timestamps, no proxies — either the file says what the sweep says or it does not. That is
+only possible because the sweep is deterministic and byte-identical across runs, which is
+the same property the whole exhaustive method rests on. `--write` regenerates.
+
+It reads the verdicts from that same run, so CI stopped sweeping twice: one hundred seconds
+back, and the two checks can no longer disagree about which sweep they are describing. The
+npm preamble came out of `docs/balance.md` at the same time — two lines describing how the
+output was obtained are not findings, and they made the document depend on which command
+produced it rather than on what it measured.
+
+## The sweep that could not fail (19 Aug 2026)
+
+`scripts/mutants.sh` was reporting **`killed 0 mutants, 204 survived`** on this machine, and
+had been for some time. Not one mutant had run. Three defects, each hidden by the one above
+it, and the middle one is the only one worth remembering.
+
+### The stub that exits 0
+
+`mutate` called `python3`. On Windows that usually resolves to the Microsoft Store **App
+Execution Alias**, which prints `Python was not found` and **exits 0**. Real Python is on
+this machine as `python`.
+
+Because the stub exits zero, nothing failed. The file was never edited, `node --test` then
+ran against pristine source, passed, and the mutant was recorded as having SURVIVED. Every
+one of them, every run.
+
+The interpreter is now resolved once at startup by making a candidate **print a token only a
+real interpreter can print**. Asking for `--version` is not enough — the stub answers that
+too, which is exactly how it passed for a live dependency. If none of `python3`, `python`,
+`py` can do it, the script refuses to start rather than producing numbers.
+
+### The failure that scored itself as a result
+
+This is the one that matters, and it would have outlived the fix above.
+
+`mutate` treated exit code 3 as "pattern moved, skip this one" and **everything else as
+success**. Any other failure — no interpreter, unwritable file, a crash inside the edit —
+fell straight through to the test run, which then measured the *intact* build, passed, and
+blamed the guard for passing.
+
+A measurement tool is allowed to crash. It is not allowed to report the opposite of the
+truth in the tool's own vocabulary. Status 3 skips, 0 proceeds, anything else aborts the
+whole sweep loudly. And after a successful edit the file is `cmp`'d against its backup,
+because a write that silently no-ops leaves the sweep measuring the original code while
+reporting on a mutant — the same failure wearing a different hat.
+
+### The crash that fix found within one run
+
+With the abort in place the very next sweep stopped on a `UnicodeDecodeError`: Python on
+Windows opens text in the locale encoding, cp1252 here, and these sources are full of
+em-dashes. Every mutant touching a file carrying one had been dying on the read — and under
+the old handling, being recorded as a survivor.
+
+`open()` now names `encoding="utf-8"` on both ends, with `newline=""` so line endings
+round-trip untouched; `.gitattributes` pins `eol=lf` and a sweep must not be the thing that
+rewrites it.
+
+### What it actually measures
+
+**178 killed, 0 survived, 32 skipped.** The guards were sound the whole time. Nothing was
+wrong with the tests; the thing that checks them had stopped being able to tell.
+
+The 172/none/32 figure this section used to carry cannot have been measured here. It was
+either taken before the em-dashes went in or on the machine the `_stage<letter>` tarballs
+come from, and it was carried forward as a fact about this repo for long enough that nobody
+re-derived it. A number in a document outlives the run that produced it.
+
+### Eight passing tests are not eight guards
+
+The three fixes in *What the screen said it paid* shipped with eight new tests, all passing,
+none mutated. Six mutants were written for them and **one survived**: the rebuild gate reads
+`profileWithRefit`, and every case in the file used an unrefitted hull, so
+`battleProfileFor` returned the identical number and swapping one for the other changed
+nothing a test could see. `bastion:wall` moves a BASTION from 14 wounds to 18, and the case
+that uses it kills the mutant.
+
+One of the three things that gate does was unguarded while the file reported full coverage
+of it. That is the argument for this script existing, made against the code written the same
+day.
+
+### Still unmeasured
+
+**32 skipped**, down one — the `market.js` service filter, whose pattern this session's own
+rebuild fix moved out from under it. Every skip is a guard the repo believes it has and does
+not, and they are printed at the end of every run. The number should keep going down.
+
+`BattleApp.jsx` carries **12 mutants and every one of them runs**. None of them touched the
+objective-panel row or the disposition the wreck banner is handed, which is the code that
+changed — and nothing could, because that logic sat inside the component.
+
+**Logic in `BattleApp` is not under-tested, it is unreachable.** The component is hook-driven
+with no props, so `renderToString` can only ever produce the screen before anything has been
+chosen; a resolved battle is not a state the suite can get to, and there is no testing
+library here to drive one. Anything load-bearing has to be a pure function outside it. So the
+round panel's derivation moved to `roundPanelFor` in `afterAction.js`, beside the other
+screen-facing pure functions, and the JSX now reads `row.paid` and `row.dark` and computes
+nothing. Same strings render; the difference is that eight tests and seven mutants can now
+reach it.
+
+That sentence originally read "no mutants at all", which was wrong and was written into this
+file before anyone counted. The count is 12, all live, and every one of the 32 skips is in an
+engine file: campaign 11, battleRules 8, battleMission 5, market 3, doctrine 2, battlePlans 2,
+battleTerrain 1. A claim about coverage is worth exactly as much as the count behind it, which
+is the same lesson as the 172 above and it was made twice in one day.
+
+## What a passing test is worth, twice in one day (19 Aug 2026)
+
+Mutation testing found a hole in freshly written tests **twice**, and both holes were the
+same shape: *a test that exercises the code without varying the thing the code branches on.*
+
+The rebuild gate reads `profileWithRefit`, and every case used an unrefitted hull — so
+`battleProfileFor` returned the identical number and the swap was invisible. Killed with
+`bastion:wall`, which moves a BASTION from 14 wounds to 18.
+
+The round panel asks `liveSitesFor` for a given `side`, and **`side` only changes the answer
+for SAFEGUARD**: DOMINION lights every marker for both armies, ERADICATION darkens every
+marker for both. Every SAFEGUARD case tested the PLAYER side, which is exactly where
+hardcoding `side: "player"` is indistinguishable from the truth. Seven tests, and the mutant
+walked through all of them.
+
+The bug it stood for is not cosmetic. SAFEGUARD keeps `south-relay` for the player and
+`north-relay` for the enemy, because each army's own half is the one it deploys in. An enemy
+declaring SAFEGUARD would have been paid for the PLAYER's half — the reverse of the truth, on
+the one disposition where which ground you hold is the entire decision. Killed by the case
+where the enemy declares it: paid at the top of the board, paid nothing at the bottom.
+
+Both were written the same day as the code, by someone who had just read it, and both passed.
+That is what the sweep is for, and it is worth more than the count it prints.
+
+**185 killed, 0 survived, 32 skipped.**
+
+## The two fights, pinned (21 Aug 2026)
+
+The fights that reported all of this are regression tests now, written with the numbers off
+the screen rather than with synthetic rounds, so a regression has to survive being
+recognisable.
+
+**Fight one — THE NARROWS, round 5, WARHOST DOMINION 13 v HELIOCH ERADICATION 5.** THE SPAN
+at `4 v 16.5` and NORTH YARD at `0 v 4` read `PAYS NOTHING` now. The assertion that matters
+is the reconciliation that was visibly broken on screen: the player's rows sum to exactly the
+`WARHOST +3` the header printed, and the enemy's to nothing, because everything HELIOCH
+scored that round it scored by doing damage rather than by holding ground.
+
+**Fight two — BREAK THE CIRCUIT, round 5, 9-10, both DOMINION.** Pinned precisely BECAUSE the
+panel was already right there. Both armies lit the board, so face value was the correct
+answer and the rows always reconciled with the header (1+1+2 = 4, 1+1 = 2). A later change
+that "corrects" this panel would be breaking it. The defect in that fight was the banner, and
+it is asserted separately.
+
+### A fourth instance of the same defect, off the same screenshot
+
+*"Patching seems to recover them to full strength as well"* was read as the market, and the
+FULL REBUILD overlap was what got fixed. But the same screen carried `SALVAGE TENDER patches
+GAFF HOOK for 2`, and that line was lying. The heal has always been capped at the hull's
+maximum — the LOG recorded the intent, so a formation close to full printed the whole attempt
+having been given the remainder.
+
+Wounds are fractional, so the test gives GAFF HOOK half a wound of room: one patch is worth a
+whole one, and the intent and the outcome cannot be confused for each other. It logs `0.5`
+and lands on exactly 6.
+
+### What four of four says
+
+Every defect reported from play has been the same thing: **the screen stating a number that
+is not the number that happened.** A panel crediting a darkened marker, a shelf offering a
+purchase that buys nothing extra, a banner celebrating an event worth zero, a log reporting
+an attempt as an outcome.
+
+Not one was a resolution bug, which is exactly why none of them was visible to 187 mutants
+and forty-odd balance verdicts pointed at the engine. The sweep resolves battles; it never
+reads a word the game says. Two fights found four defects the whole apparatus could not see,
+and that ratio is the argument for playing it.

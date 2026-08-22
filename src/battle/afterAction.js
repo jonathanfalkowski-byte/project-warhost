@@ -148,6 +148,38 @@ export const headlineFor = ({ round, previous, known = [], disposition = null } 
   return { tone: "quiet", text: "Nothing in range. Both armies are still closing." };
 };
 
+// WHAT THE ROUND PANEL SAYS EACH MARKER PAID, which is not what the marker is printed with
+// and is not the same question for both armies. `scoreObjectives` reports raw control and
+// the printed points, because that is all a control check can know; what the holder is
+// actually paid is decided by the holder's OWN declaration. An enemy on ERADICATION darkens
+// every marker, so it can stand on your ground for five rounds and score nothing for it.
+//
+// This lives here rather than inline in the panel because BattleApp is a hook-driven
+// component with no props: server-rendering it can only ever produce the screen before
+// anything has been chosen, so anything computed inside it is unreachable from the tests
+// AND from the mutation harness. The three defects reported from play were all in this
+// layer, and all three were invisible to a suite pointed entirely at the engine. A pure
+// function is the difference between logic that can be guarded and logic that cannot.
+export const roundPanelFor = ({
+  round, objectives = [], playerDisposition = "dominion", enemyDisposition = "dominion",
+} = {}) => {
+  const paysFor = (disposition, side) => new Map(
+    liveSitesFor({ disposition, side, objectives })
+      // Re-valued by the rule that kept them: SAFEGUARD doubles the little it can score, so
+      // reading the marker's face value here understates it exactly as it overstates a dark one.
+      .map((objective) => [objective.id, objective.points ?? 1]));
+  const playerPays = paysFor(playerDisposition, "player");
+  const enemyPays = paysFor(enemyDisposition, "enemy");
+  return (round?.objectives ?? []).map((entry) => {
+    const paid = entry.holder === "player" ? (playerPays.get(entry.objectiveId) ?? 0)
+      : entry.holder === "enemy" ? (enemyPays.get(entry.objectiveId) ?? 0)
+        : 0;
+    // Held is not the same as paid, and a marker taken for nothing is the interesting row on
+    // the panel. Contested is neither - nobody holds it, so nobody is being paid nothing.
+    return { ...entry, paid, dark: entry.holder !== "contested" && paid === 0 };
+  });
+};
+
 export const afterActionFor = ({ result, objectives = [], disposition = "dominion" } = {}) => {
   const rounds = result?.rounds ?? [];
   if (rounds.length === 0) return { formations: [], measure: "ground", basis: 0 };

@@ -451,9 +451,16 @@ export const resolveBattle = ({
         if (!patient) continue;
         // Repairs cannot outpace a determined gun line, or a support formation becomes an
         // answer to every list rather than a way to keep a damaged one in the fight.
-        const amount = 1 + synergyBonusFor(medic, pairings ? alive(patched) : []).repairBonus;
+        const intended = 1 + synergyBonusFor(medic, pairings ? alive(patched) : []).repairBonus;
+        // WHAT WAS PUT BACK, not what was attempted. The heal has always been capped at the
+        // hull's maximum, but the log recorded the intent, so a formation one wound below
+        // its cap and patched for two printed "patches for 2" having been given one. The
+        // same mistake as the round panel crediting a darkened marker: a number on screen
+        // that is not the number that happened.
+        const healed = Math.min(patient.maxWounds, patient.wounds + intended);
+        const amount = Number((healed - patient.wounds).toFixed(2));
         patched = patched.map((unit) => (unit.id === patient.id
-          ? { ...unit, wounds: Math.min(unit.maxWounds, unit.wounds + amount) } : unit));
+          ? { ...unit, wounds: healed } : unit));
         log.push({ phase: "repair", side, actor: medic.name, target: patient.name, amount });
       }
       return patched;
