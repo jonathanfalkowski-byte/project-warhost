@@ -11,6 +11,7 @@ import { FORMATIONS } from "../formationData.js";
 import { BATTLE_PROFILES, OBJECTIVE_CONTROL_RANGE, statLineFor } from "./battleProfiles.js";
 import { armyFor, buildEnemyForce, buildPlayerForce, missionFor, missionList } from "./battleMission.js";
 import { TERRAIN_KINDS, terrainFor } from "./battleTerrain.js";
+import { GLYPH_BOX, glyphFor } from "./formationGlyphs.js";
 
 // Enough to tell a warband's worth of the same hull apart. Roman rather than "2", because
 // "MAIN BATTLE TANK 2" reads as a mark number and these are two of the same mark.
@@ -546,7 +547,16 @@ export default function BattleApp({ onExit }) {
                 aria-label={`${unit.name} — ${standing}${line ? `. ${line}` : ""}${
                   sightable && looking && sightSummary ? `. Sees ${sightSummary} enemy formations from here` : ""}`}
               >
-                <b>{unit.name}</b>
+                <b>
+                  {/* The silhouette sits WITH the name rather than instead of it. Dropping
+                      the name would declutter a crowded board at the cost of making every
+                      marker something you have to hover to identify - and the names beside
+                      the shapes are how a player learns which shape is which at all. */}
+                  <svg className="battle-unit-glyph" viewBox={`0 0 ${GLYPH_BOX.width} ${GLYPH_BOX.height}`} aria-hidden="true" focusable="false">
+                    {glyphFor(unit.formationId).map((d) => <path key={d} d={d} />)}
+                  </svg>
+                  {unit.name}
+                </b>
                 <i aria-hidden="true"><em style={{ width: `${Math.max(0, 100 * unit.wounds / unit.maxWounds)}%` }} /></i>
                 {/* WHAT IT CAN DO, not what it is holding. The profile is public in any
                     wargame — you can read your opponent's army list off the table — and
@@ -554,7 +564,12 @@ export default function BattleApp({ onExit }) {
                     you. What stays hidden is the hand — what they are holding and when they
                     will spend it — because that is the only uncertainty this game has. */}
                 <span className="battle-unit-card" aria-hidden="true">
-                  <span className="battle-unit-card-name">{unit.name}</span>
+                  <span className="battle-unit-card-name">
+                    <svg className="battle-unit-card-glyph" viewBox={`0 0 ${GLYPH_BOX.width} ${GLYPH_BOX.height}`} aria-hidden="true" focusable="false">
+                      {glyphFor(unit.formationId).map((d) => <path key={d} d={d} />)}
+                    </svg>
+                    {unit.name}
+                  </span>
                   {line && <span className="battle-unit-stats">{line}</span>}
                   <span className="battle-unit-card-state">{standing}</span>
                   {sightable && looking && sightSummary && (
@@ -986,7 +1001,15 @@ export default function BattleApp({ onExit }) {
                 <ul>
                   {enemy.units.map((unit) => (
                     <li key={unit.id}>
-                      <b>{unit.name}</b>
+                      {/* The same shape that will be on the board. This list is where the
+                          deployment is decided, so it is also where the vocabulary is
+                          learned - a glyph met here is one you recognise out there. */}
+                      <b>
+                        <svg className="battle-enemy-glyph" viewBox={`0 0 ${GLYPH_BOX.width} ${GLYPH_BOX.height}`} aria-hidden="true" focusable="false">
+                          {glyphFor(unit.formationId).map((d) => <path key={d} d={d} />)}
+                        </svg>
+                        {unit.name}
+                      </b>
                       <em>
                         advances on {mission.objectives.find((objective) => objective.id === enemy.orders[unit.id])?.name ?? "no scoring ground"}
                       </em>

@@ -1060,6 +1060,12 @@ echo "=== the round panel ==="
 # The layer all three reported defects lived in, and the one the harness could not reach
 # until roundPanelFor came out of BattleApp. These decide whether the panel tests are guards
 # or just seven more things that happen to pass.
+echo "=== a formation has a shape ==="
+# The renders in public/assets are three megabytes each, have no silhouette at marker size,
+# and nine formations share five of them - four pairs would have been the same marker twice.
+mutate "every hull draws the fallback, so the board is one shape nine times" src/battle/formationGlyphs.js       'export const glyphFor = (formationId) => FORMATION_GLYPHS[formationId] ?? FALLBACK_GLYPH;'       'export const glyphFor = () => FALLBACK_GLYPH;'       "tests/battle-glyphs.test.mjs"
+mutate "an unknown hull draws nothing at all" src/battle/formationGlyphs.js       'export const glyphFor = (formationId) => FORMATION_GLYPHS[formationId] ?? FALLBACK_GLYPH;'       'export const glyphFor = (formationId) => FORMATION_GLYPHS[formationId] ?? [];'       "tests/battle-glyphs.test.mjs"
+mutate "two hulls are given the same shape" src/battle/formationGlyphs.js       '  skimmer: Object.freeze(['       '  skimmer: Object.freeze(["M6 12h16l3 3H6z", "M10 9h7v3h-7z", "M4 15h24v3H4z", "M21 4h1.6v6H21z", "M22 10h8v1.6h-8z"]), _skimmer: Object.freeze(['       "tests/battle-glyphs.test.mjs"
 echo "=== what a gun can reach ==="
 # The rules always consulted sightBlocked; the screen never did. These decide whether the
 # derivation the deploy screen draws is guarded, or eight more things that happen to pass.

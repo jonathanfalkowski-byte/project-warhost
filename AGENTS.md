@@ -1139,3 +1139,55 @@ Every run where fewer formations were fielded than there are positions resolves 
 Armies broken across the run axis moved 4.4% to 5.0%, dispositions by under a fifth of a
 point, no verdict changed state. Skilled attrition is unchanged at **1.1%**, so the open
 question about the difficulty curve is exactly where it was.
+
+## Shapes on the board, and what the renders are for (21 Aug 2026)
+
+Asked for: icons on the units, and a battleground where terrain affects line of sight and
+placement. Half of that was already built.
+
+### The terrain was never missing
+
+`battleTerrain.js` has carried three kinds since the battle model landed — broken ground
+halves the advance, cover cuts fire coming into it by two fifths, blocking stops sight in
+both directions — and `sightBlocked` is consulted by `battleRules` when a unit picks a target
+and again for FOCUS FIRE. The GROUND axis measures it: 4,686 of 5,292 battles resolved
+differently, 918 outcomes flipped, five of six plans reordered.
+
+What was missing is that the board never said any of it. The colours are unexplained and the
+sightlines were invisible, which is the same complaint the README already makes about terrain
+the player cannot see. `sightlinesFrom` is the answer to the second half; a key on the board
+is still owed for the first.
+
+### The renders are dossier art, not markers
+
+Every formation carries an `asset`, and no part of `src/battle/` ever read it. Opening them
+explains why that was survivable: they are isometric renders of a vehicle inside a lit scene,
+with crew and barricades, around three megabytes each, gunmetal on near-black. At marker size
+there is no silhouette to read, and against a near-black board there is no contrast to read it
+with.
+
+And nine formations share five files. `harpoon-rig.png` is the art for the RECON TANK and the
+SCOUT SKIMMER, and depicts a tracked salvage crane, which is neither. Four pairs would have
+been the same marker drawn twice.
+
+So the board gets **silhouettes** — one per archetype, side profile because a top-down tank
+and a top-down recovery vehicle are the same oblong, and colour inherited from the badge so a
+player's glyph is the player's blue without stating it twice. They sit WITH the names rather
+than instead of them: dropping the name would declutter a crowded board at the cost of making
+every marker something you have to hover to identify, and the names beside the shapes are how
+the shapes get learned. The enemy counter-board carries them too, because that is where the
+deployment is decided and therefore where the vocabulary is learned.
+
+**No two formations may share a glyph, and that is a test.** It is exactly the property the
+art failed, so it is not left as an intention.
+
+### What is still owed
+
+The renders belong on a dossier, and are not there yet, because there is no downscaler on
+this machine — no ImageMagick, no sharp, no PIL. Wiring three-megabyte files into a hover
+card would ship fourteen megabytes to draw five thumbnails and make the deploy screen worse
+rather than better. It needs a build step producing derivatives, or smaller source art.
+
+Four of the nine also depict the wrong vehicle. Putting the renders on a dossier will make
+that visible rather than hiding it, which is probably the right moment to decide whether
+those four want their own.
