@@ -12,6 +12,7 @@ import { BATTLE_PROFILES, OBJECTIVE_CONTROL_RANGE, statLineFor } from "./battleP
 import { armyFor, buildEnemyForce, buildPlayerForce, missionFor, missionList } from "./battleMission.js";
 import { TERRAIN_KINDS, terrainFor } from "./battleTerrain.js";
 import { GLYPH_BOX, glyphFor } from "./formationGlyphs.js";
+import { thumbFor } from "./formationArt.js";
 
 // Enough to tell a warband's worth of the same hull apart. Roman rather than "2", because
 // "MAIN BATTLE TANK 2" reads as a mark number and these are two of the same mark.
@@ -320,6 +321,9 @@ export default function BattleApp({ onExit }) {
     ...player.units.map((unit) => [`player:${unit.id}`, unit]),
     ...enemy.units.map((unit) => [`enemy:${unit.id}`, unit]),
   ]);
+  // The render art, keyed by hull. A deployed unit carries its wargame profile and its
+  // formationId, not the picture - the picture belongs to the formation it was built from.
+  const artFor = new Map(FORMATIONS.map((formation) => [formation.id, thumbFor(formation.asset)]));
   const scored = view ? view.objectives : null;
   const battleLog = view ? view.log.filter((entry) => entry.phase !== "stratagem") : [];
   // What each formation actually did, measured against what the declared disposition was
@@ -564,6 +568,23 @@ export default function BattleApp({ onExit }) {
                     you. What stays hidden is the hand — what they are holding and when they
                     will spend it — because that is the only uncertainty this game has. */}
                 <span className="battle-unit-card" aria-hidden="true">
+                  {/* THE DOSSIER, and the only place the render art appears. The board draws
+                      silhouettes instead: a render has no readable shape at marker size, and
+                      nine formations share five files. Here there is room for it.
+                      A derivative rather than the source - the originals are around three
+                      megabytes each, so hovering five formations would have pulled fourteen
+                      to draw five thumbnails. Lazy, because most of them are never hovered
+                      at all, and decorative, because the name beside it already says what
+                      this is. */}
+                  {artFor.get(unit.formationId) && (
+                    <img
+                      className="battle-unit-card-art"
+                      src={artFor.get(unit.formationId)}
+                      loading="lazy"
+                      decoding="async"
+                      alt=""
+                    />
+                  )}
                   <span className="battle-unit-card-name">
                     <svg className="battle-unit-card-glyph" viewBox={`0 0 ${GLYPH_BOX.width} ${GLYPH_BOX.height}`} aria-hidden="true" focusable="false">
                       {glyphFor(unit.formationId).map((d) => <path key={d} d={d} />)}

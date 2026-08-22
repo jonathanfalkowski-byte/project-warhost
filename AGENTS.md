@@ -1191,3 +1191,23 @@ rather than better. It needs a build step producing derivatives, or smaller sour
 Four of the nine also depict the wrong vehicle. Putting the renders on a dossier will make
 that visible rather than hiding it, which is probably the right moment to decide whether
 those four want their own.
+
+### The renders, at a size a hover can afford
+
+`sharp` is a devDependency now, and `npm run thumbs` writes a 416px webp beside every render
+in `public/assets`. **23,333 KB becomes 216 KB** — a hundredfold, and the difference between
+art you can hang off a pointer and art you cannot.
+
+The derivatives are committed rather than built on demand: the deploy worker serves `public/`
+as it finds it, and a card that waits for a resize is a card that flickers.
+
+`src/battle/formationArt.js` states the width and the format once and both the script and the
+screen import it, so a card sized for one picture and a file written at another cannot drift
+apart. `thumbFor` is **total** — an asset it does not recognise returns null and the card
+draws no picture, rather than an `<img>` pointed at a path assembled out of whatever it was
+handed. Nothing user-supplied reaches it today; a mapping that can only produce one shape of
+path stays correct if that changes.
+
+The board still draws silhouettes. The card is the dossier, and the only place a render
+appears — which is also where the four formations carrying the wrong vehicle become visible
+rather than hidden.

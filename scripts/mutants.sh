@@ -1060,6 +1060,11 @@ echo "=== the round panel ==="
 # The layer all three reported defects lived in, and the one the harness could not reach
 # until roundPanelFor came out of BattleApp. These decide whether the panel tests are guards
 # or just seven more things that happen to pass.
+echo "=== the dossier art ==="
+# The renders are three megabytes each. The card hangs off a hover, so it reads derivatives.
+mutate "the card loads the three-megabyte render instead of the derivative" src/battle/formationArt.js       '  return `${THUMB_PREFIX}${name}.${THUMB_FORMAT}`;'       '  return asset;'       "tests/battle-art.test.mjs"
+mutate "the mapping accepts any path it is handed" src/battle/formationArt.js       '  if (!asset.startsWith(ASSET_PREFIX) || !asset.endsWith(".png")) return null;'       '  if (typeof asset !== "string") return null;'       "tests/battle-art.test.mjs"
+mutate "a name may carry separators, so a derivative can be pointed anywhere" src/battle/formationArt.js       '  if (name.length === 0 || /[^a-zA-Z0-9._-]/.test(name) || name.includes("..")) return null;'       '  if (name.length === 0) return null;'       "tests/battle-art.test.mjs"
 echo "=== a formation has a shape ==="
 # The renders in public/assets are three megabytes each, have no silhouette at marker size,
 # and nine formations share five of them - four pairs would have been the same marker twice.

@@ -7,10 +7,11 @@
     "dev": "vite",
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
-    "test:game": "node --test tests/accessibility.test.mjs tests/app-render.test.mjs tests/battle-rules.test.mjs tests/battle-stratagems.test.mjs tests/battle-doctrine-layers.test.mjs tests/battle-plans.test.mjs tests/battle-lanes.test.mjs tests/battle-map.test.mjs tests/battle-missions.test.mjs tests/battle-after-action.test.mjs tests/battle-campaign.test.mjs tests/battle-counterplay.test.mjs tests/battle-refits.test.mjs tests/battle-support.test.mjs tests/battle-synergies.test.mjs tests/battle-terrain.test.mjs tests/battle-what-it-pays.test.mjs tests/battle-glyphs.test.mjs",
+    "test:game": "node --test tests/accessibility.test.mjs tests/app-render.test.mjs tests/battle-rules.test.mjs tests/battle-stratagems.test.mjs tests/battle-doctrine-layers.test.mjs tests/battle-plans.test.mjs tests/battle-lanes.test.mjs tests/battle-map.test.mjs tests/battle-missions.test.mjs tests/battle-after-action.test.mjs tests/battle-campaign.test.mjs tests/battle-counterplay.test.mjs tests/battle-refits.test.mjs tests/battle-support.test.mjs tests/battle-synergies.test.mjs tests/battle-terrain.test.mjs tests/battle-what-it-pays.test.mjs tests/battle-glyphs.test.mjs tests/battle-art.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "analyse": "node scripts/battle-sweep.mjs",
-    "check:findings": "node scripts/check-findings-fresh.mjs"
+    "check:findings": "node scripts/check-findings-fresh.mjs",
+    "thumbs": "node scripts/make-thumbs.mjs"
   },
   "dependencies": {
     "@fontsource/barlow": "^5.2.6",
@@ -19,5 +20,8 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "vite": "6.4.2"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3"
   }
 }
