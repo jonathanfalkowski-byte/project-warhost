@@ -1071,3 +1071,143 @@ Not one was a resolution bug, which is exactly why none of them was visible to 1
 and forty-odd balance verdicts pointed at the engine. The sweep resolves battles; it never
 reads a word the game says. Two fights found four defects the whole apparatus could not see,
 and that ratio is the argument for playing it.
+
+## A lane belongs to a position (21 Aug 2026)
+
+Reported from play, on SPEAR: *"when i slotted the main battle tank into the middle slot the
+plan changed... Is that supposed to happen?"*
+
+It was. The lanes were shared out among the FILLED slots, so filling a third re-resolved the
+plan for the two already in it. SPEAR's shares are **1 : 3 : 1**, and three formations divide
+them differently from five:
+
+```
+size 3 -> south-relay, reactor, east-gantry
+size 5 -> south-relay, reactor, reactor, reactor, east-gantry
+```
+
+So staffing the centre moved it off the two-point REACTOR SPINE and onto EAST GANTRY. That
+is the rule this file already had, broken by the lanes change that came after it: *staffing a
+formation never moves, bends, or replaces authored route geometry.* It is the worse of the
+two rules to break, because the plan was rearranging itself underneath a decision being made
+about it.
+
+Worse, the deploy panel was showing **two plans at once**: filled slots read the resolved
+orders at the current turnout, empty slots read the plan at full size. `CENTRE → EAST GANTRY`
+next to `EAST CENTRE → REACTOR SPINE` is not a plan, it is two plans spliced.
+
+### A lane is the position's
+
+`size` is how many positions the engagement allows and `index` is the slot's own place on the
+board, west to east. An empty slot is a lane nobody walks; it does not hand its share to
+everyone else. SPEAR now reads as the column its own text describes at every turnout.
+
+### The road still costs a position
+
+The first version of the fix read the lane basis off the BOARD, and
+`tests/app-render.test.mjs` caught it: *"FORCED MARCH costs a deployment position — the only
+way a harder road can be harder while both armies have five. If the screen keeps offering
+five, the road is a free 45%."* Board-based lanes hand that cost straight back.
+
+So the basis is the road's allowance, threaded through `buildPlayerForce` as an explicit
+`positions` argument. Four positions is a genuine four-lane plan — `south-relay, reactor,
+reactor, east-gantry` — a different shape, so the road buys something.
+
+### The enemy is deliberately not this rule
+
+`buildEnemyForce` fills a part-strength army into its first N positions CONTIGUOUSLY, so
+board-based lanes would bunch the whole Helioch force into one flank. Its positions are handed
+out by count; the player's are chosen by position. Different situations, different rule, and
+both are written down so neither gets "fixed" into the other.
+
+### A mutant that could not fail
+
+Fixing this un-skipped `"a part-strength warband takes a slice out of the middle of its
+plan"`, which had been sitting in the skip list because the code had moved. It ran for the
+first time in a while — and survived. It swaps `index` for `slotIndex` in the route lookup,
+and `index` is now DEFINED as `slotIndex`, so it edits the file, passes the `cmp` guard, and
+changes nothing.
+
+Removed. A mutant that cannot fail is worse than no mutant, because it counts. It is also the
+one failure the harness still cannot catch for itself: `cmp` proves the text changed, and
+nothing proves the meaning did. Some of the remaining **32 skips** will be this rather than
+lost coverage, and they should be read that way when the list is worked.
+
+### Cost
+
+Every run where fewer formations were fielded than there are positions resolves differently.
+Armies broken across the run axis moved 4.4% to 5.0%, dispositions by under a fifth of a
+point, no verdict changed state. Skilled attrition is unchanged at **1.1%**, so the open
+question about the difficulty curve is exactly where it was.
+
+## Shapes on the board, and what the renders are for (21 Aug 2026)
+
+Asked for: icons on the units, and a battleground where terrain affects line of sight and
+placement. Half of that was already built.
+
+### The terrain was never missing
+
+`battleTerrain.js` has carried three kinds since the battle model landed — broken ground
+halves the advance, cover cuts fire coming into it by two fifths, blocking stops sight in
+both directions — and `sightBlocked` is consulted by `battleRules` when a unit picks a target
+and again for FOCUS FIRE. The GROUND axis measures it: 4,686 of 5,292 battles resolved
+differently, 918 outcomes flipped, five of six plans reordered.
+
+What was missing is that the board never said any of it. The colours are unexplained and the
+sightlines were invisible, which is the same complaint the README already makes about terrain
+the player cannot see. `sightlinesFrom` is the answer to the second half; a key on the board
+is still owed for the first.
+
+### The renders are dossier art, not markers
+
+Every formation carries an `asset`, and no part of `src/battle/` ever read it. Opening them
+explains why that was survivable: they are isometric renders of a vehicle inside a lit scene,
+with crew and barricades, around three megabytes each, gunmetal on near-black. At marker size
+there is no silhouette to read, and against a near-black board there is no contrast to read it
+with.
+
+And nine formations share five files. `harpoon-rig.png` is the art for the RECON TANK and the
+SCOUT SKIMMER, and depicts a tracked salvage crane, which is neither. Four pairs would have
+been the same marker drawn twice.
+
+So the board gets **silhouettes** — one per archetype, side profile because a top-down tank
+and a top-down recovery vehicle are the same oblong, and colour inherited from the badge so a
+player's glyph is the player's blue without stating it twice. They sit WITH the names rather
+than instead of them: dropping the name would declutter a crowded board at the cost of making
+every marker something you have to hover to identify, and the names beside the shapes are how
+the shapes get learned. The enemy counter-board carries them too, because that is where the
+deployment is decided and therefore where the vocabulary is learned.
+
+**No two formations may share a glyph, and that is a test.** It is exactly the property the
+art failed, so it is not left as an intention.
+
+### What is still owed
+
+The renders belong on a dossier, and are not there yet, because there is no downscaler on
+this machine — no ImageMagick, no sharp, no PIL. Wiring three-megabyte files into a hover
+card would ship fourteen megabytes to draw five thumbnails and make the deploy screen worse
+rather than better. It needs a build step producing derivatives, or smaller source art.
+
+Four of the nine also depict the wrong vehicle. Putting the renders on a dossier will make
+that visible rather than hiding it, which is probably the right moment to decide whether
+those four want their own.
+
+### The renders, at a size a hover can afford
+
+`sharp` is a devDependency now, and `npm run thumbs` writes a 416px webp beside every render
+in `public/assets`. **23,333 KB becomes 216 KB** — a hundredfold, and the difference between
+art you can hang off a pointer and art you cannot.
+
+The derivatives are committed rather than built on demand: the deploy worker serves `public/`
+as it finds it, and a card that waits for a resize is a card that flickers.
+
+`src/battle/formationArt.js` states the width and the format once and both the script and the
+screen import it, so a card sized for one picture and a file written at another cannot drift
+apart. `thumbFor` is **total** — an asset it does not recognise returns null and the card
+draws no picture, rather than an `<img>` pointed at a path assembled out of whatever it was
+handed. Nothing user-supplied reaches it today; a mapping that can only produce one shape of
+path stays correct if that changes.
+
+The board still draws silhouettes. The card is the dossier, and the only place a render
+appears — which is also where the four formations carrying the wrong vehicle become visible
+rather than hidden.

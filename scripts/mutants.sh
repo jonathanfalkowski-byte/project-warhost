@@ -938,10 +938,21 @@ mutate "a part-strength enemy takes a slice out of the middle of its doctrine" s
       '    const route = plan ? routePointsFor(plan, index, mission.id, true, size) : [];' \
       '    const route = plan ? routePointsFor(plan, slotIndex, mission.id, true, size) : [];' \
       "tests/battle-lanes.test.mjs"
-mutate "a part-strength warband takes a slice out of the middle of its plan" src/battle/battleMission.js \
-      '    const route = battlePlan ? routePointsFor(battlePlan, index, mission.id, false, size) : [];' \
-      '    const route = battlePlan ? routePointsFor(battlePlan, slotIndex, mission.id, false, size) : [];' \
-      "tests/battle-lanes.test.mjs"
+# REMOVED: "a part-strength warband takes a slice out of the middle of its plan" swapped
+# `index` for `slotIndex` in the route lookup. That was a real mutation while `index` was
+# the filled-index, and it had been SKIPPED for a while because the code moved out from
+# under its pattern. Making a lane belong to a position defines `const index = slotIndex`,
+# so the swap now substitutes an identical value: it edits the file, passes the cmp guard,
+# and changes no behaviour, so nothing can ever kill it.
+#
+# A mutant that cannot fail is worse than no mutant, because it counts. It is also the one
+# failure this harness still cannot detect for itself - the cmp check proves the text
+# changed, and nothing proves the MEANING did. Worth remembering while working the skip
+# list: some of those 32 will be tautologies waiting to be noticed rather than coverage
+# waiting to be restored.
+#
+# The claim it was making is made properly by "a lane is shared out among whoever turned
+# up", which replaces the index with the filled count and dies.
 
 
 echo "=== what a declaration pays ==="
@@ -1049,6 +1060,50 @@ echo "=== the round panel ==="
 # The layer all three reported defects lived in, and the one the harness could not reach
 # until roundPanelFor came out of BattleApp. These decide whether the panel tests are guards
 # or just seven more things that happen to pass.
+echo "=== the dossier art ==="
+# The renders are three megabytes each. The card hangs off a hover, so it reads derivatives.
+mutate "the card loads the three-megabyte render instead of the derivative" src/battle/formationArt.js       '  return `${THUMB_PREFIX}${name}.${THUMB_FORMAT}`;'       '  return asset;'       "tests/battle-art.test.mjs"
+mutate "the mapping accepts any path it is handed" src/battle/formationArt.js       '  if (!asset.startsWith(ASSET_PREFIX) || !asset.endsWith(".png")) return null;'       '  if (typeof asset !== "string") return null;'       "tests/battle-art.test.mjs"
+mutate "a name may carry separators, so a derivative can be pointed anywhere" src/battle/formationArt.js       '  if (name.length === 0 || /[^a-zA-Z0-9._-]/.test(name) || name.includes("..")) return null;'       '  if (name.length === 0) return null;'       "tests/battle-art.test.mjs"
+echo "=== a formation has a shape ==="
+# The renders in public/assets are three megabytes each, have no silhouette at marker size,
+# and nine formations share five of them - four pairs would have been the same marker twice.
+mutate "every hull draws the fallback, so the board is one shape nine times" src/battle/formationGlyphs.js       'export const glyphFor = (formationId) => FORMATION_GLYPHS[formationId] ?? FALLBACK_GLYPH;'       'export const glyphFor = () => FALLBACK_GLYPH;'       "tests/battle-glyphs.test.mjs"
+mutate "an unknown hull draws nothing at all" src/battle/formationGlyphs.js       'export const glyphFor = (formationId) => FORMATION_GLYPHS[formationId] ?? FALLBACK_GLYPH;'       'export const glyphFor = (formationId) => FORMATION_GLYPHS[formationId] ?? [];'       "tests/battle-glyphs.test.mjs"
+mutate "two hulls are given the same shape" src/battle/formationGlyphs.js       '  skimmer: Object.freeze(['       '  skimmer: Object.freeze(["M6 12h16l3 3H6z", "M10 9h7v3h-7z", "M4 15h24v3H4z", "M21 4h1.6v6H21z", "M22 10h8v1.6h-8z"]), _skimmer: Object.freeze(['       "tests/battle-glyphs.test.mjs"
+echo "=== what a gun can reach ==="
+# The rules always consulted sightBlocked; the screen never did. These decide whether the
+# derivation the deploy screen draws is guarded, or eight more things that happen to pass.
+mutate "a blocked lane is drawn as a clear one" src/battle/afterAction.js \
+      'const blocked = Boolean(missionId) && sightBlocked(from, target, missionId);' \
+      'const blocked = false;' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "the sightline test is inverted, so open ground reads as blocked" src/battle/afterAction.js \
+      'const blocked = Boolean(missionId) && sightBlocked(from, target, missionId);' \
+      'const blocked = Boolean(missionId) && !sightBlocked(from, target, missionId);' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "reach stops being judged, so a shot that cannot arrive reads clear" src/battle/afterAction.js \
+      'const far = range !== null && distance > range;' \
+      'const far = false;' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "a caller that named no range is told its shots are short" src/battle/afterAction.js \
+      'const far = range !== null && distance > range;' \
+      'const far = distance > range;' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "blocked outranks out-of-range, so the player is sent to move the wrong thing" src/battle/afterAction.js \
+      'status: far ? "far" : blocked ? "blocked" : "clear",' \
+      'status: blocked ? "blocked" : far ? "far" : "clear",' \
+      "tests/battle-what-it-pays.test.mjs"
+mutate "a wreck is still drawn a line" src/battle/afterAction.js \
+      '.filter((target) => target && (target.wounds === undefined || target.wounds > 0))' \
+      '.filter((target) => Boolean(target))' \
+      "tests/battle-what-it-pays.test.mjs"
+echo "=== a lane belongs to a position ==="
+# Reported from play: staffing the centre slot moved the formations already deployed. The
+# lanes were shared out among whoever had turned up, so filling a third slot re-resolved the
+# plan for the two already in it.
+mutate "a lane is shared out among whoever turned up, so staffing moves the others" src/battle/battleMission.js       'const index = slotIndex;'       'const index = units.length;'       "tests/battle-lanes.test.mjs"
+mutate "the lane basis ignores the road, so a position it costs is free" src/battle/battleMission.js       'const size = positions ?? mission.playerDeployment.length;'       'const size = mission.playerDeployment.length;'       "tests/battle-lanes.test.mjs"
 mutate "a patch reports what it tried rather than what it put back" src/battle/battleRules.js       'const amount = Number((healed - patient.wounds).toFixed(2));'       'const amount = intended;'       "tests/battle-what-it-pays.test.mjs"
 mutate "a patch overshoots the hull's maximum" src/battle/battleRules.js       'const healed = Math.min(patient.maxWounds, patient.wounds + intended);'       'const healed = patient.wounds + intended;'       "tests/battle-what-it-pays.test.mjs"
 mutate "the panel reads the enemy's ground through the player's declaration" src/battle/afterAction.js \

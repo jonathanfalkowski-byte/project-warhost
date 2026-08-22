@@ -152,20 +152,7 @@ test("a part-strength army walks the whole plan, not the middle of it", async ()
       "a part-strength enemy walked a slice out of the middle of its doctrine");
   });
 
-  // The player's half of the same claim: three filled slots, three different lanes.
-  const deployment = {};
-  ["p1", "p3", "p5"].forEach((slotId, index) => {
-    const formation = FORMATIONS[index];
-    deployment[slotId] = { id: `${formation.id}#${index}`, formationId: formation.id, name: formation.name };
-  });
-  const force = buildPlayerForce({ mission: CIRCUIT_CLASH, deployment, formations: FORMATIONS, battlePlan: trapline });
-  assert.equal(force.units.length, 3);
-  assert.equal(held(force.units, force.orders).size, 3, "three formations under TRAPLINE walked to the same marker");
-  force.units.forEach((unit, index) => {
-    assert.deepEqual(force.paths[unit.id], routePointsFor(trapline, index, CIRCUIT_CLASH.id, false, 3),
-      "a part-strength warband walked a slice out of the middle of its plan");
-  });
-  // And at full strength it is untouched: five slots, the five routes as authored.
+  // At full strength the player's five slots walk the five routes as authored.
   const full = {};
   CIRCUIT_CLASH.playerDeployment.forEach((slot, index) => {
     const formation = FORMATIONS[index];
@@ -175,4 +162,84 @@ test("a part-strength army walks the whole plan, not the middle of it", async ()
   whole.units.forEach((unit, index) => {
     assert.deepEqual(whole.paths[unit.id], routePointsFor(trapline, index, CIRCUIT_CLASH.id, false, 5));
   });
+});
+
+test("a player's lane belongs to the deployment position, not to the turnout", async () => {
+  // Reported from play on 21 Aug 2026, on SPEAR: "when i slotted the main battle tank into
+  // the middle slot the plan changed". It did. The lanes were shared out among the FILLED
+  // slots, so filling a third re-resolved the plan for the two already in it - SPEAR's
+  // shares are 1:3:1 and three formations divide them differently from five, which moved
+  // the centre slot off the REACTOR SPINE and onto EAST GANTRY.
+  //
+  // AGENTS.md forbids it: staffing a formation never moves, bends or replaces authored
+  // route geometry. So a lane is the POSITION's now, west to east, and an empty slot is a
+  // lane nobody walks rather than a share handed to everyone else.
+  //
+  // The enemy above is deliberately NOT this rule. A part-strength Helioch force fills its
+  // first N positions contiguously, so board-based lanes would bunch the whole army into
+  // one flank. Its positions are handed out by count; the player's are chosen by position.
+  const { buildPlayerForce } = await import("../src/battle/battleMission.js");
+  const { FORMATIONS } = await import("../src/formationData.js");
+  const spear = plansFor("dominion").find((plan) => plan.id === "spear");
+  const slots = CIRCUIT_CLASH.playerDeployment;
+
+  const forceWith = (occupied) => {
+    const deployment = {};
+    occupied.forEach((index) => {
+      const formation = FORMATIONS[index];
+      deployment[slots[index].id] = { id: `${formation.id}#${index}`, formationId: formation.id, name: formation.name };
+    });
+    const force = buildPlayerForce({ mission: CIRCUIT_CLASH, deployment, formations: FORMATIONS, battlePlan: spear });
+    return slots.map((slot) => {
+      const unit = force.units.find((entry) => entry.x === slot.x && entry.y === slot.y);
+      return unit ? force.orders[unit.id] : null;
+    });
+  };
+
+  // The centre slot is on the Spine whether it is alone or one of five, and every slot
+  // filled alongside it lands where the position says rather than where the count says.
+  const alone = forceWith([2]);
+  assert.equal(alone[2], "reactor", "SPEAR's centre lane is the two-point Spine");
+
+  const three = forceWith([0, 1, 2]);
+  assert.equal(three[2], "reactor", "and staffing two more slots did not move it");
+  assert.equal(three[0], "south-relay");
+  assert.equal(three[1], "reactor");
+  assert.equal(three[3], null, "an unfilled slot is a lane nobody walks");
+  assert.equal(three[4], null);
+
+  const five = forceWith([0, 1, 2, 3, 4]);
+  assert.deepEqual(five, ["south-relay", "reactor", "reactor", "reactor", "east-gantry"],
+    "SPEAR at full strength is the column its own text describes");
+
+  // The property that was actually broken, stated directly: filling a slot changes nothing
+  // about any other slot.
+  for (const extra of [1, 3, 4]) {
+    const before = forceWith([0, 2]);
+    const after = forceWith([0, 2, extra]);
+    assert.equal(after[0], before[0], `staffing slot ${extra} moved the west flank`);
+    assert.equal(after[2], before[2], `staffing slot ${extra} moved the centre`);
+  }
+
+  // A ROAD THAT COSTS A POSITION IS THE ROAD'S ANSWER, not the board's. FORCED MARCH takes
+  // a deployment position away, and lanes read off the board would hand that cost back as a
+  // free lane nobody needed to walk. Four positions is a four-lane plan.
+  const onFour = (() => {
+    const deployment = {};
+    [0, 1, 2, 3].forEach((index) => {
+      const formation = FORMATIONS[index];
+      deployment[slots[index].id] = { id: `${formation.id}#${index}`, formationId: formation.id, name: formation.name };
+    });
+    const force = buildPlayerForce({
+      mission: CIRCUIT_CLASH, deployment, formations: FORMATIONS, battlePlan: spear, positions: 4,
+    });
+    return slots.map((slot) => {
+      const unit = force.units.find((entry) => entry.x === slot.x && entry.y === slot.y);
+      return unit ? force.orders[unit.id] : null;
+    });
+  })();
+  assert.deepEqual(onFour.slice(0, 4), ["south-relay", "reactor", "reactor", "east-gantry"],
+    "SPEAR over four positions is SPEAR at four, not five with one lane spare");
+  assert.notDeepEqual(onFour.slice(0, 4), five.slice(0, 4),
+    "a road that costs a position has to change the plan, or it costs nothing");
 });

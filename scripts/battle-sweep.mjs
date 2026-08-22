@@ -448,7 +448,7 @@ const playRun = ({ detachmentId, seed, dispositionId, planIndex, rewardPolicy, e
     // here would be measuring a different army than the run is fighting.
     const foe = engagement.foe;
     faced.push({ disposition: foe.disposition, plan: foe.plan?.id ?? null });
-    const built = buildRunForce({ mission: engagement.mission, deployment, formations: FORMATIONS, battlePlan });
+    const built = buildRunForce({ mission: engagement.mission, deployment, formations: FORMATIONS, battlePlan, positions: positions.length });
     const outcome = resolveBattle({
       playerUnits: built.units, enemyUnits: foe.units, objectives: engagement.mission.objectives,
       playerOrders: built.orders, enemyOrders: foe.orders, playerPaths: built.paths, enemyPaths: foe.paths,
@@ -1000,7 +1000,7 @@ const resolveSkilled = ({ engagement, disposition, detachment, battlePlan, field
       : {},
   ]));
   const foe = engagement.foe;
-  const built = buildRunForce({ mission: engagement.mission, deployment, formations: FORMATIONS, battlePlan });
+  const built = buildRunForce({ mission: engagement.mission, deployment, formations: FORMATIONS, battlePlan, positions: positions.length });
   const outcome = resolveBattle({
     playerUnits: built.units, enemyUnits: foe.units, objectives: engagement.mission.objectives,
     playerOrders: built.orders, enemyOrders: foe.orders, playerPaths: built.paths, enemyPaths: foe.paths,
